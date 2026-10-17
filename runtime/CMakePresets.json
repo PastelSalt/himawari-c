@@ -27,18 +27,19 @@
     {
       "name": "win64-asan",
       "displayName": "Windows ASan/UBSan (MSYS2 CLANG64)",
-      "description": "Needs the CLANG64 environment. To verify at Phase 1 start (plan §14.3).",
+      "description": "Needs C:\\msys64\\clang64\\bin first on PATH. Verified 2026-10-17 (plan §14.3).",
       "inherits": "windows",
       "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "CMAKE_C_COMPILER": "clang", "HW_SANITIZE": "ON" }
     },
     {
       "name": "win64-fuzz",
       "displayName": "Windows libFuzzer targets (MSYS2 CLANG64)",
-      "description": "Needs the CLANG64 environment. To verify at Phase 1 start (plan §14.3).",
+      "description": "Needs C:\\msys64\\clang64\\bin first on PATH. Verified 2026-10-17 (plan §14.3).",
       "inherits": "windows",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
         "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
         "HW_FUZZ": "ON",
         "HW_WITH_SDL": "OFF"
       }

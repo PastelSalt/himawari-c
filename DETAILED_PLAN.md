@@ -1002,12 +1002,13 @@ Sign in as `PastelSalt`.
 |---|---|---|
 | `win64-debug` | MSYS2 UCRT64 | `-O0 -g`, console subsystem, your everyday build |
 | `win64-release` | MSYS2 UCRT64 and CI `windows-latest` | `-O2` + LTO, `-static -static-libgcc -mwindows -s`, the **shipping build** (verified fully static in Spike A) |
-| `win64-asan` | MSYS2 **CLANG64** | `-fsanitize=address,undefined`. **To verify at Phase 1 start** |
-| `win64-fuzz` | MSYS2 **CLANG64** | `-fsanitize=fuzzer,address` libFuzzer targets. **To verify at Phase 1 start** |
+| `win64-asan` | MSYS2 **CLANG64** | `-fsanitize=address,undefined -fno-sanitize-recover=undefined`. ✅ Verified 2026-10-17: full build including SDL, tests pass under both sanitizers |
+| `win64-fuzz` | MSYS2 **CLANG64** | libFuzzer + ASan. ✅ Verified 2026-10-17, with a workaround (below) |
 
-**Memory safety on Windows only.** v0.4 relied on Linux ASan/UBSan and libFuzzer. On Windows:
-- If CLANG64 supports ASan/UBSan and libFuzzer for MinGW targets, `win64-asan` and `win64-fuzz` become mandatory before merging runtime changes, and run in CI.
-- If not: run the fuzz harnesses as regression tests over a saved corpus in normal builds, add Dr. Memory runs for the test suite, and keep loaders' bounds checks exhaustively unit-tested. Record the outcome in an RFC.
+**Memory safety on Windows (verified at Phase 1 start, 2026-10-17).** MSYS2 CLANG64 (clang 23) supports it for MinGW targets:
+- **ASan** (dynamic runtime) catches heap overflows with symbolized stacks; **UBSan** catches signed overflow. Both run on every test in `win64-asan`, and `-fno-sanitize-recover=undefined` makes UBSan fail the test.
+- **libFuzzer:** the runtime ships, but clang's driver rejects `-fsanitize=fuzzer` for `x86_64-w64-windows-gnu`. Workaround in `runtime/CMakeLists.txt`: compile fuzzed code with `-fsanitize=address -fsanitize-coverage=inline-8bit-counters,pc-table,trace-cmp`, link `libclang_rt.fuzzer-x86_64.a` directly, and link as C++. Measured ~160–220k runs/s.
+- Both run in CI (`runtime-asan`) and are mandatory before merging runtime changes. The fallbacks (corpus replay, Dr. Memory) are not needed.
 
 - **CRT:** everything targets **UCRT** (built into Windows 10+). MSYS2 UCRT64 uses it by default.
 - **Dependencies** are pinned release tarballs with SHA-256, fetched by `runtime/cmake/HimawariDeps.cmake` (or taken from `runtime/third_party/<name>/` if vendored) and linked statically (RFC 0001).
@@ -1034,7 +1035,7 @@ build/windows/SunflowerDays/
 | `ts` | typecheck, lint, vitest, conformance (compile half) |
 | `i18n` | no hard-coded UI strings, EN/JA message keys in sync, pseudo-locale screenshot diff |
 | `runtime-win` | MSYS2 UCRT64 **shipping build**, unit tests, DLL-import check, spike/runtime smoke tests, headless sample playtest, non-ASCII path test, Studio export test |
-| `runtime-asan` | `win64-asan` tests and short `win64-fuzz` runs, once verified (§14.3) |
+| `runtime-asan` | MSYS2 CLANG64: `win64-asan` build + tests, then 60 s `win64-fuzz` per target (§14.3) |
 | `e2e` | Playwright-Electron: first-run flow, edit → preview, export |
 | `ux-budget` | **P1 check**: scripted New Project → first frame in under 60 s; edit → preview update in under 1 s |
 | `release` | tags: Windows Studio package (bundling the prebuilt runtime), spec docs |
@@ -1144,8 +1145,9 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 - ✅ **Exit:** spikes answered and decisions recorded in `rfcs/0001-0003`. Every push builds a Windows `.exe` that opens a window, plays a sound, and shows JP text, verified on your Windows machine and by the CI `runtime-win` job. ⏳ The TypeScript CI jobs failed on the first run (a setup-node/pnpm setup issue, fixed in session 8); confirm they pass on the next run.
 
 ### Phase 1: Contract and compiler (⏱ 4)
-- First: verify `win64-asan` / `win64-fuzz` in MSYS2 CLANG64, or adopt the fallbacks (§14.3).
-- Lossless CST parser with recovery, typed AST, line IDs, validator with codes and quick fixes, formatter, structured `edit` API.
+- ✅ First: verify `win64-asan` / `win64-fuzz` in MSYS2 CLANG64 (done 2026-10-17; both work, §14.3).
+- ✅ Lossless CST parser with recovery, typed AST, line IDs, formatter, `hwc check` / `hwc fmt` (2026-10-17).
+- ⏳ Validator with codes and quick fixes, structured `edit` API.
 - Character and layered-sprite schema, presets, attribute resolution, l10n string tables and placeholders.
 - `bytecode.md` v1, compiler, `hwc check|fmt|build|disasm|l10n`.
 - Conformance harness (compile half).
@@ -1211,7 +1213,7 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 | GPU render state on older GPUs, or a silently failing pipeline | Low–Med | Startup self-test and crossfade fallback (RFC 0002) |
 | TS compiler vs C VM drift | High | One VM, conformance transcripts in CI |
 | Windows-specific bugs | Low (since v0.4) | You develop on Windows natively, and the release build runs on the CI Windows runner |
-| Weaker sanitizer and fuzzing coverage on Windows only | Medium | Verify MSYS2 CLANG64 ASan/UBSan + libFuzzer at Phase 1 start; otherwise corpus regression tests, Dr. Memory, exhaustive loader bounds tests (§14.3) |
+| Weaker sanitizer and fuzzing coverage on Windows only | Low (since Phase 1) | Verified: MSYS2 CLANG64 ASan/UBSan and libFuzzer (with a link workaround) run locally and in CI (§14.3) |
 | A later Linux port is harder than expected | Low | Keep `core/` and `text/` free of SDL and OS APIs; keep platform code behind `platform/` |
 | Built-in assistant cost surprises users | Medium | Cost meter per message and session, cheaper-model toggle, a clear "API key ≠ subscription" note, no background AI calls |
 | AI provider API drift (beta tool runner) | Medium | Thin provider adapter. Pin SDK versions. Mode A (MCP) keeps working if Mode B breaks |

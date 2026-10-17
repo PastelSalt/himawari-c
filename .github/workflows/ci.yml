@@ -1,6 +1,6 @@
 # CI skeleton (plan §14.6). Windows only (plan v0.5): every job runs on windows-latest.
-# Phase 0 covers: ts, i18n, runtime-win.
-# Later phases add: runtime-asan (once MSYS2 CLANG64 is verified), e2e, ux-budget, release.
+# Jobs: ts, i18n, runtime-win (shipping build), runtime-asan (ASan/UBSan + libFuzzer).
+# Later phases add: e2e, ux-budget, release.
 name: CI
 
 on:
@@ -102,3 +102,31 @@ jobs:
             runtime/build/win64-release/spike_b.exe
             runtime/build/win64-release/spike_c_ft.exe
             runtime/build/win64-release/spike_c_ttf.exe
+
+  runtime-asan:
+    name: Runtime, Windows (ASan/UBSan + libFuzzer, MSYS2 CLANG64)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+        working-directory: runtime
+    steps:
+      - uses: actions/checkout@v5
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          install: >-
+            mingw-w64-clang-x86_64-toolchain
+            mingw-w64-clang-x86_64-cmake
+            mingw-w64-clang-x86_64-ninja
+      - name: Build and test under ASan + UBSan (win64-asan)
+        run: |
+          cmake --preset win64-asan
+          cmake --build --preset win64-asan
+          ctest --preset win64-asan
+      - name: Fuzz (60 s per target, win64-fuzz)
+        run: |
+          cmake --preset win64-fuzz
+          cmake --build --preset win64-fuzz
+          ./build/win64-fuzz/fuzz_utf8.exe -max_total_time=60

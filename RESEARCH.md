@@ -405,7 +405,7 @@ Synthesis of the proven patterns above, ranked by how much they reduce friction:
 | Item | Why | When |
 |---|---|---|
 | ~~Fully static SDL3 + SDL3_mixer + FreeType `.exe`~~ | ✅ Verified natively with MSYS2 UCRT64 (rfcs/0001). The cross-build part is deferred with Linux (plan v0.5) | Done (Phase 0) |
-| ASan/UBSan **and libFuzzer** in MSYS2 CLANG64 for MinGW targets | Plan v0.5 is Windows-only, so this decides the whole memory-safety approach (plan §14.3) | **Phase 1 start** |
+| ~~ASan/UBSan and libFuzzer in MSYS2 CLANG64 for MinGW targets~~ | ✅ Verified 2026-10-17 (clang 23.1.3). ASan + UBSan work as-is; libFuzzer needs manual coverage flags plus a direct link of `libclang_rt.fuzzer-x86_64.a`, because the driver rejects `-fsanitize=fuzzer` for MinGW (plan §14.3) | Done (Phase 1) |
 | `resedit` (pure-JS PE resource editing) for per-game `.exe` icons | Reproducible exports without a compiler | Phase 4 |
 | ~~`SDL_GPURenderState` on MinGW builds (D3D12/Vulkan)~~ | ✅ Verified; struct is `SDL_GPURenderStateCreateInfo` (rfcs/0002) | Done (Phase 0) |
 | ~~SDL3_ttf as atlas/shaping layer vs direct FreeType~~ | ✅ Decided: FreeType direct (rfcs/0003) | Done (Phase 0) |

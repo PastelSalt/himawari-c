@@ -28,7 +28,8 @@ add_library(hw_warnings INTERFACE)
 target_compile_options(hw_warnings INTERFACE -Wall -Wextra -Werror -Wconversion -Wshadow -Wstrict-prototypes)
 
 if(HW_SANITIZE)
-  add_compile_options(-fsanitize=address,undefined -fno-omit-frame-pointer)
+  # -fno-sanitize-recover: UBSan aborts instead of logging, so tests fail on undefined behavior.
+  add_compile_options(-fsanitize=address,undefined -fno-sanitize-recover=undefined -fno-omit-frame-pointer)
   add_link_options(-fsanitize=address,undefined)
 endif()
 
@@ -50,10 +51,21 @@ target_link_libraries(test_utf8 PRIVATE hw_core hw_warnings)
 add_test(NAME utf8 COMMAND test_utf8)
 
 if(HW_FUZZ)
-  add_executable(fuzz_utf8 fuzz/fuzz_utf8.c)
-  target_compile_options(fuzz_utf8 PRIVATE -fsanitize=fuzzer,address)
-  target_link_options(fuzz_utf8 PRIVATE -fsanitize=fuzzer,address)
-  target_link_libraries(fuzz_utf8 PRIVATE hw_core hw_warnings)
+  # MSYS2 CLANG64 ships libFuzzer, but clang rejects -fsanitize=fuzzer for MinGW
+  # targets. So: instrument by hand, link the libFuzzer runtime directly, and link
+  # as C++ (the runtime is C++). Verified 2026-10-17 (plan §14.3, LOG session 9).
+  enable_language(CXX)
+  execute_process(COMMAND ${CMAKE_C_COMPILER} --print-runtime-dir
+                  OUTPUT_VARIABLE hw_clang_rt_dir OUTPUT_STRIP_TRAILING_WHITESPACE)
+  set(hw_fuzz_flags -fsanitize=address -fsanitize-coverage=inline-8bit-counters,pc-table,trace-cmp)
+
+  # Fuzzed code is compiled into each target so it gets coverage instrumentation.
+  add_executable(fuzz_utf8 fuzz/fuzz_utf8.c src/core/hw_utf8.c)
+  target_include_directories(fuzz_utf8 PRIVATE src/core)
+  target_compile_options(fuzz_utf8 PRIVATE ${hw_fuzz_flags})
+  target_link_options(fuzz_utf8 PRIVATE -fsanitize=address)
+  target_link_libraries(fuzz_utf8 PRIVATE hw_warnings "${hw_clang_rt_dir}/libclang_rt.fuzzer-x86_64.a")
+  set_target_properties(fuzz_utf8 PROPERTIES LINKER_LANGUAGE CXX)
 endif()
 
 if(HW_WITH_SDL)

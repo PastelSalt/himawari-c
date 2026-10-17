@@ -74,7 +74,7 @@ static SDL_Texture *create_mask(SDL_Renderer *ren, MaskKind kind)
     for (int y = 0; y < MASK_H; y++) {
         Uint8 *row = (Uint8 *)surf->pixels + (size_t)y * (size_t)surf->pitch;
         for (int x = 0; x < MASK_W; x++) {
-            float m = mask_value(kind, ((float)x + 0.5f) / MASK_W, ((float)y + 0.5f) / MASK_H);
+            float m = mask_value(kind, ((float)x + 0.5f) / (float)MASK_W, ((float)y + 0.5f) / (float)MASK_H);
             Uint8 g = (Uint8)SDL_clamp((int)(m * 255.0f + 0.5f), 0, 255);
             row[x * 4 + 0] = g;
             row[x * 4 + 1] = g;

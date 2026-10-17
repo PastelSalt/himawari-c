@@ -16,7 +16,7 @@
 | **Game output** | Windows x64 only |
 | **Studio** | Windows, UI in English (default) + Japanese |
 | **AI role** | Development assistant only. **No media generation** |
-| **Phase** | **Phase 0 done** (as of session 8): scaffold, spec drafts, i18n, CI skeleton, Spikes A–C; RFCs 0001–0003 accepted. Waiting for the first CI run and your go-ahead for Phase 1 |
+| **Phase** | **Phase 1 in progress** (as of session 9): sanitizers verified; lexer, CST parser, AST, formatter, `hwc check`/`fmt` done. Next: semantic validator, edit API, bytecode + compiler |
 | **Owner** | Moesoft (GitHub: `PastelSalt`) |
 | **Repo** | **https://github.com/PastelSalt/himawari-c** (public) |
 
@@ -257,6 +257,63 @@ You noted that nothing was final and asked for improvements.
 
 **Verified locally:** clean rebuilds of `win64-debug` and `win64-release` with no warnings from our code; `ctest` 2/2 on both; release Spike A and Spike C run; `pnpm check` passes.
 
+You then asked to commit and push: `0419238`.
+
+---
+
+## Session 9: 2026-10-17 · Phase 1 starts (contract and compiler)
+**You asked:** continue with Phase 1, and keep the log current because your session limit is close. This entry is updated after each milestone, so it shows exactly where work stopped.
+
+**CI:** run 38997827583 (the cleanup commit): `ts` ✅ and `i18n` ✅ now pass (setup-node fix confirmed); `runtime-win` was still running when this entry was opened (it passed on the previous run).
+
+**Phase 1 work order (plan §18):**
+1. Verify `win64-asan` / `win64-fuzz` in MSYS2 CLANG64, or adopt the §14.3 fallbacks.
+2. Lossless lexer and CST parser in `@himawari/core` with error recovery, plus round-trip tests.
+3. Typed AST over the CST; line-ID assignment; validator with codes and quick fixes; formatter; structured `edit` API.
+4. `bytecode.md` v1, compiler, `hwc check|fmt|build|disasm|l10n`; conformance harness (compile half).
+
+**Progress:** _(updated below as milestones land)_
+
+- ✅ **Milestone 1: lossless lexer + error-recovering CST parser** (`packages/core/src/syntax/`):
+  - `lexer.ts`: every character lands in exactly one token (indent, whitespace, comments, `#line:` tags, newlines, BOM). It never throws; bad input becomes `Error` tokens + diagnostics.
+  - `cst.ts`: node/token tree with `textOf`, `tokensOf`, `spanOf`, `walk`, `childNodes`, `childTokens`.
+  - `parser.ts`: one statement per line, blocks by indentation, line-scoped recovery (one diagnostic per broken line, parsing continues). Covers every spec/language.md v0.2 statement: scene, define (raw signature for now), jump/call/return/end, if/elif/else (one `IfStmt`), menu with options (`once`, `if` conditions), say (speaker + attributes), narration, show/hide/move with attributes, `-attr`, `at`, and `with` transitions, bg/cg, music/sfx/ambient/voice with `fade(ms)`, stop, wait, shake/flash, `$` assignments with a Pratt expression parser (or < and < not < comparisons < + - < * / % < unary minus; `rand(n)` calls).
+  - Comment lines right before a dedented statement attach to the outer block (so the `# gather` comment after a menu stays with the scene, not the menu).
+  - `diagnostics.ts`: codes HW0001–HW0015 with params + English messages (localizable by code, plan §11.5).
+  - Exported from `@himawari/core`.
+- Tests (`parser.test.ts`, 26): byte-exact round-trip of the plan §5.1 sample, CRLF/BOM/tabs/garbage, **500 random inputs** (never throw, always round-trip), token offsets contiguous; the sample parses with **zero diagnostics**; structure of scenes, menus, if/elif/else, show clauses; precedence; every diagnostic HW0001–HW0015; recovery (3 broken lines → exactly 3 diagnostics, all 5 statements still parsed). `pnpm check`: 63 tests pass.
+- ✅ **Milestone 2: memory-safety tooling verified on Windows** (MSYS2 CLANG64, clang 23.1.3, installed with pacman):
+  - A deliberate heap overflow is caught by **ASan** (symbolized stack, `overflow.c:17`); a signed overflow is caught by **UBSan**. Added `-fno-sanitize-recover=undefined` so UBSan fails tests instead of only logging.
+  - `win64-asan`: full build including SDL; `ctest` 2/2 pass under ASan + UBSan.
+  - Clang found `-Wenum-float-conversion` in spikes B and C (enum constants in float math) that GCC never reported; fixed with explicit casts.
+  - **libFuzzer:** clang rejects `-fsanitize=fuzzer` for MinGW targets, but the runtime ships. Workaround in `runtime/CMakeLists.txt`: manual `-fsanitize-coverage=inline-8bit-counters,pc-table,trace-cmp` + ASan, direct link of `libclang_rt.fuzzer-x86_64.a`, C++ link. `fuzz_utf8`: 3.3–4.6 M runs in ~20 s, no crashes.
+  - New CI job `runtime-asan` (CLANG64): ASan/UBSan tests + 60 s fuzz. Plan §14.3/§14.6/§19, RESEARCH §15, CLAUDE.md updated. The §14.3 fallbacks are not needed.
+- ✅ **Milestone 3: typed AST + text parser** (`packages/core/src/syntax/ast.ts`, `text.ts`):
+  - `parseAst(source, file)` → `{ ast, diagnostics, cst }` in the plan §5.3 JSON shape: scenes and every statement kind with spans, line IDs, attribute add/remove, transitions, fades, expressions (`Int`, `Bool`, `Str`, `Var`, `Unary`, `Binary`, `Call`), if clauses, menu options with `once`, conditions, and **`fallsThrough`** (computed by `endsFlow`).
+  - Text inside strings: escapes, `[var]`, wrapping tags (`b i color size speed shake rb`), standalone tags (`w nw alt`), ruby, nested tags, `{select var: k="…" other="…"}` (`other` required). New codes HW0016–HW0021. Diagnostic spans are file offsets.
+  - Tests (`ast.test.ts`, 22). Syntax suite total: 48.
+- ✅ **Milestone 4: formatter + line-ID assignment** (`packages/core/src/format.ts`, the engine behind `hwc fmt`):
+  - Rebuilds indentation from block depth (4 spaces), normalizes token spacing (`fade(300)`, `wait(500)`, `-glasses`, `-1`, but `if (a)` and `not (b)` keep their space), never touches string contents or comments, collapses blank-line runs, drops blank lines right after a header, one blank line before each top-level scene unless a comment introduces it, LF + final newline, strips the BOM.
+  - Adds `#line:` IDs to every dialogue line, narration line, and menu option without one; keeps existing IDs; reassigns duplicates on the later copy; avoids IDs taken elsewhere in the project (`takenIds`).
+  - Refuses files with real syntax errors (returns them unchanged with the diagnostics), but fixes the two indentation errors itself (HW0001 tabs, HW0006 width).
+  - **Bug found by the idempotence test and fixed:** a tag written after a comment (`# note #line:…`) was swallowed by the comment, so every run added a new ID. The lexer now reads `#line:xxxxxx` at the start of a comment as a `LineTag` followed by an ordinary comment, and the formatter writes the tag first: `"…"   #line:k3f9a1  # note`.
+  - Tests (`format.test.ts`, 10): exact canonical output for a messy file, idempotence, meaning preserved (AST equal apart from spans and IDs), duplicate handling, project-wide ID avoidance, CRLF/BOM, refusal on errors. Core suite: 66 tests.
+- Added `LineIndex` (offset ↔ 1-based line/col) and `renderDiagnostic` (plan §2.2 style: `error[HW0011]: …`, `┌─ file:line:col`, source line, carets).
+- ⏸ **Session limit hit here** (the previous chat ended mid-milestone 5). Resumed in a new session: next was wiring `hwc check` and `hwc fmt`.
+- ✅ **Milestone 5: `hwc check` and `hwc fmt` work** (`packages/cli/src/main.ts`):
+  - `hwc check [paths]`: parses every `.hws` (default `./script`, else the current folder), prints diagnostics in the plan §2.2 style, exits 1 on errors.
+  - `hwc fmt [--check] [paths]`: formats in place; reserves every existing line ID in the project first, so new IDs are unique across files; skips (and explains) files with syntax errors; `--check` exits 1 if anything needs formatting (for CI).
+  - Tried end to end on a scratch project: friendly diagnostics, 3 IDs assigned, second run changes nothing, broken file skipped.
+- **Checks at this point:** `pnpm check` 96 tests ✅; GCC `win64-debug` build + `ctest` ✅. (ASan/fuzz verified earlier in this session.) **Nothing committed yet.**
+
+**Remaining Phase 1 work (plan §18), in order:**
+1. **Project model + semantic validator** (`packages/core/src/project/`): load `himawari.json` and `characters/*.md` (schemas from `spec/`), build the scene/variable/character/attribute index, then report HW02xx (unknown speaker, attribute, asset, position, transition, scene, variable; type errors; "did you mean" suggestions via edit distance) and HW03xx (dead ends HW0320, empty options HW0330, menus that can vanish HW0331, `return` outside `call` HW0310), each with a quick-fix description.
+2. **Structured edit API** (`edit.ts`): insert_after(line_id), replace_text(line_id), set_attrs, delete, move, add_menu_option, all on the CST so comments and layout survive; property test: random edits keep the file parseable and round-trippable.
+3. **Spec documents:** `spec/grammar.ebnf` (from the parser), `spec/ast.schema.json` (from `ast.ts` types), resolve the open questions in `spec/language.md` §5.
+4. **Bytecode:** `spec/bytecode.md` v1 (header, sections, ISA from plan §5.4), compiler in Core, `hwc build` (writes `.hwb`) and `hwc disasm`; conformance harness (compile half) in `tests/conformance/`.
+5. `hwc l10n` (string tables, CSV/XLIFF) can follow, or move to Phase 2 if time is short.
+6. Phase 1 exit: tutorial and starter projects compile; broken inputs give friendly multi-error diagnostics with fixes; CST round-trip property tests pass (✅ already).
+
 ---
 
 ## Decision Register
@@ -297,7 +354,8 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 8)
+## Next Steps (after session 9)
 
-1. **CI:** confirm the `ts` and `i18n` jobs pass with the setup-node fix (session 8b). `runtime-win` already passed.
-2. **You:** say when to start **Phase 1** (plan §18): first verify `win64-asan` / `win64-fuzz` in MSYS2 CLANG64 (or adopt the §14.3 fallbacks), then the lossless CST parser, typed AST, validator with codes and quick fixes, formatter, `edit` API, compiler, and `hwc check|fmt|build|disasm|l10n`.
+1. ~~CI: confirm `ts` and `i18n` pass~~ ✅ confirmed in session 9.
+2. **Phase 1 continues** with the "Remaining Phase 1 work" list at the end of session 9 (validator → edit API → spec docs → bytecode + compiler).
+3. **You:** the session 9 work is not committed yet. Ask for a commit/push when ready; the new `runtime-asan` CI job runs for the first time on that push.

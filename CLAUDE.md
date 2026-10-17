@@ -2,7 +2,7 @@
 
 Himawari is an open-source, AI-assisted **visual novel engine** for other developers. It is made by Moesoft (GitHub: `PastelSalt`). Repo: **https://github.com/PastelSalt/himawari-c** (public).
 
-**Status:** **Phase 0 done on Windows** (scaffold, spec drafts, i18n, CI skeleton, Spikes A–C; RFCs 0001–0003 accepted). Waiting on the first green CI run on GitHub, and on the owner's go-ahead for Phase 1. See the latest LOG.md session. Read these before doing anything substantial:
+**Status:** **Phase 1 in progress.** Done: sanitizers verified, lexer, lossless CST parser, AST, formatter, `hwc check`/`fmt` (`packages/core/src/syntax/`, `format.ts`, `packages/cli`). Next: semantic validator, edit API, bytecode + compiler. The latest LOG.md session ends with the exact remaining list. Read these before doing anything substantial:
 - [DETAILED_PLAN.md](DETAILED_PLAN.md): the plan (v0.5). Section numbers are referenced everywhere.
 - [LOG.md](LOG.md): decision history, the decision register (D01–D24), and next steps.
 - [RESEARCH.md](RESEARCH.md): evidence behind decisions (🔬§N in the plan = RESEARCH.md §N).
@@ -30,10 +30,11 @@ Himawari is an open-source, AI-assisted **visual novel engine** for other develo
 ## Environment (Windows only)
 - Windows 11: MSYS2 **UCRT64** (GCC, CMake, Ninja) on `PATH`, Node LTS + pnpm (via corepack), Git, GitHub CLI (logged in as `PastelSalt`).
 - Line endings: LF (`.gitattributes`).
-- CMake presets: `win64-debug`, `win64-release`, and `win64-asan` / `win64-fuzz` (MSYS2 CLANG64, to verify at Phase 1 start) (§14.3).
+- CMake presets: `win64-debug`, `win64-release` (UCRT64 GCC), and `win64-asan` / `win64-fuzz` (MSYS2 CLANG64, verified; put `C:\msys64\clang64\bin` first on `PATH`) (§14.3).
 
 ## Commands
 - TS: `corepack pnpm install`, then `corepack pnpm check` (typecheck, lint, vitest, i18n). pnpm is only reachable through corepack on this PC.
+- CLI (after `corepack pnpm exec tsc -b`): `node packages/cli/dist/main.js check|fmt [--check] [paths]`.
 - Runtime: from `runtime/`: `cmake --preset win64-debug`, `cmake --build --preset win64-debug`, `ctest --preset win64-debug`.
 - Git for Windows is at `C:\Program Files\Git\cmd` (may not be on `PATH` in older shells).
 - Shaders: DXC is at `%LOCALAPPDATA%\himawari-tools\dxc-1.9.2609\bin\x64\dxc.exe`; from `runtime/`: `cmake -DDXC=<that path> -P shaders/compile-shaders.cmake`. Pixel-shader inputs must be `TEXCOORD0`/`TEXCOORD1` (rfcs/0002, finding 1).

@@ -311,7 +311,7 @@ int main(int argc, char *argv[])
         }
         double t_raster = now_ms() - t0;
         SDL_Log("raster: %d atlas glyphs (outline + fill) in %.2f ms; %.1f%% of one %dx%d page (shelf reached y=%d)",
-                atlas.glyph_count, t_raster, 100.0 * (double)atlas.pixels_used / ((double)ATLAS_SIZE * ATLAS_SIZE),
+                atlas.glyph_count, t_raster, 100.0 * (double)atlas.pixels_used / ((double)ATLAS_SIZE * (double)ATLAS_SIZE),
                 ATLAS_SIZE, ATLAS_SIZE, atlas.shelf_y + atlas.shelf_h);
         log_memory("after window + raster");
     }
@@ -356,7 +356,7 @@ int main(int argc, char *argv[])
         failures++;
     }
 
-    const float box_x = (CANVAS_W - width) / 2.0f;
+    const float box_x = ((float)CANVAS_W - width) / 2.0f;
     const float box_y = SDL_max(140.0f, (float)CANVAS_H - 120.0f - layout.height); /* bottom-anchored, always on screen */
     uint32_t reveal = reveal_limit >= 0 ? (uint32_t)reveal_limit : layout.reveal_count;
     bool running = !check_only;
