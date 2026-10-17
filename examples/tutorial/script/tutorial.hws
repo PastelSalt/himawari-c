@@ -1,0 +1,75 @@
+# The Himawari tutorial. Every lesson shows a feature, then shows the script
+# lines that produced it. Open this file next to the game to compare.
+
+scene start:
+    bg tutorial_room with fade(500)
+    "Welcome to Himawari. This short tutorial shows how a visual novel script works."   #line:y2815z
+    "Each line you read is one line in script/tutorial.hws."   #line:xbbgse
+    jump hub
+
+scene hub:
+    menu "Which lesson would you like?":
+        once "Dialogue and narration":   #line:42wdtg
+            call lesson_dialogue
+            jump hub
+        once "Choices":   #line:12m7es
+            call lesson_choices
+            jump hub
+        once "Variables and conditions":   #line:n8zbhy
+            call lesson_variables
+            jump hub
+        once "Formatting text":   #line:jy3y1g
+            call lesson_text
+            jump hub
+        "I'm done for now.":   #line:xpjbmm
+            jump finish
+
+scene lesson_dialogue:
+    "A line in quotes on its own is narration, like this one."   #line:30rwxc
+    show kai at center with dissolve(300)
+    kai "A line that starts with a name is dialogue. I'm Kai, a character from characters/kai.md."   #line:5w7x58
+    kai smile "Words between the name and the quotes change my expression, if I have a sprite for it."   #line:xve47p
+    "Kai has no art yet, so Himawari draws a labeled placeholder. Your art is never required to start writing."   #line:7ykd79
+    hide kai with fade(300)
+    $ lessons_done += 1
+    return
+
+scene lesson_choices:
+    show kai at center
+    menu "Kai offers you a drink.":
+        "Tea, please.":   #line:76vj3v
+            $ liked_tea = true
+            kai "Good choice."   #line:wq7pjf
+        "Just water.":   #line:ae5kgq
+            kai "Coming right up."   #line:esnce4
+    "Both options continued here, because neither ended with jump. This is called a gather point."   #line:yxz83c
+    "In the lesson list, \"once\" options disappear after you pick them."   #line:pq9x96
+    hide kai
+    $ lessons_done += 1
+    return
+
+scene lesson_variables:
+    "Lines that start with $ change variables, which are declared in himawari.json."   #line:8sq8wh
+    "You have finished [lessons_done] lesson(s) so far."   #line:r17vr1
+    if liked_tea:
+        "You chose tea earlier, so this line only appears for tea drinkers."   #line:e344er
+    elif lessons_done >= 2:
+        "You haven't had tea, but you're making good progress."   #line:01xehw
+    else:
+        "An if line checks a condition. Try the choices lesson, then come back."   #line:02ty47
+    $ lessons_done += 1
+    return
+
+scene lesson_text:
+    "Text can be {b}bold{/b}, {i}italic{/i}, or {color=#d65a4f}colored{/color}."   #line:wydn6s
+    "It can pause{w=600}... and continue."   #line:r7fa4w
+    "Names from variables appear in brackets: hello, [player_name]!"   #line:17czt7
+    "Japanese text can carry ruby: {rb=ひまわり}向日葵{/rb} means sunflower."   #line:qqzvs4
+    $ lessons_done += 1
+    return
+
+scene finish:
+    $ tutorial_finished = true
+    "That's the tutorial. You finished [lessons_done] lesson(s)."   #line:rz1350
+    "Next, create your own project with: hwc init my-novel"   #line:25d2rm
+    end

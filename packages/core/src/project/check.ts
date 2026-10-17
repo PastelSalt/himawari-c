@@ -9,6 +9,7 @@ import { lex } from "../syntax/lexer.js";
 import { type Character, characterWords, readCharacter } from "./character.js";
 import { DEFAULT_POSITIONS, type Manifest, type VarType, readManifest } from "./manifest.js";
 import { listNames, suggest } from "./suggest.js";
+import { type L10nTable, type SourceLine, collectLines, parityProblems, parseTable } from "../l10n/table.js";
 
 export interface SourceFile {
   /** Project-relative path with forward slashes, e.g. script/ch1.hws. */
@@ -25,6 +26,8 @@ export interface ProjectInput {
   scripts: SourceFile[];
   /** Files under assets/, relative to it (e.g. bg/classroom_day.png). Omit to skip asset checks. */
   assets?: readonly string[];
+  /** locales/<lang>.json string tables. */
+  locales?: SourceFile[];
 }
 
 export interface FileReport {
@@ -151,8 +154,46 @@ export function checkProject(input: ProjectInput): ProjectCheck {
     }
   }
 
+  // String tables: placeholder parity and freshness (plan §7).
+  if (input.locales?.length) {
+    const lines = new Map(collectLines(parsed).map((l) => [l.id, l]));
+    for (const lf of input.locales) checkLocale(lf, lines, report(lf.file, lf.text).diagnostics);
+  }
+
   for (const r of reports.values()) r.diagnostics.sort((a, b) => a.span.start - b.span.start);
   return { files: [...reports.values()], manifest, characters, parsed };
+}
+
+function checkLocale(lf: SourceFile, lines: ReadonlyMap<string, SourceLine>, out: Diagnostic[]): void {
+  let table: L10nTable;
+  try {
+    table = parseTable(lf.text);
+  } catch (e) {
+    out.push(diagnostic("HW0406", { start: 0, end: 0 }, { reason: (e as Error).message }));
+    return;
+  }
+  const lang = table.language;
+  const at = (id: string): Span => {
+    const i = lf.text.indexOf(`"${id}"`);
+    return i < 0 ? { start: 0, end: 0 } : { start: i, end: i + id.length + 2 };
+  };
+  let missing = 0;
+  let review = 0;
+  for (const e of table.lines) {
+    const src = lines.get(e.id);
+    if (!src) {
+      out.push(diagnostic("HW0405", at(e.id), { id: e.id, lang }, { help: "run hwc l10n sync" }));
+      continue;
+    }
+    if (src.text !== e.source) out.push(diagnostic("HW0403", at(e.id), { id: e.id, lang }, { help: "run hwc l10n sync" }));
+    if (e.text === "") missing++;
+    else if (e.status === "needs-review") review++;
+    for (const problem of parityProblems(src.text, e.text)) out.push(diagnostic("HW0401", at(e.id), { lang, id: e.id, problem }));
+  }
+  const inTable = new Set(table.lines.map((e) => e.id));
+  missing += [...lines.keys()].filter((id) => !inTable.has(id)).length;
+  if (missing > 0) out.push(diagnostic("HW0402", { start: 0, end: 0 }, { count: String(missing), lang }, { help: "run hwc l10n sync, then hwc l10n export" }));
+  if (review > 0) out.push(diagnostic("HW0404", { start: 0, end: 0 }, { count: String(review), lang }));
 }
 
 interface Ctx {

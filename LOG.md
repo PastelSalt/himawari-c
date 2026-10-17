@@ -16,7 +16,7 @@
 | **Game output** | Windows x64 only |
 | **Studio** | Windows, UI in English (default) + Japanese |
 | **AI role** | Development assistant only. **No media generation** |
-| **Phase** | **Phase 1 nearly done** (as of session 9): sanitizers; lexer, CST parser, AST, formatter, validator, edit API, bytecode spec + compiler, conformance, `hwc check/fmt/build/disasm`. Left: tutorial + starter project, `hwc l10n`, `ast.schema.json` |
+| **Phase** | **Phase 1 done** (session 9): sanitizers; lexer, CST parser, AST + `ast.schema.json`, formatter, validator, edit API, bytecode spec + compiler, conformance (compile half), localization, templates + tutorial, `hwc check/fmt/build/disasm/init/l10n`. Next: **Phase 2, runtime MVP** (waiting on your go-ahead) |
 | **Owner** | Moesoft (GitHub: `PastelSalt`) |
 | **Repo** | **https://github.com/PastelSalt/himawari-c** (public) |
 
@@ -341,18 +341,36 @@ You then asked to commit and push: `0419238`.
   - Type-error carets (HW0211) now point at the statement, not its indentation.
   - `hwc build [--release]` → `build/game.hwb` (2612 bytes with debug info, 2248 without, for the basic case); refuses with friendly diagnostics on errors. `hwc disasm <file.hwb>` validates and lists.
   - **Bug found by running the CLI on a real file, fixed:** `readHwb` used `bytes.slice()`, which for a Node `Buffer` is a view into a shared pool, so the CRC check zeroed the wrong memory and rejected every file read from disk (the in-memory tests couldn't see it). Now it makes a real copy; a regression test feeds it a non-zero-offset view and checks the surrounding memory is untouched.
-- **Checks:** `pnpm check` **179 tests** ✅. Not committed yet (milestone 8 is new since `24de0a5`).
+- **Checks:** `pnpm check` **179 tests** ✅.
+- 📦 **Committed and pushed** at your request: `bac5bc2` "Phase 1: bytecode spec, compiler, conformance, hwc build/disasm". You asked to finish Phase 1: tutorial and starter projects, `hwc l10n`, `ast.schema.json`.
+- ✅ **Milestone 9a: templates + `hwc init`.**
+  - `templates/adv/` (P1: playable before any art exists): `himawari.json`, `script/start.hws` (Aoi greets the player, a menu, a variable, an if/else), `characters/aoi.md` (no sprite yet → placeholder), `assets/README.md` (folder conventions; "Himawari never generates art"), `AGENTS.md` (project layer of the AI instructions, plan §10.8, with the no-media scope), `CLAUDE.md` (`@AGENTS.md`), `gitignore.txt` (→ `.gitignore`). `templates/blank/`: the minimum.
+  - `hwc init <folder> [--template adv|blank] [--name] [--lang] [--id]` (`packages/cli/src/init.ts`): fills `{{name}}`/`{{id}}`/`{{lang}}` (JSON-escaped in .json), derives a valid id from the name, assigns fresh line IDs via the formatter, refuses non-empty folders.
+  - **Decision: HW0213 (missing asset) is now `info`, not a warning.** Missing art is the normal state while writing (P5); a fresh project shouldn't greet users with warnings. A release export can be stricter later.
+  - Tried end to end: `init` → `check` (one info note) → `build` (1512 bytes) for `adv`; `blank` is fully clean.
+- ✅ **Milestone 9b: tutorial project** (`examples/tutorial/`, plain, no mascot, D16): a hub menu of `once` lessons (dialogue and narration, choices and gather points, variables and conditions, text formatting with ruby), each a `call`ed scene that returns, plus a finish scene. Kai (`characters/kai.md`, EN/JA names) demonstrates dialogue; no art yet, so placeholders. 28 line IDs from `hwc fmt`; compiles to 4848 bytes, 7 scenes.
+  - `tests/projects.test.ts` (6 tests) enforces the Phase 1 exit criterion in CI: both templates (rendered by `hwc init`) and every example check with no errors or warnings, compile, and survive the validating reader; template IDs are unique; names with quotes stay valid JSON.
+- ✅ **Milestone 9c: localization** (`packages/core/src/l10n/`, `packages/cli/src/l10n.ts`):
+  - `table.ts`: `locales/<lang>.json` = `{ language, sourceLanguage, lines: [{ id, source, text, status, provenance }] }` in script order (an array, so diffs stay stable). `collectLines` (tagged dialogue/narration/options with scene and speaker context, text as written), `syncTable` (new → missing; changed source → needs-review, keeping the old translation; deleted → removed), **placeholder parity** (`parityProblems`: same `[vars]`, tags, and `{select}` variables; ruby exempt), `applyTranslations` (refuses entries that break parity; human imports → ok, AI → needs-review).
+  - **Decision:** translations use the same markup as the source (translators see `[player_name]` and `{b}…{/b}`) rather than numbered `{0}` placeholders as plan §7 sketched; parity checking protects them, and XLIFF `<ph>`/`<pc>` inline codes can come later.
+  - `exchange.ts`: CSV (RFC 4180, UTF-8 BOM, columns id/scene/speaker/source/translation/status) and XLIFF 2.0 (scene/speaker notes, segment state), both with importers.
+  - `hwc check` now checks `locales/*.json` (HW0401 broken placeholders, HW0402 untranslated count, HW0403 stale source, HW0404 needs-review count, HW0405 orphaned entry, HW0406 unreadable table).
+  - CLI: `hwc l10n sync` (every target language in `himawari.json`), `hwc l10n export --lang ja [--format csv|xliff]` (syncs first, writes `locales/ja.csv` or `.xlf`), `hwc l10n import <file> --lang ja [--ai]` (exit 1 if anything was refused). Refuses to run while scripts have errors.
+  - Tests (`l10n.test.ts`, 18): line collection with context, sync add/change/remove, JSON round-trip, parity cases (reordering allowed, ruby exempt, select cases may differ per language), human vs AI imports, CSV quoting/BOM/multi-line cells, XLIFF escaping/notes/state, `hwc check` integration.
+  - Tried on a copy of the tutorial: sync (28 lines) → CSV export → a translator's broken cell (dropped `[player_name]`) refused with the reason → correct cells imported as `ok` → XLIFF export. (A bug in my own test edit, not in the tool, hid one import at first: an unquoted CSV cell.)
+  - Not yet: compiling translations into `.hwb` (`LOCx` sections) for in-game language switching; menu prompts have no line IDs, so they can't be translated yet (a small spec change for Phase 2).
 
-**Remaining Phase 1 work (plan §18), in order:**
-1. ~~Project model + semantic validator~~ ✅ done (milestone 6). Known gaps to revisit: manifest/character diagnostics have no line positions yet (they point at line 1); `if`/`elif` type errors point at the `if` line; a test asserting the TS manifest reader and `spec/manifest.schema.json` agree on shared fixtures.
-2. ~~Structured edit API~~ ✅ done (milestone 7). `add_menu_option` is `insert_after` on an option's line ID. Later: rename refactors across files (scenes, characters, variables) using the `refs` index.
-3. Spec documents: ✅ `grammar.ebnf`, ✅ `bytecode.md`. Still open: `spec/ast.schema.json` (from the `ast.ts` types) and resolving the open questions in `spec/language.md` §5.
-4. ~~Bytecode, compiler, `hwc build`/`disasm`, conformance (compile half)~~ ✅ done (milestone 8).
-5. **Still to do for the Phase 1 exit (plan §18):**
-   - **Tutorial and starter projects** that compile: `examples/tutorial/` (EN, plain, no mascot, D16) and the `adv` template for `hwc init` (16:9, `AGENTS.md` + `CLAUDE.md`, procedural placeholders only).
-   - `hwc l10n` (string tables keyed by line ID, CSV/XLIFF export/import, placeholder checks), or move it to Phase 2 if time is short.
-   - `spec/ast.schema.json`.
-   - Already met: broken inputs give friendly multi-error diagnostics with fixes; CST round-trip property tests pass.
+- ✅ **Milestone 9d: `spec/ast.schema.json`** (JSON Schema 2020-12, `$id` `…/spec/ast/1.0.json`): the JSON form of `parseAst()`'s `ast` (scenes, all 15 statement kinds, expressions, text parts, menu options with `fallsThrough`, spans, line IDs). Closed objects (`additionalProperties: false`), so any AST change must update the schema. Tests in `tests/spec/schemas.test.ts` validate the real AST of every conformance case, example, and template, plus a script that uses every statement and expression kind, under Ajv strict mode.
+- ✅ **Phase 1 complete.** `corepack pnpm check`: 212 tests, typecheck, lint, i18n all pass; runtime `win64-debug` builds and ctest passes. Not committed yet (everything after `bac5bc2`).
+
+**Phase 1 exit (plan §18), final state:**
+1. ✅ Project model + semantic validator (milestone 6). Known gaps: manifest/character diagnostics point at line 1; `if`/`elif` type errors point at the `if` line; no test yet that the TS manifest reader and `spec/manifest.schema.json` agree on shared fixtures.
+2. ✅ Structured edit API (milestone 7). Later: cross-file rename refactors via the `refs` index.
+3. ✅ Spec documents: `grammar.ebnf`, `bytecode.md`, `ast.schema.json`. Still open: the open questions in `spec/language.md` §5.
+4. ✅ Bytecode, compiler, `hwc build`/`disasm`, conformance compile half (milestone 8).
+5. ✅ Tutorial + starter templates (9a, 9b), `hwc l10n` (9c), `ast.schema.json` (9d). Friendly multi-error diagnostics with fixes and CST round-trip property tests were already met.
+
+**Carried into Phase 2:** compile `locales/*.json` into `.hwb` (`LOCx` sections) for in-game language switching; give menu prompts line IDs so they can be translated; execution transcripts for the conformance suite once the C VM runs.
 
 ---
 
@@ -390,12 +408,13 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 ## Open Items (non-blocking)
 - Who reviews the Japanese Studio UI strings before v1.0.
 - GitHub Sponsors: yes or no.
-- Verify at Phase 1 start: ASan/UBSan and libFuzzer in MSYS2 CLANG64 (plan §14.3).
+- ~~Verify at Phase 1 start: ASan/UBSan and libFuzzer in MSYS2 CLANG64 (plan §14.3).~~ ✅ Verified in session 9 (`win64-asan`, `win64-fuzz`).
 
 ---
 
 ## Next Steps (after session 9)
 
 1. ~~CI: confirm `ts` and `i18n` pass~~ ✅ confirmed in session 9.
-2. **Phase 1 finishes** with item 5 of the "Remaining Phase 1 work" list at the end of session 9 (tutorial + starter project, `hwc l10n`, `ast.schema.json`). Then **Phase 2: the runtime MVP** (C VM + loader following `spec/bytecode.md` and `reader.ts`, renderer, text, audio, `--headless` playtests that complete the conformance suite).
-3. **You:** milestone 8 (bytecode, compiler, conformance, `hwc build`/`disasm`) is not committed yet; `24de0a5` has everything before it.
+2. ~~Finish Phase 1~~ ✅ done (milestones 9a–9d).
+3. **You:** decide whether to commit and push the Phase 1 finish (templates, `hwc init`, tutorial, localization, `ast.schema.json`); `bac5bc2` has everything before it. Check the `runtime-asan` CI job result on the next push.
+4. **Phase 2: the runtime MVP**, on your go-ahead (plan §18): C VM + loader following `spec/bytecode.md` and `reader.ts`, renderer, text, audio, `--headless` playtests that complete the conformance suite (execution transcripts), plus the Phase 2 items carried over above (`LOCx`, menu prompt IDs).

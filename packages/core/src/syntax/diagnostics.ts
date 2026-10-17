@@ -74,7 +74,7 @@ export const SEMANTIC_DIAGNOSTICS = {
   HW0210: { severity: "error", message: "\"{name}\" isn't a declared variable." },
   HW0211: { severity: "error", message: "Type mismatch: {problem}." },
   HW0212: { severity: "error", message: "\"{value}\" isn't one of the values of {name}." },
-  HW0213: { severity: "warning", message: "The {channel} \"{name}\" isn't in assets/{folder}/; a placeholder will be used." },
+  HW0213: { severity: "info", message: "The {channel} \"{name}\" isn't in assets/{folder}/ yet; a placeholder will be shown." },
   HW0214: { severity: "error", message: "Unknown function \"{name}\"." },
   HW0215: { severity: "error", message: "The entry scene \"{name}\" set in himawari.json doesn't exist." },
   HW0216: { severity: "error", message: "The line ID {id} is used more than once (also in {other})." },
@@ -83,6 +83,12 @@ export const SEMANTIC_DIAGNOSTICS = {
   HW0320: { severity: "warning", message: "The scene \"{name}\" can reach its end without jump, return, or end; the game would stop there." },
   HW0321: { severity: "info", message: "The scene \"{name}\" is never reached from the entry scene." },
   HW0331: { severity: "warning", message: "Every option in this menu is \"once\", so it can run out of choices (it is then skipped)." },
+  HW0401: { severity: "error", message: "The {lang} translation of line {id} {problem}." },
+  HW0402: { severity: "info", message: "{count} line(s) aren't translated into {lang} yet." },
+  HW0403: { severity: "warning", message: "The source of line {id} changed since this {lang} table was synced." },
+  HW0404: { severity: "info", message: "{count} {lang} translation(s) need review." },
+  HW0405: { severity: "warning", message: "Line {id} is in the {lang} table but no longer in the scripts." },
+  HW0406: { severity: "error", message: "This string table can't be read: {reason}." },
 } as const satisfies Record<string, { severity: Severity; message: string }>;
 
 export const DIAGNOSTICS = { ...SYNTAX_DIAGNOSTICS, ...SEMANTIC_DIAGNOSTICS };

@@ -2,7 +2,7 @@
 
 Himawari is an open-source, AI-assisted **visual novel engine** for other developers. It is made by Moesoft (GitHub: `PastelSalt`). Repo: **https://github.com/PastelSalt/himawari-c** (public).
 
-**Status:** **Phase 1 in progress.** Done: sanitizers verified, lexer, lossless CST parser, AST + refs index, formatter, semantic validator, structured edit API, bytecode spec + compiler + validating reader + disassembler, conformance suite, `hwc check/fmt/build/disasm` (`packages/core/src/syntax/`, `format.ts`, `edit.ts`, `project/`, `bytecode/`, `packages/cli`, `tests/conformance/`). Left in Phase 1: tutorial + starter project, `hwc l10n`, `spec/ast.schema.json`. Then Phase 2 (C runtime). The latest LOG.md session ends with the exact remaining list. Read these before doing anything substantial:
+**Status:** **Phase 1 done** (2026-10-17): sanitizers verified, lexer, lossless CST parser, AST + refs index + `spec/ast.schema.json`, formatter, semantic validator, structured edit API, bytecode spec + compiler + validating reader + disassembler, conformance suite (compile half), localization (`packages/core/src/l10n/`), starter templates (`templates/`) and tutorial (`examples/tutorial/`), `hwc check/fmt/build/disasm/init/l10n`. Next: Phase 2 (C runtime MVP) on the owner's go-ahead. See the latest LOG.md session. Read these before doing anything substantial:
 - [DETAILED_PLAN.md](DETAILED_PLAN.md): the plan (v0.5). Section numbers are referenced everywhere.
 - [LOG.md](LOG.md): decision history, the decision register (D01–D24), and next steps.
 - [RESEARCH.md](RESEARCH.md): evidence behind decisions (🔬§N in the plan = RESEARCH.md §N).
@@ -34,7 +34,7 @@ Himawari is an open-source, AI-assisted **visual novel engine** for other develo
 
 ## Commands
 - TS: `corepack pnpm install`, then `corepack pnpm check` (typecheck, lint, vitest, i18n). pnpm is only reachable through corepack on this PC.
-- CLI (after `corepack pnpm exec tsc -b`): `node packages/cli/dist/main.js check|fmt [--check]|build [--release]|disasm <file.hwb>`.
+- CLI (after `corepack pnpm exec tsc -b`): `node packages/cli/dist/main.js check|fmt [--check]|build [--release]|disasm <file.hwb>|init <folder> [--template adv|blank]|l10n sync|export --lang ja|import <file> --lang ja`. Templates and examples must check clean and compile (`tests/projects.test.ts`).
 - Conformance: `corepack pnpm vitest run tests/conformance`; regenerate expected files with `UPDATE_CONFORMANCE=1` and review the diff.
 - Runtime: from `runtime/`: `cmake --preset win64-debug`, `cmake --build --preset win64-debug`, `ctest --preset win64-debug`.
 - Git for Windows is at `C:\Program Files\Git\cmd` (may not be on `PATH` in older shells).

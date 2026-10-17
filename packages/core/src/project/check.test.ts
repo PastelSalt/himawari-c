@@ -147,10 +147,10 @@ describe("names", () => {
     expect(codes(project(scene(body)))).toContain(code);
   });
 
-  test("HW0213 missing asset is a warning, with a suggestion", () => {
+  test("HW0213 missing asset is only info (placeholders, P5), with a suggestion", () => {
     const d = all(project(scene("    bg classrom"))).find((x) => x.code === "HW0213");
-    expect(d?.severity).toBe("warning");
-    expect(d?.message).toBe('The bg "classrom" isn\'t in assets/bg/; a placeholder will be used.');
+    expect(d?.severity).toBe("info");
+    expect(d?.message).toBe('The bg "classrom" isn\'t in assets/bg/ yet; a placeholder will be shown.');
     expect(d?.help).toBe('did you mean "classroom"?');
   });
 

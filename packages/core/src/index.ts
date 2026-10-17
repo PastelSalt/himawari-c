@@ -41,6 +41,20 @@ export { HwbError, readHwb } from "./bytecode/reader.js";
 export { disassemble, textPreview } from "./bytecode/disasm.js";
 export { HWB_MAJOR, HWB_MINOR, type HwbModule, Op, TextOp } from "./bytecode/format.js";
 export {
+  type L10nEntry,
+  type L10nStatus,
+  type L10nTable,
+  type SourceLine,
+  type SyncResult,
+  applyTranslations,
+  collectLines,
+  parityProblems,
+  parseTable,
+  stringifyTable,
+  syncTable,
+} from "./l10n/table.js";
+export { parseCsv, toCsv, toXliff, translationsFromCsv, translationsFromXliff } from "./l10n/exchange.js";
+export {
   AST_VERSION,
   type Ast,
   type AstResult,

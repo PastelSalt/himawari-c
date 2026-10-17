@@ -45,5 +45,6 @@ export function loadProject(root: string, scripts?: readonly string[]): ProjectI
     characters: listFiles(join(root, "characters"), root, (n) => n.endsWith(".md")).map((f) => read(root, f)),
     scripts: scriptFiles.map((f) => read(root, f)),
     assets: listFiles(join(root, "assets"), join(root, "assets"), () => true),
+    locales: listFiles(join(root, "locales"), root, (n) => n.endsWith(".json")).map((f) => read(root, f)),
   };
 }

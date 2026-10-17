@@ -1,0 +1,18 @@
+{
+  "$schema": "https://pastelsalt.github.io/himawari-c/spec/manifest/1.0.json",
+  "name": "Himawari Tutorial",
+  "id": "dev.moesoft.himawari.tutorial",
+  "version": "0.1.0",
+  "engine": "^1.0.0",
+  "resolution": [1920, 1080],
+  "sourceLanguage": "en",
+  "languages": ["en", "ja"],
+  "entry": "start",
+  "positions": { "left": [0.25, 1.0], "center": [0.5, 1.0], "right": [0.75, 1.0] },
+  "variables": {
+    "lessons_done": { "type": "int", "default": 0, "scope": "save" },
+    "liked_tea": { "type": "bool", "default": false, "scope": "save" },
+    "player_name": { "type": "str", "default": "Aoi", "scope": "save" },
+    "tutorial_finished": { "type": "bool", "default": false, "scope": "global" }
+  }
+}

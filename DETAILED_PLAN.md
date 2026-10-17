@@ -1144,19 +1144,19 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 - ✅ Drafts: `language.md`, `manifest`, `character` schemas.
 - ✅ **Exit:** spikes answered and decisions recorded in `rfcs/0001-0003`. Every push builds a Windows `.exe` that opens a window, plays a sound, and shows JP text, verified on your Windows machine and by the CI `runtime-win` job. ⏳ The TypeScript CI jobs failed on the first run (a setup-node/pnpm setup issue, fixed in session 8); confirm they pass on the next run.
 
-### Phase 1: Contract and compiler (⏱ 4)
+### Phase 1: Contract and compiler (⏱ 4) ✅ done 2026-10-17
 - ✅ First: verify `win64-asan` / `win64-fuzz` in MSYS2 CLANG64 (done 2026-10-17; both work, §14.3).
 - ✅ Lossless CST parser with recovery, typed AST, line IDs, formatter, `hwc check` / `hwc fmt` (2026-10-17).
 - ✅ Validator with codes, suggestions, and quick fixes; `hwc check` validates whole projects (2026-10-17).
 - ✅ Structured `edit` API, line-ID anchored, atomic and validated (2026-10-17).
-- ✅ Character frontmatter, presets, attribute discovery (validator). ⏳ l10n string tables and placeholders.
-- ✅ `bytecode.md` v1 (word-aligned variable-length instructions, rich-text programs), compiler, validating reader, `hwc check|fmt|build|disasm` (2026-10-17). ⏳ `hwc l10n`.
+- ✅ Character frontmatter, presets, attribute discovery (validator). ✅ l10n string tables keyed by line ID, placeholder parity checks, CSV/XLIFF exchange (2026-10-17). Compiling tables into `.hwb` moves to Phase 2.
+- ✅ `bytecode.md` v1 (word-aligned variable-length instructions, rich-text programs), compiler, validating reader, `hwc check|fmt|build|disasm` (2026-10-17). ✅ `hwc init`, `hwc l10n sync|export|import` (2026-10-17).
 - ✅ Conformance harness (compile half): `tests/conformance/` with golden disassembly and diagnostics.
-- ⏳ Tutorial and starter (`adv` template) projects; `spec/ast.schema.json`.
+- ✅ Tutorial (`examples/tutorial/`) and starter templates (`adv`, `blank`); `spec/ast.schema.json` (2026-10-17).
 - ✅ **Exit:** the tutorial and starter projects compile. Broken inputs produce friendly multi-error diagnostics with fixes. CST round-trip passes property tests.
 
 ### Phase 2: Runtime MVP (⏱ 6)
-- `core/` VM, loader, saves, and rollback.
+- `core/` VM, loader, saves, and rollback. Carried from Phase 1: `LOCx` string tables in `.hwb`, line IDs on menu prompts, conformance execution transcripts.
 - Renderer with layered characters (blink and lip-flap), fade/dissolve.
 - Text: atlas, line breaking, kinsoku, ruby, fallback.
 - Textbox, menus. Audio via SDL3_mixer, including voice.

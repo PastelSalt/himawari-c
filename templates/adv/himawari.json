@@ -1,0 +1,15 @@
+{
+  "$schema": "https://pastelsalt.github.io/himawari-c/spec/manifest/1.0.json",
+  "name": "{{name}}",
+  "id": "{{id}}",
+  "version": "0.1.0",
+  "engine": "^1.0.0",
+  "resolution": [1920, 1080],
+  "sourceLanguage": "{{lang}}",
+  "languages": ["{{lang}}"],
+  "entry": "start",
+  "positions": { "left": [0.25, 1.0], "center": [0.5, 1.0], "right": [0.75, 1.0] },
+  "variables": {
+    "talked_about_engine": { "type": "bool", "default": false, "scope": "save" }
+  }
+}

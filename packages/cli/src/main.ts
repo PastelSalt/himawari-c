@@ -16,10 +16,12 @@ import {
   renderDiagnostic,
   writeHwb,
 } from "@himawari/core";
+import { TEMPLATES, type TemplateName, initProject } from "./init.js";
+import { L10nUsageError, l10n } from "./l10n.js";
 import { findProjectRoot, loadProject } from "./project.js";
 
 // Commands from plan §9.2. `check` and `fmt` work; the rest land later in Phase 1+.
-const PLANNED = ["init", "run", "playtest", "l10n", "sprites", "graph", "report", "migrate"];
+const PLANNED = ["run", "playtest", "sprites", "graph", "report", "migrate"]; // l10n: sync/export/import done
 
 const HELP = `hwc ${CORE_VERSION}
 
@@ -30,6 +32,13 @@ Commands:
                          assets); exit 1 on errors
   fmt [--check] [paths]  Format files in place and add missing #line: IDs
                          (--check: only report files that need formatting)
+  init <folder> [--template adv|blank] [--name "Title"] [--lang en]
+                         Create a new project (default template: adv)
+  l10n sync              Update locales/<lang>.json for every target language
+  l10n export --lang ja [--format csv|xliff]
+                         Write locales/ja.csv (or .xlf) for translators
+  l10n import <file> --lang ja [--ai]
+                         Bring translations back (placeholders are checked)
   build [--release]      Compile the project to build/game.hwb
                          (--release: without debug info)
   disasm <file.hwb>      Validate a .hwb file and print its instructions
@@ -140,6 +149,31 @@ function fmt(args: readonly string[]): number {
   return refused > 0 || (checkOnly && changed > 0) ? 1 : 0;
 }
 
+/** Value after `--flag`, or undefined. */
+function option(args: readonly string[], flag: string): string | undefined {
+  const i = args.indexOf(flag);
+  return i >= 0 ? args[i + 1] : undefined;
+}
+
+function init(args: readonly string[]): number {
+  const valued = new Set(["--template", "--name", "--lang", "--id"]);
+  const folder = args.find((a, i) => !a.startsWith("--") && !valued.has(args[i - 1] ?? ""));
+  if (!folder) throw new UsageError('usage: hwc init <folder> [--template adv|blank] [--name "Title"] [--lang en]');
+  const template = (option(args, "--template") ?? "adv") as TemplateName;
+  if (!TEMPLATES.includes(template)) throw new UsageError(`unknown template "${template}" (available: ${TEMPLATES.join(", ")})`);
+  const name = option(args, "--name") ?? (folder.split(/[\\/]/).pop() || "My Novel");
+  const lang = option(args, "--lang") ?? "en";
+  const id = option(args, "--id");
+  try {
+    const files = initProject(folder, template, id ? { name, lang, id } : { name, lang });
+    console.log(`✓ Created "${name}" in ${folder} from the ${template} template (${files.length} files).`);
+    console.log(`  Next: cd ${folder}, then hwc check and hwc build.`);
+    return 0;
+  } catch (e) {
+    throw new UsageError((e as Error).message);
+  }
+}
+
 function build(args: readonly string[]): number {
   const release = args.includes("--release");
   const root = findProjectRoot(".");
@@ -200,6 +234,17 @@ function main(argv: readonly string[]): number {
     if (command === "check") return check(rest);
     if (command === "fmt") return fmt(rest);
     if (command === "build") return build(rest);
+    if (command === "init") return init(rest);
+    if (command === "l10n") {
+      const root = findProjectRoot(".");
+      if (!root) throw new UsageError("no himawari.json here or above; run hwc l10n inside a project");
+      try {
+        return l10n(root, rest);
+      } catch (e) {
+        if (e instanceof L10nUsageError) throw new UsageError(e.message);
+        throw e;
+      }
+    }
     if (command === "disasm") return disasm(rest);
     if (PLANNED.includes(command)) {
       console.error(`hwc ${command}: not implemented yet (see DETAILED_PLAN.md §18).`);
