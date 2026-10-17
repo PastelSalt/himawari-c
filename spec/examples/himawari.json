@@ -1,5 +1,5 @@
 {
-  "$schema": "https://pastelsalt.github.io/himawari/spec/manifest/1.0.json",
+  "$schema": "https://pastelsalt.github.io/himawari-c/spec/manifest/1.0.json",
   "name": "Sunflower Days",
   "id": "dev.moesoft.sunflowerdays",
   "version": "0.1.0",

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://pastelsalt.github.io/himawari/spec/manifest/1.0.json",
+  "$id": "https://pastelsalt.github.io/himawari-c/spec/manifest/1.0.json",
   "title": "Himawari project manifest (himawari.json)",
   "description": "Draft 1.0.0-draft. Plan §5.5. Cross-field rules that JSON Schema cannot express (e.g. sourceLanguage must be listed in languages, entry must name an existing scene) are checked by @himawari/core's validator.",
   "type": "object",

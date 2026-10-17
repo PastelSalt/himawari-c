@@ -12,6 +12,6 @@ Phase 0 spike results are recorded as RFCs 0001–0003.
 
 | RFC | Title | Status |
 |---|---|---|
-| [0001](0001-static-sdl3-build.md) | Static SDL 3.4 + SDL3_mixer + FreeType build (Spike A) | Draft: Windows half verified |
-| [0002](0002-gpu-render-state-transitions.md) | Rule-wipe transitions with `SDL_GPURenderState` (Spike B) | Draft: D3D12 + Vulkan verified on Windows |
-| [0003](0003-text-stack.md) | Text stack: FreeType + libunibreak vs SDL3_ttf (Spike C) | Draft: verified on Windows; proposes FreeType direct |
+| [0001](0001-static-sdl3-build.md) | Static SDL 3.4 + SDL3_mixer + FreeType build (Spike A) | **Accepted** 2026-10-17 |
+| [0002](0002-gpu-render-state-transitions.md) | Rule-wipe transitions with `SDL_GPURenderState` (Spike B) | **Accepted** 2026-10-17 |
+| [0003](0003-text-stack.md) | Text stack: FreeType + libunibreak vs SDL3_ttf (Spike C) | **Accepted** 2026-10-17: FreeType direct |

@@ -2,7 +2,9 @@
 
 An open-source, AI-assisted **visual novel engine** for developers. Write in plain text, play instantly, ship a small native Windows game.
 
-> **Status: Phase 0 (foundations and spikes).** Nothing is usable yet. See [DETAILED_PLAN.md](DETAILED_PLAN.md) for the full plan and [LOG.md](LOG.md) for progress.
+> **Status: Phase 0 (foundations and spikes) done.** Nothing is usable yet. See [DETAILED_PLAN.md](DETAILED_PLAN.md) for the full plan and [LOG.md](LOG.md) for progress.
+>
+> **Platform: Windows only.** Games, Studio, and all tooling target Windows x64. Linux support is planned as a future improvement.
 
 ## Parts
 
@@ -41,7 +43,7 @@ cmake --build --preset win64-debug
 ```bash
 ctest --preset win64-debug
 ```
-The first configure downloads the pinned SDL, SDL3_mixer, and FreeType sources (hash-checked). Presets: `win64-debug`, `win64-release`, `win64-asan`, `linux-debug`, `linux-preview`, `fuzz`, `win64-cross`.
+The first configure downloads the pinned SDL, SDL3_mixer, FreeType, libunibreak, and SDL3_ttf sources (hash-checked; SDL3_ttf is only used by the Spike C comparison). Presets: `win64-debug`, `win64-release` (the shipping build), and `win64-asan` / `win64-fuzz` (MSYS2 CLANG64, not yet verified).
 
 Spike A (a window, a sound, and Japanese text, all statically linked):
 ```bash

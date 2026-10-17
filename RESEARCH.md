@@ -1,6 +1,6 @@
 # Himawari — Foundations Research
 
-> **Status:** v1.1 · 2026-10-17 (§16 added; §13 and §15 updated for plan v0.4)
+> **Status:** v1.2 · 2026-10-17 (§4.4 and §15 updated with Phase 0 spike results; plan v0.5 is Windows-only, so Linux-specific findings, e.g. cross-compiling in §4.5, are kept for the future Linux work in plan §18.9 but are not on the v1 path)
 > **Purpose:** Find proven, field-tested patterns before committing to designs, so the plan rests on evidence instead of guesses.
 > **Method:** Web research across official docs, specs, source repositories, and practitioner write-ups (October 2026). Each finding is rated:
 > - ✅ **Primary:** official docs, specs, or source code
@@ -404,11 +404,11 @@ Synthesis of the proven patterns above, ranked by how much they reduce friction:
 
 | Item | Why | When |
 |---|---|---|
-| Fully static SDL3 + SDL3_mixer + FreeType `.exe` (native MSYS2 UCRT64 build, plus the CI cross-build) | Only partial recipes found | Phase 0 spike |
-| ASan/UBSan support in MSYS2 CLANG64 for MinGW targets | Decides whether `win64-asan` is usable or WSL2 does all sanitizer runs | Phase 0 spike |
-| `resedit` (pure-JS PE resource editing) for per-game `.exe` icons | Needed for byte-identical exports from either OS | Phase 4 |
-| `SDL_GPURenderState` on MinGW builds under Wine and real Windows (D3D12/Vulkan) | New 3.4 API, struct-name discrepancy | Phase 0 spike |
-| SDL3_ttf as atlas/shaping layer vs direct FreeType | Could save weeks of text work | Phase 0 spike |
+| ~~Fully static SDL3 + SDL3_mixer + FreeType `.exe`~~ | ✅ Verified natively with MSYS2 UCRT64 (rfcs/0001). The cross-build part is deferred with Linux (plan v0.5) | Done (Phase 0) |
+| ASan/UBSan **and libFuzzer** in MSYS2 CLANG64 for MinGW targets | Plan v0.5 is Windows-only, so this decides the whole memory-safety approach (plan §14.3) | **Phase 1 start** |
+| `resedit` (pure-JS PE resource editing) for per-game `.exe` icons | Reproducible exports without a compiler | Phase 4 |
+| ~~`SDL_GPURenderState` on MinGW builds (D3D12/Vulkan)~~ | ✅ Verified; struct is `SDL_GPURenderStateCreateInfo` (rfcs/0002) | Done (Phase 0) |
+| ~~SDL3_ttf as atlas/shaping layer vs direct FreeType~~ | ✅ Decided: FreeType direct (rfcs/0003) | Done (Phase 0) |
 | MCP TS SDK v2 GA status | Conflicting sources | Phase 3 start |
 | Electron fuses recommended set | Not retrieved | Phase 4 |
 | Lua sandboxing approach | Not covered | Before Tier C |

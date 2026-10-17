@@ -15,4 +15,4 @@ export const SPEC_VERSIONS = {
 export type SpecName = keyof typeof SPEC_VERSIONS;
 
 /** Base URL where specs and JSON Schemas are published (plan §17, D20). */
-export const SPEC_BASE_URL = "https://pastelsalt.github.io/himawari/spec";
+export const SPEC_BASE_URL = "https://pastelsalt.github.io/himawari-c/spec";

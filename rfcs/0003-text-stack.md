@@ -1,6 +1,6 @@
 # RFC 0003: Text stack, FreeType + libunibreak vs SDL3_ttf (Spike C)
 
-- **Status:** Draft. Verified on Windows 2026-10-17; Linux and CI pending
+- **Status:** **Accepted** 2026-10-17 (owner accepted the recommendation; plan v0.5, D24). Verified on Windows; first CI run pending
 - **Created:** 2026-10-17
 - **Affects:** runtime (`text/`), `spec/language.md` (ruby), plan §7, §8.2, §8.6
 - **Plan references:** §7, §8.6, §18 Phase 0 · RESEARCH.md §4.3, §4.4, §15
@@ -56,7 +56,7 @@ Both backends gave identical results. Screenshots: [paragraph](assets/0003-parag
 4. **Atlas:** ours in both cases, shelf-packed, about 2,900 outlined 48 px glyphs per 2048² page. Multi-page and LRU eviction are still to do (plan §8.6).
 5. **Size:** a tie (+22 KB for SDL3_ttf). The text stack's real cost is FreeType (~0.9 MB unstripped).
 
-## Proposed decision
+## Decision (accepted)
 **Use FreeType directly, plus libunibreak and our own layout (`src/text/hw_layout.c`). Do not use SDL3_ttf.**
 - SDL3_ttf's higher-level features don't fit VN layout, and its glyph API offers little over FreeType: the FreeType backend is only 17 lines longer than the SDL3_ttf one, including fallback and outlines.
 - FreeType direct is ~1.7× faster to rasterize and initialize, uses ~1.6 MB less memory, and places outlines exactly.
@@ -71,4 +71,5 @@ Both backends gave identical results. Screenshots: [paragraph](assets/0003-parag
 - [ ] Ruby reveal timing: currently all at once with the group's first character; consider spreading it across the group.
 - [ ] Atlas pages + LRU; glyph rasterization off the main thread (plan §8.5 prefetch).
 - [ ] The layout allocates with `malloc` per paragraph; fine per line shown, but the runtime should use its arena (no frame-loop allocations, §8.1).
-- [ ] Linux preview build (WSL2) and CI.
+- [ ] First CI run on GitHub (`test_layout` under `ctest`, and the kinsoku check if the runner has Yu Gothic).
+- [ ] Remove SDL3_ttf from `HimawariDeps.cmake` and the `spike_c_ttf` target once the spikes are retired (Phase 2), since it was not adopted.

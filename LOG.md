@@ -2,7 +2,7 @@
 
 > A running record of how the project was planned and why each decision was made. Newest entries are at the **bottom**. Add a new entry for every work session.
 >
-> **Files:** [DETAILED_PLAN.md](DETAILED_PLAN.md) (the plan, currently **v0.4**) · [RESEARCH.md](RESEARCH.md) (evidence, **v1.1**) · [CLAUDE.md](CLAUDE.md) (context for AI coding sessions) · this file.
+> **Files:** [DETAILED_PLAN.md](DETAILED_PLAN.md) (the plan, currently **v0.5**) · [RESEARCH.md](RESEARCH.md) (evidence, **v1.2**) · [CLAUDE.md](CLAUDE.md) (context for AI coding sessions) · [rfcs/](rfcs/) (accepted spike decisions) · this file.
 
 ---
 
@@ -12,12 +12,13 @@
 |---|---|
 | **What** | Himawari: an open-source, AI-assisted visual novel engine for other developers |
 | **Parts** | `@himawari/core` (TS compiler and validator) · Himawari Studio (Electron authoring app) · `himawari-mcp` (MCP server) · **Himawari-C** (C11 + SDL 3.4 runtime) |
+| **Platform** | **Windows only, for everything** (games, Studio, tooling, dev, CI). Linux is a future improvement |
 | **Game output** | Windows x64 only |
-| **Studio** | Windows + Linux, UI in English (default) + Japanese |
+| **Studio** | Windows, UI in English (default) + Japanese |
 | **AI role** | Development assistant only. **No media generation** |
-| **Phase** | **Phase 0 in progress** (as of session 7): scaffold, spec drafts, i18n, CI skeleton, and Spikes A, B, C done on Windows. Open: Linux half, CI on GitHub, RFC acceptance |
+| **Phase** | **Phase 0 done** (as of session 8): scaffold, spec drafts, i18n, CI skeleton, Spikes A–C; RFCs 0001–0003 accepted. Waiting for the first CI run and your go-ahead for Phase 1 |
 | **Owner** | Moesoft (GitHub: `PastelSalt`) |
-| **Repo** | Planned: `github.com/PastelSalt/himawari` (not created yet) |
+| **Repo** | **https://github.com/PastelSalt/himawari-c** (public) |
 
 ---
 
@@ -211,6 +212,29 @@ You noted that nothing was final and asked for improvements.
 
 **Phase 0 status:** all three spikes are answered on Windows. What's left for the Phase 0 exit (plan §18): the Linux half (WSL2), CI green on GitHub (needs the repo), and accepting RFCs 0001–0003.
 
+**Session 7 follow-up:** you asked to commit all Phase 0 work to local `main` without pushing: commit `3cb3cb9` (74 files).
+
+---
+
+## Session 8: 2026-10-17 · Windows-only scope → plan v0.5, RFCs accepted, first push
+**You decided:**
+- **"This project will be solely for Windows only. The Linux integration/development will be for future improvement."** Update the plan, log, and every connected document.
+- You added MSYS2 to `PATH` and ran `gh auth login` (next steps 1 and 3 from session 7). WSL2 is no longer needed.
+- Repo: **https://github.com/PastelSalt/himawari-c** (public, created empty).
+- **You accepted the spike recommendations** (RFCs 0001–0003).
+- Push the codebase; wait for your go-ahead before Phase 1.
+
+**Changes:**
+- **Plan v0.5:** Windows-only scope in §0, §0.1 (new change table), §0.2 (decisions #14 and #15), §1, §3, §8 (accepted spike decisions folded into §8.1, §8.2, §8.3, §8.5, §8.6), §9.2, §11.3, **§14 rewritten** (platform matrix, host setup with no WSL2, Windows presets, memory-safety plan on Windows, Windows-only Studio packaging and CI), §15, §16, §17, §18 (Phase 0 marked done; Phase 1 starts with sanitizer verification; Phase 2 adds size trimming), §18.9 (Linux as a future improvement), §19, §20, §21.
+- **Build:** removed the `linux-debug`, `linux-preview`, `fuzz`, and `win64-cross` presets and the MinGW cross toolchain file; added `win64-fuzz` (CLANG64, to verify).
+- **CI:** every job now runs on `windows-latest`; removed `runtime-linux` and `fuzz`.
+- **Spec URLs:** schemas, examples, tests, and `SPEC_BASE_URL` now point at `https://pastelsalt.github.io/himawari-c/spec/…` to match the repo name.
+- **RFCs 0001–0003:** status **Accepted**; Linux items moved to "deferred".
+- **CLAUDE.md, README.md, RESEARCH.md (v1.2):** updated for Windows-only and the accepted decisions.
+- Pushed `main` to `origin` (see the end of this session's work).
+
+**Consequence to watch:** memory-safety tooling (ASan/UBSan, libFuzzer) was planned on Linux. It now depends on MSYS2 CLANG64 working for MinGW targets, to be verified first thing in Phase 1, with fallbacks in plan §14.3.
+
 ---
 
 ## Decision Register
@@ -229,45 +253,29 @@ You noted that nothing was final and asked for improvements.
 | D10 | MCP spec 2026-07-28, ID-anchored edits, proposals by default | v0.2 | ✅ Active |
 | D11 | Licenses: runtime zlib, tooling MIT, specs CC-BY-4.0 | v0.2 | ✅ Active |
 | D12 | Linux runtime as a Tier 1 export | v0.2 | ❌ Superseded by D13 |
-| D13 | Games export for Windows x64 only. The Linux runtime is internal (preview, playtests, CI) | v0.3 | ✅ Active |
+| D13 | Games export for Windows x64 only. ~~The Linux runtime is internal (preview, playtests, CI)~~ | v0.3 | ✅ Active (Linux clause superseded by D21) |
 | D14 | Two AI modes: external Claude app via MCP + built-in BYOK assistant panel | v0.3 | ✅ Active |
 | D15 | Studio UI localized: English default, Japanese at v1.0 | v0.3 | ✅ Active |
 | D16 | 16:9 templates only; plain tutorial without a mascot | v0.3 | ✅ Active |
 | D17 | Develop on Linux plus a Windows test PC | v0.3 | ❌ Superseded by D19 |
 | D18 | AI is a development assistant only. **No media generation** | v0.4 | ✅ Active |
-| D19 | Develop on Windows 11 (MSYS2 UCRT64) + WSL2 for Linux-side work; UCRT | v0.4 | ✅ Active |
-| D20 | Hosting on the personal GitHub account `PastelSalt`, repo `himawari`, GitHub Pages for spec and docs | v0.4 | ✅ Active (repo not yet created) |
+| D19 | Develop on Windows 11 (MSYS2 UCRT64); UCRT. (The WSL2 part was dropped by D21) | v0.4 / v0.5 | ✅ Active |
+| D20 | Hosting on the personal GitHub account `PastelSalt`, repo **`himawari-c`**, GitHub Pages (`pastelsalt.github.io/himawari-c`) for spec and docs | v0.4 / v0.5 | ✅ Active (repo created 2026-10-17) |
+| D21 | **Windows only, for everything** (games, Studio, CLI, MCP, dev, CI). Linux is a future improvement (plan §18.9). Supersedes the internal Linux runtime in D13 and the WSL2 part of D19 | v0.5 | ✅ Active |
+| D22 | Runtime build recipe: pinned tarballs + SHA-256, fully static, native MSYS2 UCRT64 (rfcs/0001) | v0.5 | ✅ Active |
+| D23 | Transitions/effects via `SDL_GPURenderState` on the explicitly requested GPU renderer; HLSL → DXIL + SPIR-V with DXC, committed headers; crossfade fallback after a startup self-test (rfcs/0002) | v0.5 | ✅ Active |
+| D24 | Text stack: FreeType directly + libunibreak + our layout with a strict JLREQ kinsoku table; no SDL3_ttf (rfcs/0003) | v0.5 | ✅ Active |
+
+Also: **D13** (games export for Windows x64 only) stays active; its "internal Linux runtime" clause is superseded by D21.
 
 ## Open Items (non-blocking)
-- Repo name: `himawari` (recommended) or `himawari-c`.
 - Who reviews the Japanese Studio UI strings before v1.0.
 - GitHub Sponsors: yes or no.
-- Verify in Phase 0: a fully static SDL3 build, `SDL_GPURenderState` on your GPU, SDL3_ttf vs direct FreeType, sanitizers in MSYS2 CLANG64. Full list in RESEARCH.md §15.
+- Verify at Phase 1 start: ASan/UBSan and libFuzzer in MSYS2 CLANG64 (plan §14.3).
 
 ---
 
-## Next Steps (after session 7; Spikes B and C, steps 4–5 below, are done on Windows)
+## Next Steps (after session 8)
 
-1. **You:** add `C:\msys64\ucrt64\bin` to the Windows `PATH`; install WSL2 (`wsl --install -d Ubuntu-24.04`, admin + reboot); run `gh auth login` as `PastelSalt`.
-2. **You decide:** repo name (`himawari` recommended), then create it and make the first commit (commands in the old steps below). The CI workflow runs for the first time on that push. Expect to fix small things in `runtime-linux` and `runtime-win` (Windows runner fonts, audio device).
-3. **Spike A, Linux half:** build `linux-debug` and `linux-preview` in WSL2; try `win64-asan` in MSYS2 CLANG64 (RESEARCH.md §15).
-4. ~~**Spike B** (rfcs/0002): `SDL_GPURenderState` rule wipe on D3D12 and Vulkan.~~ Done on Windows (session 6). Still to do: Linux/Vulkan in WSL2, CI, another GPU vendor.
-5. ~~**Spike C** (rfcs/0003): FreeType + libunibreak vs SDL3_ttf, a JP paragraph with ruby and kinsoku.~~ Done on Windows (session 7); proposes FreeType direct.
-5b. **You decide:** accept RFCs 0001–0003 (the proposed decisions), or ask for changes.
-6. Then Phase 1: lossless CST parser in `@himawari/core`.
-
-## Original Next Steps on the Windows PC (written in session 4; steps 1–2 are done except WSL2, `git init` from step 4 and the scaffold part of step 5 are done)
-
-1. **Copy** `DETAILED_PLAN.md`, `RESEARCH.md`, `LOG.md`, and `CLAUDE.md` into a new folder, e.g. `C:\dev\himawari`.
-2. **Install tools:** follow plan **§14.2** (winget: Git, GitHub CLI, MSYS2, Node LTS; then MSYS2 UCRT64 packages; then WSL2 Ubuntu).
-3. Run `gh auth login` and sign in as `PastelSalt`.
-4. **Create the repo** (when you're ready; this publishes to GitHub):
-   ```powershell
-   gh repo create PastelSalt/himawari --public --description "AI-assisted open-source visual novel engine"
-   ```
-   ```powershell
-   git init -b main
-   ```
-   Then add `.gitattributes` (`* text=auto eol=lf`), the four `.md` files, the licenses, and make the first commit.
-5. **Phase 0 work** (plan §18): monorepo scaffold → Spike A (static SDL3 `.exe` with sound and JP text) → Spike B (rule-wipe shader) → Spike C (text stack). Record the results in `rfcs/0001-0003` and add a session entry here.
-6. Open Claude Code in the folder. `CLAUDE.md` gives it the context.
+1. **CI:** check the first GitHub Actions run of the push and fix anything Windows-runner-specific (fonts, audio device, GPU-less runner).
+2. **You:** say when to start **Phase 1** (plan §18): first verify `win64-asan` / `win64-fuzz` in MSYS2 CLANG64 (or adopt the §14.3 fallbacks), then the lossless CST parser, typed AST, validator with codes and quick fixes, formatter, `edit` API, compiler, and `hwc check|fmt|build|disasm|l10n`.

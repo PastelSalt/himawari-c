@@ -1,6 +1,6 @@
 # Himawari — Detailed Project Plan
 
-> **Status:** Draft **v0.4** · 2026-10-17 · Nothing here is final.
+> **Status:** Draft **v0.5** · 2026-10-17 · Nothing here is final. **Phase 0 in progress** (spikes answered, RFCs 0001–0003 accepted).
 > **Companion files:** [RESEARCH.md](RESEARCH.md) (evidence) · [LOG.md](LOG.md) (decision history and next steps) · [CLAUDE.md](CLAUDE.md) (context for AI coding sessions)
 > Decisions marked 🔬 cite RESEARCH.md by section number (e.g. 🔬§3 = RESEARCH.md §3).
 
@@ -13,9 +13,11 @@ Himawari is an **open-source visual novel (VN) engine that works with AI from th
 | Component | Tech | License | Role |
 |---|---|---|---|
 | **Himawari Core** (`@himawari/core`) | TypeScript | MIT | Parser, validator, analyzer, compiler, formatter, editor services. The one authority on story semantics. |
-| **Himawari Studio** | Electron + React + CodeMirror 6 | MIT | Authoring app for **Windows and Linux**, with a UI in **English (default) and Japanese**. Script and Screenplay views, story graph, sprite composer, live preview, AI review, and a **built-in AI assistant (bring your own key)**. |
+| **Himawari Studio** | Electron + React + CodeMirror 6 | MIT | Authoring app for **Windows**, with a UI in **English (default) and Japanese**. Script and Screenplay views, story graph, sprite composer, live preview, AI review, and a **built-in AI assistant (bring your own key)**. |
 | **himawari-mcp** | TypeScript, MCP spec 2026-07-28 | MIT | Lets any MCP client (for example the Claude desktop app or Claude Code) query, write, validate, and playtest stories, with changes appearing live in Studio. |
-| **Himawari-C** | C11, SDL 3.4, SDL3_mixer, FreeType | **zlib** | Small native runtime that plays compiled games. **Games ship for Windows only.** Developed natively on Windows (MSYS2 UCRT64 / MinGW-w64). A Linux build exists only to power Studio's preview and AI playtests on Linux. |
+| **Himawari-C** | C11, SDL 3.4, SDL3_mixer, FreeType, libunibreak | **zlib** | Small native runtime that plays compiled games. **Games ship for Windows only.** Developed natively on Windows (MSYS2 UCRT64 / MinGW-w64). |
+
+**Platform scope (v0.5): Windows only, for everything.** Games, Studio, the CLI, the MCP server, development, and CI all target Windows x64. Linux support (Studio on Linux, a Linux runtime build, Linux CI) is a **future improvement** (§18.9), not part of v1. The C core stays portable, so adding Linux later remains a small change.
 
 The design rules, unchanged from v0.1:
 1. **The runtime never parses source text.** `.hws` source compiles to validated `.hwb` bytecode plus a `.hwp` asset pack.
@@ -27,6 +29,18 @@ The design rules, unchanged from v0.1:
 ---
 
 ## 0.1 What Changed
+
+### v0.4 → v0.5 (Phase 0 on Windows, your decisions)
+
+| Area | v0.4 | v0.5 | Why |
+|---|---|---|---|
+| Platform scope | Games Windows-only; Studio Windows + Linux; internal Linux runtime; WSL2 for Linux-side work | **Windows only for everything.** No Studio-on-Linux, no Linux runtime build, no WSL2, no Linux CI in v1. Linux is a future improvement (§18.9) | Your decision, to speed up development |
+| Memory-safety tooling | Linux ASan/UBSan + libFuzzer in WSL2/CI | **Windows:** `win64-asan` (MSYS2 CLANG64) and fuzz targets on Windows, both to be verified at Phase 1 start; fallbacks in §14.3 | Follows from Windows-only |
+| CI | ubuntu + windows jobs, cross-build, Proton smoke | **All jobs on `windows-latest`** | Follows from Windows-only |
+| Hosting | `github.com/PastelSalt/himawari` (planned) | **`github.com/PastelSalt/himawari-c`** (created, public). Spec on `https://pastelsalt.github.io/himawari-c/` | You created the repo |
+| Runtime build recipe | Spike A to verify | **RFC 0001 accepted:** pinned tarballs + SHA-256, fully static, native MSYS2 UCRT64 | Spike A results |
+| Transitions | Spike B to verify | **RFC 0002 accepted:** SDL_GPURenderState on the explicitly requested GPU renderer, HLSL → DXIL + SPIR-V via DXC (committed headers), crossfade fallback | Spike B results |
+| Text stack | Spike C to verify | **RFC 0003 accepted:** FreeType directly + libunibreak + our layout (`src/text/hw_layout.c`); no SDL3_ttf | Spike C results |
 
 ### v0.3 → v0.4 (final planning session)
 
@@ -84,22 +98,24 @@ The design rules, unchanged from v0.1:
 | 2 | Art pipeline | Layered sprites | First-class layered sprite system (§6) with a visual composer in Studio. |
 | 3 | Licensing | Open source | zlib runtime, MIT tooling, CC-BY specs. Public governance and RFC process (§17). |
 | 4 | Distribution | An engine other devs use | Stable public spec, templates, themes, extension API, docs site, semantic versioning, project migrations. |
-| 5 | Linux runtime | Your call → then: *"output is Windows only"* | **Games export for Windows x64 only.** The Linux runtime build stays internal (Studio preview on Linux, MCP playtests, CI) (§14.1). |
+| 5 | Linux runtime | Your call → then: *"output is Windows only"* | **Games export for Windows x64 only.** (v0.3 kept an internal Linux runtime build; v0.5 drops it, see #14.) |
 | 6 | Built-in AI panel | *Both: chat in Claude via MCP, and a built-in BYOK panel with Himawari's own instructions* | **Both are first-class.** External MCP from Phase 3; built-in panel in Phase 4 (§10.7). |
 | 7 | C standard | (not answered) | C11, kept. Easy to revisit. |
 | 8 | 4:3 / vertical templates | No, 16:9 is the standard | Templates are 16:9 (default 1920×1080). Resolution is still configurable in the manifest. |
 | 9 | Tutorial mascot | No, a simple tutorial | A plain, friendly tutorial project with no mascot. |
 | 10 | Studio UI localization | **Yes, non-negotiable. English default** | Externalized UI strings from the first commit. EN + JA at v1.0. Community languages later (§11.5). |
-| 11 | Hosting | Personal GitHub account (**PastelSalt**) | Repo at `github.com/PastelSalt/himawari` (not created yet; the name is free as of 2026-10-17). Spec and schemas on GitHub Pages: `https://pastelsalt.github.io/himawari/spec/…` |
+| 11 | Hosting | Personal GitHub account (**PastelSalt**) | Repo **`github.com/PastelSalt/himawari-c`** (public, created 2026-10-17). Spec and schemas on GitHub Pages: `https://pastelsalt.github.io/himawari-c/spec/…` |
 | 12 | AI and media | **Development only. No AI images, assets, or other creative media** | §1.5. No media-generation features anywhere. AI works on scripts and text only |
-| 13 | Dev OS | **Windows** | Windows 11 + MSYS2 UCRT64 natively, WSL2 for Linux-side work (§14.7) |
+| 13 | Dev OS | **Windows** | Windows 11 + MSYS2 UCRT64 natively (§14.7). No WSL2 (v0.5) |
+| 14 | Platform scope | **"Solely Windows only. Linux is for future improvement"** (v0.5) | Games, Studio, CLI, MCP, development, and CI are all Windows x64. Linux moves to §18.9 |
+| 15 | Spike recommendations | **Accepted** (v0.5) | RFCs 0001 (static build), 0002 (GPU render-state transitions), 0003 (FreeType direct text stack) |
 
 ---
 
 ## 1. Vision, Users, Non-Goals
 
 ### 1.1 Vision
-A VN engine (Windows games, authored on Windows or Linux) where **a first-time writer can play their first scene within 5 minutes**, a professional team can ship a multi-language commercial title, and an AI collaborator can contribute through a precise, validated API. All of them work on the same plain-text, git-friendly project. The shipped game is a single small native executable plus a data pack.
+A VN engine (Windows games, authored on Windows) where **a first-time writer can play their first scene within 5 minutes**, a professional team can ship a multi-language commercial title, and an AI collaborator can contribute through a precise, validated API. All of them work on the same plain-text, git-friendly project. The shipped game is a single small native executable plus a data pack.
 
 ### 1.2 Who it's for
 
@@ -127,7 +143,8 @@ A VN engine (Windows games, authored on Windows or Linux) where **a first-time w
 - Live LLM calls inside shipped games. Generation happens at authoring time only, which keeps the Steam disclosure "pre-generated" 🔬§13.
 - Live2D or skeletal animation.
 - Real-time multi-user editing (git is the collaboration layer).
-- Non-Windows game exports: Linux, macOS, mobile, web. Games ship as Windows x64 only. Linux players can use Proton.
+- Non-Windows game exports: Linux, macOS, mobile, web. Games ship as Windows x64 only. (Linux and Steam Deck players may be able to use Proton, but that is untested in v1.)
+- Non-Windows tooling: Studio, `hwc`, and `himawari-mcp` on Linux or macOS. Linux support is a future improvement (§18.9).
 - **Any AI media generation:** images, sprites, backgrounds, music, sound effects, voice/TTS acting, video. Permanently out of scope (§1.5).
 
 ### 1.5 AI scope (your clarification)
@@ -207,7 +224,7 @@ error[HW0204]: Hana has no expression called "smil"
 | 5 | C99 | **C11** | `_Static_assert` for binary layouts, at no cost |
 | 6 | MCP layer | Standalone **and** embedded in Studio, with a proposal review flow | Human in the loop |
 | 7 | — | Shared `@himawari/core` | One parser, so the editor and the AI never disagree |
-| 8 | Windows only | **Games: Windows only (kept).** Studio: Windows + Linux. A Linux runtime build is used internally only | Matches your target. Linux Studio still needs a native preview |
+| 8 | Windows only | **Windows only, for everything (kept, v0.5).** Games, Studio, tooling, dev, and CI | Matches your target; Linux is a future improvement |
 | 9 | — | Headless runtime for AI playtests | Same semantics as the real game |
 | 10 | — | Real Windows CI runner | Wine ≠ Windows |
 | 11 | — | Deterministic integer logic plus seeded RNG | Reproducible playtests and rollback |
@@ -239,7 +256,7 @@ flowchart LR
     end
 
     subgraph Runtime["Himawari-C (C11 + SDL 3.4)"]
-        R[game.exe / game]
+        R[game.exe]
         HL[--headless / --debug-pipe]
     end
 
@@ -365,7 +382,7 @@ Every dialogue line and menu option has a permanent ID. It anchors AI patches, s
 ### 5.3 AST (JSON), sketch
 ```jsonc
 {
-  "$schema": "https://pastelsalt.github.io/himawari/spec/ast/1.0.json",
+  "$schema": "https://pastelsalt.github.io/himawari-c/spec/ast/1.0.json",
   "version": "1.0", "file": "script/ch1.hws",
   "scenes": [{
     "kind": "Scene", "id": "ch1_intro", "span": [3,1,28,20],
@@ -421,7 +438,7 @@ my-novel/
 ```jsonc
 // himawari.json
 {
-  "$schema": "https://pastelsalt.github.io/himawari/spec/manifest/1.0.json",
+  "$schema": "https://pastelsalt.github.io/himawari-c/spec/manifest/1.0.json",
   "name": "Sunflower Days", "id": "dev.moesoft.sunflowerdays", "version": "0.1.0",
   "engine": "^1.0.0",
   "resolution": [1920, 1080],
@@ -553,7 +570,7 @@ Reveal her transfer plans before ch4_rooftop.
 ### 8.1 Goals and budgets
 | Metric | Target |
 |---|---|
-| Release `.exe` (static, stripped, HarfBuzz off) | ≤ 4 MB |
+| Release `.exe` (static, stripped, HarfBuzz off) | ≤ 4 MB (Phase 0 spikes measured 5.1 MB; SDL alone is 4.1 MB, so SDL subsystem and FreeType module trimming are required, RFC 0001) |
 | Cold start to first frame | ≤ 250 ms (SSD) |
 | Frame time | 60 FPS vsync, ≤ 2 ms CPU typical |
 | Memory, typical 1080p scene | ≤ 150 MB |
@@ -561,14 +578,15 @@ Reveal her transfer plans before ch4_rooftop.
 | `.hwb` load (1 MB) | ≤ 5 ms |
 | External DLLs on Windows | None |
 
-### 8.2 Dependencies (vendored, pinned, built from source with CMake)
+### 8.2 Dependencies (pinned by tag + SHA-256, built from source with CMake, linked statically; RFC 0001)
 | Need | Library | License | Notes |
 |---|---|---|---|
-| Platform, renderer, input, threads, I/O | **SDL 3.4.x** | zlib | GPU renderer + `SDL_GPURenderState` for shader effects 🔬§4.1 |
-| Audio mixing, decoding, streaming | **SDL3_mixer 3.2.x** | zlib | Replaces the v0.1 custom mixer. Honors loop metadata 🔬§4.2 |
-| Glyphs | **FreeType** | FTL (credit required) | |
-| Shaping (Tier 2 scripts) | HarfBuzz | MIT | Build option. Spike: SDL3_ttf as the wrapper 🔬§4.3 |
-| Line breaking | **libunibreak** | zlib | UAX #14 / #29 🔬§4.4 |
+| Platform, renderer, input, threads, I/O | **SDL 3.4.x** (3.4.18) | zlib | GPU renderer + `SDL_GPURenderState` for shader effects (RFC 0002) 🔬§4.1 |
+| Audio mixing, decoding, streaming | **SDL3_mixer 3.2.x** (3.2.4) | zlib | Replaces the v0.1 custom mixer. Honors loop metadata 🔬§4.2 |
+| Glyphs | **FreeType** (2.14.3), used directly | FTL (credit required) | SDL3_ttf was evaluated and not adopted (RFC 0003) |
+| Shaping (Tier 2 scripts) | HarfBuzz | MIT | Build option, later: `hb-ft` directly over our FreeType faces (RFC 0003) 🔬§4.3 |
+| Line breaking | **libunibreak** (8.0, Unicode 17) | zlib | UAX #14 / #29, plus our JLREQ override table 🔬§4.4 |
+| Shader compiler (dev only) | DXC | NCSA/MIT | HLSL → DXIL + SPIR-V offline; output committed as headers, so builds don't need it (RFC 0002) |
 | Images | stb_image (PNG/JPG), libwebp | PD/MIT, BSD | WebP for sprites with alpha |
 | Pack compression | LZ4 (zstd optional) | BSD | |
 | Optional scripting (v1.x) | Lua 5.4 | MIT | Opt-in, sandboxed, §12 🔬§10 |
@@ -588,9 +606,10 @@ runtime/
 │   ├── ext/         # extension-statement registry (Tier B), Lua bridge (Tier C, optional)
 │   ├── debug/       # debug pipe, dev overlay, warp, reload-in-place
 │   └── main.c
-├── third_party/  tests/  fuzz/  cmake/toolchains/
+├── shaders/         # HLSL sources + generated/ DXIL and SPIR-V headers (committed)
+├── spikes/  tests/  fuzz/  cmake/
 ```
-**Rule:** `core/` has no SDL and no I/O. It's shared by the game, headless playtests, tests, fuzzers, and a future WASM build.
+**Rule:** `core/` has no SDL and no I/O. It's shared by the game, headless playtests, tests, fuzzers, and a future WASM build. `text/hw_layout.c` (line breaking, kinsoku, ruby) also has no SDL and no font library. Keeping these portable is also what keeps a future Linux port cheap (§18.9).
 
 ### 8.4 Execution model
 - Fixed 60 Hz logic with interpolated render.
@@ -600,14 +619,17 @@ runtime/
 ### 8.5 Rendering
 - Virtual canvas from the manifest via `SDL_SetRenderLogicalPresentation(..., LETTERBOX)`.
 - Layers: `bg` → characters → `cg` → textbox/UI → overlay.
-- v1 transitions: fade, dissolve, slide, shake, flash, and **rule/mask** wipes using a fragment shader via **`SDL_GPURenderState`**. Shaders are precompiled per backend (to be verified with SDL_shadercross 🔬§4.1), with a CPU fallback on old GPUs.
+- v1 transitions: fade, dissolve, slide, shake, flash, and **rule/mask** wipes using a fragment shader via **`SDL_GPURenderState`** (RFC 0002):
+  - The runtime **requests the GPU renderer explicitly** (`SDL_CreateGPUDevice` + `SDL_CreateGPURenderer`); it is never the default. SDL picks D3D12 on Windows, Vulkan also works.
+  - Shaders are HLSL, compiled offline by DXC to DXIL and SPIR-V and committed as headers. Pixel-shader inputs must be `TEXCOORD0`/`TEXCOORD1` to match SDL's vertex shaders.
+  - A failed custom pipeline is silent outside debug mode, so the runtime **self-tests render states at startup** and falls back to the default renderer with crossfades if they don't draw.
 - Prefetch: the compiler emits a per-scene asset list. Decode happens on a worker thread and upload on the main thread.
 
 ### 8.6 Text
-UTF-8 everywhere.
-- **Atlas:** FreeType renders into a dynamic multi-page glyph atlas with LRU eviction. CJK fonts are huge, so pages fill on demand.
-- **Line breaking:** libunibreak break opportunities, plus a JLREQ override table and Latin word wrap.
-- **Ruby:** placed per W3C Simple Ruby.
+UTF-8 everywhere. Stack decided in RFC 0003: **FreeType directly + libunibreak + our layout** (`src/text/hw_layout.c`).
+- **Atlas:** FreeType renders into a dynamic multi-page glyph atlas with LRU eviction. CJK fonts are huge, so pages fill on demand (Spike C: ~2,900 outlined 48 px glyphs per 2048² page).
+- **Line breaking:** libunibreak break opportunities, plus a **strict JLREQ kinsoku override table** (required: UAX #14 alone puts small kana at line starts), hanging punctuation for `、。，．`, and Latin word wrap.
+- **Ruby:** placed per W3C Simple Ruby: unbreakable groups, the narrower side spread 1:2:1, no overhang. Ruby is half the base size in a reserved band above each line.
 - **Effects and reveal:** per-glyph reveal timing, outline and shadow via the FreeType stroker.
 - **Fallback:** a glyph-fallback chain per language.
 - Atlases are rebuilt on DPI or scale change.
@@ -666,7 +688,7 @@ game --headless --playtest strategy=all_paths max_steps=50000 seed=1 --out repor
 
 ### 8.14 Robustness
 - Content errors never `abort()`. Dev builds show an in-game error card with file:line and a "fix in Studio" button. Release builds show a friendly message.
-- Compiled with `-Wall -Wextra -Werror -Wconversion`. Linux debug builds run under ASan/UBSan.
+- Compiled with `-Wall -Wextra -Werror -Wconversion -Wshadow -Wstrict-prototypes`. The `win64-asan` build (MSYS2 CLANG64) runs under ASan/UBSan once verified (§14.3).
 
 ---
 
@@ -694,7 +716,7 @@ hwc init my-novel --template adv          # adv | nvl | kinetic | blank
 hwc check                                 # validate + analyze (CI-friendly exit codes)
 hwc fmt                                   # canonical format + line IDs
 hwc build --release                       # → build/windows/<Game>/ (Windows x64)
-hwc run [--warp script/ch1.hws:40]        # native preview runtime on this machine
+hwc run [--warp script/ch1.hws:40]        # run the project in the Windows runtime (dev mode)
 hwc playtest --strategy all_paths
 hwc l10n export --lang ja --format xliff  # / import
 hwc sprites import hana.psd               # PSD/ORA → folder convention + frontmatter
@@ -847,7 +869,7 @@ How each mode receives them:
 | **Assets** | Thumbnails, audio preview, unused/missing flags, drag into editor, **procedural placeholder maker** (no AI) | Import pipeline (resize, convert) |
 | **Variables** | Declarations, read/write locations | Live values from the running game |
 | **Localization** | Table by line × language, status filters, CSV/XLIFF import/export | Context screenshots, overflow warnings, AI batch translate |
-| **Build** | Windows x64 export (folder or zip), from Windows *or* Linux | itch.io `butler` upload, Steam depot helper |
+| **Build** | Windows x64 export (folder or zip) | itch.io `butler` upload, Steam depot helper |
 | **AI Proposals** | Diff per proposal, rationale, diagnostics, accept/reject, unified undo | Per-hunk accept, "explain this change" |
 | **AI Assistant** | Docked chat (BYOK, Anthropic), streaming, `@mentions`, ask-about-selection, proposals, cost meter (§10.9) | More providers, saved chat threads per project, slash-command recipes ("/translate scene", "/continuity check") |
 | **UI language** | English (default) + Japanese, switchable in Settings and on the Welcome screen (§11.5) | Community languages |
@@ -911,20 +933,21 @@ Planned later: an `himawari-ext` registry (a GitHub-topic-based index) for theme
 
 ---
 
-## 14. Build System, Platforms, Cross-Compilation
+## 14. Build System, Platforms, Toolchain
 
-### 14.1 Platform matrix (decided in v0.3)
-| What | Windows x64 | Linux x64 | Notes |
-|---|---|---|---|
-| **Exported games** | ✅ **only target** | ❌ | Steam Deck and Linux players can run the `.exe` through Proton or Wine. The Windows build is tested for this in CI (§14.6) |
-| **Himawari Studio** | ✅ Tier 1 | ✅ Tier 1 | Linux Studio exports Windows games with no Wine needed (§14.4) |
-| **Runtime build** | ✅ shipped inside games | ⚙️ **internal only** | The Linux build powers Studio's live preview on Linux, MCP headless playtests on Linux, and CI sanitizers and fuzzing. It is never offered as an export |
-| `hwc` CLI and `himawari-mcp` | ✅ | ✅ | Node packages |
-| macOS | after v1 | — | Studio and games would need Apple hardware for signing |
+### 14.1 Platform matrix (decided in v0.5: Windows only)
+| What | Windows x64 | Notes |
+|---|---|---|
+| **Exported games** | ✅ **only target** | Linux and Steam Deck players may be able to run the `.exe` through Proton, but v1 does not test it |
+| **Himawari Studio** | ✅ only platform | |
+| **Runtime build** | ✅ shipped inside games, also used for Studio's live preview and MCP headless playtests | |
+| `hwc` CLI and `himawari-mcp` | ✅ | Node packages, supported and tested on Windows |
+| Development and CI | ✅ | Windows 11 + MSYS2 UCRT64; GitHub Actions `windows-latest` |
+| Linux, macOS | future (§18.9) | Not in v1 |
 
-**Why keep a Linux runtime build at all:** without it, Studio on Linux could only preview through Wine, which breaks P1/P2 (§2). The build costs almost nothing because `core/` and the SDL layer are portable, and it is also where AddressSanitizer and fuzzing harden the C code. Turning it into a real export target later would be a small change if you ever want it.
+**Why Windows only (v0.5):** games already ship only for Windows, and dropping Studio-on-Linux removes a second runtime build, WSL2 setup, Linux CI, and cross-OS export checks. That speeds up development. The C core (`core/`, `text/hw_layout.c`) and the SDL layer stay portable, so a Linux port later remains a small change.
 
-### 14.2 Host setup: Windows 11 (primary, decided in v0.4)
+### 14.2 Host setup: Windows 11
 
 **1. Base tools** (PowerShell):
 ```powershell
@@ -966,48 +989,29 @@ gh auth login
 ```
 Sign in as `PastelSalt`.
 
-**5. WSL2 for Linux-side work** (PowerShell as admin, then reboot):
-```powershell
-wsl --install -d Ubuntu-24.04
-```
-Inside Ubuntu:
-```bash
-sudo apt update && sudo apt install build-essential cmake ninja-build pkg-config clang lld gdb git
-```
-SDL3 also needs X11, Wayland, and audio development headers on Linux. Install the list from SDL's `docs/README-linux.md` when Spike A starts.
+**5. Shader compiler (only when editing shaders):** Microsoft's DirectX Shader Compiler (DXC) from https://github.com/microsoft/DirectXShaderCompiler/releases, unpacked outside the repo (this PC: `%LOCALAPPDATA%\himawari-tools\dxc-1.9.2609\`). Normal builds don't need it (RFC 0002).
 
-**6. GPU debugging (optional):** RenderDoc (`winget install --id BaldurKarlsson.RenderDoc -e`).
+**6. Sanitizers (to verify at Phase 1 start):** the MSYS2 **CLANG64** environment (`pacman -S --needed mingw-w64-clang-x86_64-toolchain`) for the `win64-asan` and `win64-fuzz` presets.
+
+**7. GPU debugging (optional):** RenderDoc (`winget install --id BaldurKarlsson.RenderDoc -e`).
 
 > Claude Code runs natively on Windows and uses Git for Windows' bash. Open it in the repo folder on the Windows drive.
 
 ### 14.3 CMake presets
-| Preset | Where | Target | Flags / purpose |
-|---|---|---|---|
-| `win64-debug` | Windows (MSYS2 UCRT64) | Windows | `-O0 -g`, console subsystem, your everyday build |
-| `win64-release` | Windows (MSYS2 UCRT64) and CI `windows-latest` | Windows | `-O2 -flto -static -static-libgcc -mwindows -s`, the **shipping build** |
-| `win64-asan` | Windows (MSYS2 **CLANG64**) | Windows | `-fsanitize=address,undefined`. MinGW sanitizer support is to be verified in Spike A; WSL2 is the fallback |
-| `linux-debug` | WSL2 / CI ubuntu | Linux | `-O0 -g -fsanitize=address,undefined`, the main memory-safety net |
-| `linux-preview` | WSL2 / CI ubuntu | Linux | `-O2`, internal preview runtime bundled with Linux Studio |
-| `fuzz` | WSL2 / CI ubuntu | Linux | `clang -fsanitize=fuzzer,address` |
-| `win64-cross` | CI ubuntu | Windows | Cross-build check using the toolchain file below |
+| Preset | Where | Flags / purpose |
+|---|---|---|
+| `win64-debug` | MSYS2 UCRT64 | `-O0 -g`, console subsystem, your everyday build |
+| `win64-release` | MSYS2 UCRT64 and CI `windows-latest` | `-O2` + LTO, `-static -static-libgcc -mwindows -s`, the **shipping build** (verified fully static in Spike A) |
+| `win64-asan` | MSYS2 **CLANG64** | `-fsanitize=address,undefined`. **To verify at Phase 1 start** |
+| `win64-fuzz` | MSYS2 **CLANG64** | `-fsanitize=fuzzer,address` libFuzzer targets. **To verify at Phase 1 start** |
 
-```cmake
-# runtime/cmake/toolchains/mingw-w64-x86_64.cmake  (used only by the CI cross-build check)
-set(CMAKE_SYSTEM_NAME Windows)
-set(CMAKE_SYSTEM_PROCESSOR x86_64)
-set(TOOLCHAIN_PREFIX x86_64-w64-mingw32)
-set(CMAKE_C_COMPILER   ${TOOLCHAIN_PREFIX}-gcc)
-set(CMAKE_CXX_COMPILER ${TOOLCHAIN_PREFIX}-g++)
-set(CMAKE_RC_COMPILER  ${TOOLCHAIN_PREFIX}-windres)
-set(CMAKE_FIND_ROOT_PATH /usr/${TOOLCHAIN_PREFIX})
-set(CMAKE_FIND_ROOT_PATH_MODE_PROGRAM NEVER)
-set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
-set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
-```
+**Memory safety on Windows only.** v0.4 relied on Linux ASan/UBSan and libFuzzer. On Windows:
+- If CLANG64 supports ASan/UBSan and libFuzzer for MinGW targets, `win64-asan` and `win64-fuzz` become mandatory before merging runtime changes, and run in CI.
+- If not: run the fuzz harnesses as regression tests over a saved corpus in normal builds, add Dr. Memory runs for the test suite, and keep loaders' bounds checks exhaustively unit-tested. Record the outcome in an RFC.
 
-- **CRT:** everything targets **UCRT** (built into Windows 10+). MSYS2 UCRT64 uses it by default. The CI cross-build must use a UCRT MinGW toolchain too (e.g. llvm-mingw UCRT), so both builds link the same C runtime.
-- **Dependencies** are built via `add_subdirectory(third_party/…)` with `SDL_STATIC=ON SDL_SHARED=OFF`. The Phase 0 spike must **prove the fully static recipe** 🔬§4.5.
-- **Line endings:** the repo has a `.gitattributes` with `* text=auto eol=lf`, so files don't flip between CRLF and LF when you work across Windows and WSL.
+- **CRT:** everything targets **UCRT** (built into Windows 10+). MSYS2 UCRT64 uses it by default.
+- **Dependencies** are pinned release tarballs with SHA-256, fetched by `runtime/cmake/HimawariDeps.cmake` (or taken from `runtime/third_party/<name>/` if vendored) and linked statically (RFC 0001).
+- **Line endings:** the repo has a `.gitattributes` with `* text=auto eol=lf`.
 
 ### 14.4 Game export
 ```
@@ -1017,50 +1021,45 @@ build/windows/SunflowerDays/
 └── licenses/ + CREDITS.txt  # auto-generated (FreeType credit, fonts' OFL, SDL zlib…)
 ```
 - **Export needs no compiler.** Studio ships the prebuilt Windows runtime, so export is: compile `.hwb` → pack `.hwp` → copy the runtime `.exe` → patch its icon and version resource → write licenses. 🔬§12
-- **Same output from either OS.** The `.exe` resource patching is done in TypeScript (a pure-JS PE resource editor such as `resedit`, to be verified). Exports from Linux Studio and Windows Studio are therefore **byte-identical**, with no Wine involved.
-- **Steam Deck / Proton:** the CI `proton-smoke` job runs the exported sample under Proton or Wine, so "it runs on Deck" is checked rather than assumed.
+- The `.exe` resource patching is done in TypeScript (a pure-JS PE resource editor such as `resedit`, to be verified in Phase 4), so exports are reproducible.
 
-### 14.5 Studio packaging (both OSes)
-- `electron-builder`: NSIS and portable builds for Windows (official builds made on the Windows runner); AppImage and `.deb` for Linux.
+### 14.5 Studio packaging
+- `electron-builder`: NSIS installer and portable build for Windows, built on the Windows runner.
 - Auto-update channel.
 - **Code signing** planned before the public v1.0.
 
-### 14.6 CI (GitHub Actions)
-| Job | Runner | Steps |
-|---|---|---|
-| `ts` | ubuntu | typecheck, lint, vitest, conformance (compile half) |
-| `runtime-win` | **windows-latest** (MSYS2 UCRT64 via `msys2/setup-msys2`) | **Shipping build**, unit tests, headless sample playtest, windowed launch, non-ASCII path test, Studio-on-Windows export test |
-| `runtime-linux` | ubuntu | Internal preview build: sanitizers, unit tests, golden images, 60 s fuzz per target |
-| `runtime-win-cross` | ubuntu | Secondary cross-build check (UCRT MinGW) and tests under Wine |
-| `proton-smoke` | ubuntu | run the exported sample `.exe` under Wine/Proton (Steam Deck proxy) |
-| `i18n` | ubuntu | no hard-coded UI strings, EN/JA message keys in sync, pseudo-locale screenshot diff |
-| `e2e` | ubuntu (xvfb) | Playwright-Electron: first-run flow, edit → preview, export |
-| `ux-budget` | ubuntu | **P1 check**: scripted New Project → first frame in under 60 s; edit → preview update in under 1 s |
-| `release` | tags (Windows runner for the Windows package, ubuntu for the Linux package) | Studio packages for Windows and Linux (each bundling the prebuilt Windows runtime, plus the Linux preview runtime for the Linux package), spec docs |
+### 14.6 CI (GitHub Actions, all on `windows-latest`)
+| Job | Steps |
+|---|---|
+| `ts` | typecheck, lint, vitest, conformance (compile half) |
+| `i18n` | no hard-coded UI strings, EN/JA message keys in sync, pseudo-locale screenshot diff |
+| `runtime-win` | MSYS2 UCRT64 **shipping build**, unit tests, DLL-import check, spike/runtime smoke tests, headless sample playtest, non-ASCII path test, Studio export test |
+| `runtime-asan` | `win64-asan` tests and short `win64-fuzz` runs, once verified (§14.3) |
+| `e2e` | Playwright-Electron: first-run flow, edit → preview, export |
+| `ux-budget` | **P1 check**: scripted New Project → first frame in under 60 s; edit → preview update in under 1 s |
+| `release` | tags: Windows Studio package (bundling the prebuilt runtime), spec docs |
 
-### 14.7 Development environment (decided in v0.4: Windows)
+### 14.7 Development environment (decided in v0.4, narrowed in v0.5)
 
-**Windows 11 is the primary dev machine.** WSL2 Ubuntu covers the Linux-side jobs. This fits the product: the shipped output is Windows-only, so every build you run day to day is the real thing on the real platform.
+**Windows 11 is the only dev machine.** Every build you run day to day is the real thing on the real platform.
 
 | Task | Where |
 |---|---|
-| Runtime (C) everyday work, debugging, GPU testing | **Windows native**: MSYS2 UCRT64 + CMake/Ninja, `gdb` or WinDbg, RenderDoc |
-| Core / CLI / MCP / Studio (TypeScript, Electron) | **Windows native**: Node LTS + pnpm |
-| Studio on Windows (installer, file dialogs, Japanese paths) | Windows native |
-| Linux preview runtime, ASan/UBSan, fuzzing | **WSL2 Ubuntu** (and CI) |
-| Studio on Linux | **WSL2 + WSLg** (Linux GUI apps open on the Windows desktop) |
-| Wine/Proton checks of exported games | CI `proton-smoke` (optional locally in WSL2) |
+| Runtime (C) everyday work, debugging, GPU testing | MSYS2 UCRT64 + CMake/Ninja, `gdb` or WinDbg, RenderDoc |
+| Sanitizers and fuzzing | MSYS2 CLANG64 (to verify, §14.3) |
+| Core / CLI / MCP / Studio (TypeScript, Electron) | Node LTS + pnpm |
+| Studio (installer, file dialogs, Japanese paths) | Windows |
 
-**Repo location:** clone to the Windows drive (e.g. `C:\dev\himawari`). For heavy Linux work (fuzzing, sanitizer runs), keep a **second clone inside WSL2** (`~/himawari`) and sync through git. Building across `/mnt/c` works but is much slower.
+**Repo location:** any folder on the Windows drive (this PC: `C:\Users\Myaako\Documents\Moesoft\himawari-c`).
 
-**What changed from v0.3:** the Windows test PC and the remote-run dev agent are **no longer needed**. Your own machine is the Windows test box. The trade-off is that memory-safety tooling is weaker natively on Windows, so sanitizer and fuzz runs move to WSL2 and CI, and they are mandatory before merging runtime changes.
+**What changed from v0.4:** no WSL2, no second clone, no Linux CI. The cost is that memory-safety tooling must work natively on Windows; §14.3 has the plan and the fallbacks.
 
 ---
 
 ## 15. Repository Structure (monorepo)
 
 ```
-himawari/
+himawari-c/                 # github.com/PastelSalt/himawari-c
 ├── spec/                   # ★ the contract (CC-BY-4.0), published on GitHub Pages
 │   ├── language.md grammar.ebnf ast.schema.json manifest.schema.json character.schema.json
 │   ├── extension.schema.json bytecode.md pack.md save.md debug-protocol.md localization.md
@@ -1095,7 +1094,7 @@ himawari/
 | Rendering | Golden images at chosen line IDs (perceptual diff), including layered sprites and transitions |
 | Text | Layout snapshots: kinsoku, ruby (no overhang), mixed scripts, fallback fonts, long words |
 | i18n | Placeholder parity, glyph coverage, CSV/XLIFF round-trip |
-| End to end | `all_paths` playtest of examples in the Linux preview build, under Wine/Proton, and on real Windows (the one that counts) |
+| End to end | `all_paths` playtest of examples in the Windows runtime, locally and on the CI Windows runner |
 | MCP | Schema contract tests, sandbox escapes, stale revisions, dry-run purity, deterministic tool order |
 | AI quality | Eval set: validation pass rate, playtest success, bible consistency (tracked over time, non-blocking) |
 | Studio | Playwright-Electron e2e for the first-run flow, Screenplay ↔ Script round-trip, preview sync |
@@ -1119,7 +1118,7 @@ Budgets from §8.1 are measured in CI on every merge, with a trend dashboard.
 | Area | Plan |
 |---|---|
 | **Licenses** | Runtime **zlib** (embedded in every game; same as SDL, no attribution burden). Tooling **MIT**. Specs **CC-BY-4.0**. Bundled fonts OFL 🔬§12 |
-| **Hosting** | Repo `github.com/PastelSalt/himawari` (personal account). Docs and spec via GitHub Pages at `https://pastelsalt.github.io/himawari/`. Releases via GitHub Releases. Issues and Discussions on the repo |
+| **Hosting** | Repo **`github.com/PastelSalt/himawari-c`** (personal account, public). Docs and spec via GitHub Pages at `https://pastelsalt.github.io/himawari-c/`. Releases via GitHub Releases. Issues and Discussions on the repo |
 | **Governance** | BDFL (you) for v1, documented in `GOVERNANCE.md`. Maintainers added by contribution record |
 | **Spec changes** | **RFC process** in `rfcs/`, modeled on MCP's SEP workflow: numbered proposal, discussion, accept/reject, then spec PR |
 | **Versioning** | SemVer per package and per spec. Engine 1.x keeps bytecode, save, and manifest compatibility. A deprecation window of at least 2 minor versions |
@@ -1135,16 +1134,17 @@ Budgets from §8.1 are measured in CI on every merge, with a trend dashboard.
 
 Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ ≈ weeks.
 
-### Phase 0: Foundations and spikes (⏱ 2)
-- Create `github.com/PastelSalt/himawari`. Monorepo, TS strict, CMake presets, `.gitattributes`, CI skeleton. **Windows toolchain + WSL2 set up** (§14.2).
-- i18n scaffolding: message catalogs + the no-hard-coded-strings lint rule, from the first UI string onward.
-- **Spike A:** fully static SDL 3.4 + SDL3_mixer + FreeType `.exe` cross-built from Linux. Runs on Wine and real Windows. Native Linux preview build from the same sources.
-- **Spike B:** `SDL_GPURenderState` rule-wipe shader on D3D12 and Vulkan.
-- **Spike C:** text stack: FreeType + libunibreak vs SDL3_ttf for atlas and shaping. Render a JP paragraph with ruby and kinsoku.
-- Drafts: `language.md`, `manifest`, `character` schemas.
-- ✅ **Exit:** spikes answered and decisions recorded in `rfcs/0001-0003`. Every push builds a Windows `.exe` (plus the Linux preview build) that opens a window, plays a sound, and shows JP text, verified on your Windows machine and in CI.
+### Phase 0: Foundations and spikes (⏱ 2) · status after 2026-10-17
+- ✅ `github.com/PastelSalt/himawari-c` created and pushed. Monorepo, TS strict, CMake presets, `.gitattributes`, CI skeleton. Windows toolchain set up (§14.2).
+- ✅ i18n scaffolding: message catalogs + the no-hard-coded-strings lint rule, from the first UI string onward.
+- ✅ **Spike A:** fully static SDL 3.4 + SDL3_mixer + FreeType `.exe` built natively with MSYS2 UCRT64; window, sound, JP text; runs from non-ASCII paths (RFC 0001, accepted).
+- ✅ **Spike B:** `SDL_GPURenderState` rule-wipe shader on D3D12 and Vulkan, pixel-identical (RFC 0002, accepted).
+- ✅ **Spike C:** text stack: FreeType + libunibreak vs SDL3_ttf; a JP paragraph with ruby and kinsoku (RFC 0003, accepted: FreeType direct).
+- ✅ Drafts: `language.md`, `manifest`, `character` schemas.
+- ✅ **Exit:** spikes answered and decisions recorded in `rfcs/0001-0003`. Every push builds a Windows `.exe` that opens a window, plays a sound, and shows JP text, verified on your Windows machine. ⏳ Still to confirm: the first green CI run on GitHub.
 
 ### Phase 1: Contract and compiler (⏱ 4)
+- First: verify `win64-asan` / `win64-fuzz` in MSYS2 CLANG64, or adopt the fallbacks (§14.3).
 - Lossless CST parser with recovery, typed AST, line IDs, validator with codes and quick fixes, formatter, structured `edit` API.
 - Character and layered-sprite schema, presets, attribute resolution, l10n string tables and placeholders.
 - `bytecode.md` v1, compiler, `hwc check|fmt|build|disasm|l10n`.
@@ -1157,7 +1157,8 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 - Text: atlas, line breaking, kinsoku, ruby, fallback.
 - Textbox, menus. Audio via SDL3_mixer, including voice.
 - `--dev` with placeholders, reload-in-place, warp, and dev overlay. `--headless` playtest.
-- ✅ **Exit:** the starter VN plays in EN and JA on real Windows (and in the Linux preview build). Headless reaches every ending. Loaders survive 10 minutes of fuzzing.
+- Size work: trim SDL subsystems and FreeType modules toward the 4 MB budget (§8.1).
+- ✅ **Exit:** the starter VN plays in EN and JA on Windows. Headless reaches every ending. Loaders survive 10 minutes of fuzzing (or the §14.3 fallback checks).
 
 ### Phase 3: MCP v1 and CLI polish (⏱ 2)
 - Shared `packages/tools` registry. All tools on spec 2026-07-28, `llm-reference`, **`agent-guide.md` v1**, prompts, `render_line`, tasks extension.
@@ -1169,7 +1170,7 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 - Story graph, characters panel, **sprite composer + PSD/ORA import**, assets with a procedural placeholder maker, variables, localization table, build panel.
 - Embedded MCP with AI Proposals panel; **live sync with external Claude apps (Mode A)**; unified and selective undo; double-Shift search.
 - **Built-in AI assistant panel (Mode B, §10.9)**: BYOK key setup, streaming chat, `@mentions`, ask-about-selection, proposals, cost meter, prompt-cache check in CI.
-- **UI in English + Japanese** (§11.5), Welcome-screen language picker, pseudo-locale checks. Studio packaged for Windows and Linux, and export verified from both.
+- **UI in English + Japanese** (§11.5), Welcome-screen language picker, pseudo-locale checks. Studio packaged for Windows, and export verified.
 - 🎯 **M2:** a non-programmer writer passes the hallway test in **either UI language**: they create, write, preview, localize one scene, and export a Windows game without docs help, while an AI contributes proposals through **both** Mode A and Mode B.
 
 ### Phase 5: Runtime feature-complete (⏱ 5)
@@ -1185,13 +1186,14 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 
 ### Phase 7: Open-source launch (⏱ 3)
 - Docs site (Diátaxis, tutorials in EN + JA) on GitHub Pages, the tutorial project, a video walkthrough.
-- Signed Studio installers for Windows and Linux, auto-update, itch.io `butler` export, `hwc report ai-content`.
+- Signed Studio installer for Windows, auto-update, itch.io `butler` export, `hwc report ai-content`.
 - Governance and contribution docs, RFC repo, security policy, license audit.
 - 🎯 **M3: public v1.0.**
 
 **Total ≈ 33 weeks to v1.0** (v0.2 was 32: the built-in assistant and Studio UI localization add 2 weeks to Phase 4, and Phase 6 shrinks by 1). An AI-to-game slice still works at ≈ week 14.
 
 ### 18.9 After v1
+- **Linux (future improvement, v0.5):** Studio on Linux, a Linux runtime build for its live preview and headless playtests, Linux CI (sanitizers, fuzzing), and possibly a tested Proton path for Steam Deck. The portable `core/` and `text/` code and the SDL layer keep this a small change. Phase 0 already proved most of the pieces on Windows.
 - **v1.x:** self-voicing, Lua tier, Tier 2 scripts (RTL, complex shaping), scene replay, Steamworks (achievements, cloud), video (pl_mpeg / dav1d), VS Code extension via LSP, more assistant providers, community Studio UI languages.
 - **v2 (only if wanted):** Linux/macOS game exports, web export (WASM), mobile, an extension registry, real-time collaboration (CRDT), a timeline/animation editor.
 
@@ -1203,13 +1205,14 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 |---|---|---|
 | Scope (an engine, an editor, and an AI layer) | High | Headless-first order, spikes before commitments, the M1 slice by week 14, strict non-goals |
 | Screenplay ↔ Script round-trip fidelity | High | Lossless CST plus property tests from Phase 1. One shared `edit` API for every mutation |
-| CJK and multi-language layout | Medium | Spike C. libunibreak + JLREQ overrides. Glyph-coverage validator. Snapshot tests |
-| Static SDL3 cross-build unknowns | Medium | Spike A in week 1. Fallback: ship SDL3 DLLs next to the `.exe` |
-| GPU render state on older or Wine GPUs | Low–Med | CPU fallback path for rule transitions |
+| CJK and multi-language layout | Medium | Spike C done (RFC 0003): libunibreak + strict JLREQ overrides, 0 violations over 131 widths. Glyph-coverage validator. Snapshot tests |
+| Static SDL3 build unknowns | Low (since Spike A) | Fully static native build verified (RFC 0001). Fallback if ever needed: ship SDL3 DLLs next to the `.exe` |
+| Release `.exe` over the 4 MB budget | Medium | Measured 5.1 MB in Phase 0. Trim SDL subsystems and FreeType modules in Phase 2; revisit the budget if trimming isn't enough |
+| GPU render state on older GPUs, or a silently failing pipeline | Low–Med | Startup self-test and crossfade fallback (RFC 0002) |
 | TS compiler vs C VM drift | High | One VM, conformance transcripts in CI |
 | Windows-specific bugs | Low (since v0.4) | You develop on Windows natively, and the release build runs on the CI Windows runner |
-| Weaker sanitizer coverage natively on Windows | Medium | Mandatory WSL2/CI sanitizer and fuzz runs before merging runtime changes. `win64-asan` preset if MinGW support pans out |
-| Windows ↔ WSL2 friction (line endings, slow `/mnt/c`) | Low | `.gitattributes` LF policy, a separate WSL clone for heavy Linux work |
+| Weaker sanitizer and fuzzing coverage on Windows only | Medium | Verify MSYS2 CLANG64 ASan/UBSan + libFuzzer at Phase 1 start; otherwise corpus regression tests, Dr. Memory, exhaustive loader bounds tests (§14.3) |
+| A later Linux port is harder than expected | Low | Keep `core/` and `text/` free of SDL and OS APIs; keep platform code behind `platform/` |
 | Built-in assistant cost surprises users | Medium | Cost meter per message and session, cheaper-model toggle, a clear "API key ≠ subscription" note, no background AI calls |
 | AI provider API drift (beta tool runner) | Medium | Thin provider adapter. Pin SDK versions. Mode A (MCP) keeps working if Mode B breaks |
 | Japanese UI translation quality | Medium | AI-assisted first pass marked `needs-review`, then native-speaker review before each release. Pseudo-locale tests catch layout breakage |
@@ -1227,7 +1230,7 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 
 All earlier questions are answered (see §0.2 and [LOG.md](LOG.md)). Small items left, none of them blocking:
 
-1. **Repo name:** `PastelSalt/himawari` (recommended, matches the ecosystem name) or `PastelSalt/himawari-c` (matches the old local folder name). Both are free.
+1. ~~**Repo name**~~ Resolved in v0.5: `PastelSalt/himawari-c`.
 2. **Japanese UI review:** you, a friend, or a community reviewer before v1.0?
 3. **Donations** (GitHub Sponsors): yes or no.
 
@@ -1245,6 +1248,7 @@ All earlier questions are answered (see §0.2 and [LOG.md](LOG.md)). Small items
 - **Proposal:** an AI change awaiting human review.
 - **Mode A / Mode B:** working with AI through your own Claude app via MCP / through Studio's built-in assistant panel with your own API key.
 - **BYOK:** bring your own (API) key.
-- **Preview runtime:** the internal Linux build of Himawari-C used for Studio's preview on Linux. Never exported.
+- **Preview runtime:** (v0.3–v0.4 only) an internal Linux build of Himawari-C for Studio on Linux. Dropped in v0.5; see §18.9.
+- **Kinsoku override table:** Himawari's JLREQ rules applied on top of UAX #14 line breaking (RFC 0003).
 - **Provenance:** human/AI origin record per text item.
 - **Conformance suite:** shared tests binding the TS compiler and the C VM.

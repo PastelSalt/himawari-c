@@ -1,12 +1,12 @@
 # RFC 0001: Static SDL 3.4 + SDL3_mixer + FreeType build (Spike A)
 
-- **Status:** Draft. Windows half verified 2026-10-17; Linux half and CI pending
+- **Status:** **Accepted** 2026-10-17 (owner accepted the recommendation; plan v0.5, D22). Verified on Windows; first CI run pending
 - **Created:** 2026-10-17
 - **Affects:** runtime (build system, dependencies)
 - **Plan references:** §8.1, §8.2, §8.13, §14.3, §18 Phase 0 · RESEARCH.md §4.5, §15 · D04, D19
 
 ## Question
-Can Himawari-C ship as **one fully static Windows x64 `.exe`** built natively with MSYS2 UCRT64, containing SDL 3.4, SDL3_mixer 3.2, and FreeType, that opens a window, plays a sound, and shows Japanese text? Can the same sources build the internal Linux preview runtime?
+Can Himawari-C ship as **one fully static Windows x64 `.exe`** built natively with MSYS2 UCRT64, containing SDL 3.4, SDL3_mixer 3.2, and FreeType, that opens a window, plays a sound, and shows Japanese text? (The original question also covered an internal Linux build; plan v0.5 made the project Windows-only, so that part is deferred to §18.9.)
 
 ## Recipe
 - Sources: `runtime/cmake/HimawariDeps.cmake`. Pinned release tarballs, SHA-256 checked, built with `FetchContent` (`SYSTEM`, so our `-Werror` set doesn't apply to dependency headers). A vendored copy in `runtime/third_party/<name>/` takes precedence when present.
@@ -38,11 +38,10 @@ Can Himawari-C ship as **one fully static Windows x64 `.exe`** built natively wi
 4. The SDL3_mixer 3.2 API matched the header exactly: `MIX_Init`, `MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL)`, `MIX_LoadRawAudio`, `MIX_PlayAudio` (fire-and-forget).
 
 ## Still to verify
-- [ ] `linux-debug` (ASan/UBSan) and `linux-preview` builds in WSL2 (blocked: WSL2 not installed yet).
-- [ ] `win64-asan` with MSYS2 CLANG64 (RESEARCH.md §15).
 - [ ] CI: `runtime-win` on `windows-latest` (the runner has no audio device, so the smoke test uses `SDL_AUDIO_DRIVER=dummy`; check which JP fonts the runner has).
-- [ ] `win64-cross` from Ubuntu with a UCRT MinGW toolchain, and running under Wine.
-- [ ] Size trimming to reach ≤ 4 MB.
+- [ ] `win64-asan` / `win64-fuzz` with MSYS2 CLANG64 (Phase 1 start, plan §14.3).
+- [ ] Size trimming to reach ≤ 4 MB (Phase 2).
+- Deferred with Linux (plan §18.9): Linux builds and the Ubuntu cross-build check. The `win64-cross` preset and its toolchain file were removed in v0.5.
 
-## Proposed decision
-Adopt this recipe for the runtime: pinned tarballs + SHA-256 through `FetchContent`, fully static, built natively with MSYS2 UCRT64. Move to **Accepted** once the Linux half and CI are green.
+## Decision (accepted)
+Adopt this recipe for the runtime: pinned tarballs + SHA-256 through `FetchContent`, fully static, built natively with MSYS2 UCRT64.

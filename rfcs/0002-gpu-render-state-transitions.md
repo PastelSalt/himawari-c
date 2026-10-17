@@ -1,6 +1,6 @@
 # RFC 0002: Rule-wipe transitions with `SDL_GPURenderState` (Spike B)
 
-- **Status:** Draft. Verified on Windows (D3D12 and Vulkan) 2026-10-17; CI and Linux pending
+- **Status:** **Accepted** 2026-10-17 (owner accepted the recommendation; plan v0.5, D23). Verified on Windows (D3D12 and Vulkan); first CI run pending
 - **Created:** 2026-10-17
 - **Affects:** runtime (`render/`), build (shader pipeline)
 - **Plan references:** §5.1 (`rule(mask, ms)`), §8.5, §18 Phase 0 · RESEARCH.md §4.1, §15
@@ -38,17 +38,17 @@ Spike B's release `.exe` (SDL only) is **4.14 MB**, so SDL alone is about the wh
 4. **Uniform updates are safe mid-frame.** `SDL_SetGPURenderStateFragmentUniforms` flushes queued draws that use the state before changing its data, so one state can serve several transitions in a frame (one flush each). Sampler bindings are fixed at creation: one state per mask texture, or recreate it.
 5. Mask textures are ordinary `SDL_Texture`s; the GPU texture comes from `SDL_PROP_TEXTURE_GPU_TEXTURE_POINTER`. Masks can be low resolution (the spike uses 480×270 with linear filtering).
 
-## Proposed decision
+## Decision (accepted)
 - Rule transitions and future screen effects use **SDL_GPURenderState** on the GPU renderer, which the runtime requests explicitly; SDL picks the backend (D3D12 on Windows).
 - Shaders are HLSL, compiled offline with DXC to DXIL + SPIR-V, and committed as headers. Pixel shaders follow finding 1.
 - Fallback: default renderer + crossfade, chosen at startup by the self-test in finding 2.
-- Move to **Accepted** after CI (`runtime-win` smoke test) and the Linux preview build (Vulkan) pass.
+- SPIR-V output is kept: Vulkan is a valid backend on Windows too, and it keeps a future Linux port (plan §18.9) cheap.
 
 ## Still to verify
-- [ ] Linux preview build in WSL2 (Vulkan, SPIR-V path).
 - [ ] CI `windows-latest` (no GPU): confirm it takes the fallback or WARP path cleanly.
-- [ ] An Intel or NVIDIA GPU, and Wine/Proton (`proton-smoke`).
+- [ ] An Intel or NVIDIA GPU.
 - [ ] The startup self-test from finding 2, written as part of `render/` in Phase 2.
+- Deferred with Linux (plan §18.9): a Linux Vulkan build and Proton checks.
 
 ## Note on upstream
 Finding 1 looks like a documentation gap in SDL. SDL's contribution policy (its `CLAUDE.md`) says generative AI must not be used for contributions to SDL, so any upstream report or PR has to be written by a human.

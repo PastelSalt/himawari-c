@@ -17,8 +17,8 @@ const ajv = new Ajv2020({ allErrors: true, strict: true });
 ajv.addSchema(readJson("manifest.schema.json") as object);
 ajv.addSchema(readJson("character.schema.json") as object);
 
-const validateManifest = ajv.getSchema("https://pastelsalt.github.io/himawari/spec/manifest/1.0.json")!;
-const validateCharacter = ajv.getSchema("https://pastelsalt.github.io/himawari/spec/character/1.0.json")!;
+const validateManifest = ajv.getSchema("https://pastelsalt.github.io/himawari-c/spec/manifest/1.0.json")!;
+const validateCharacter = ajv.getSchema("https://pastelsalt.github.io/himawari-c/spec/character/1.0.json")!;
 
 describe("manifest schema", () => {
   const example = readJson("examples/himawari.json") as Record<string, unknown>;

@@ -1,5 +1,6 @@
-# CI skeleton (plan §14.6). Phase 0 covers: ts, i18n, runtime-win, runtime-linux, fuzz.
-# Later phases add: runtime-win-cross, proton-smoke, e2e, ux-budget, release.
+# CI skeleton (plan §14.6). Windows only (plan v0.5): every job runs on windows-latest.
+# Phase 0 covers: ts, i18n, runtime-win.
+# Later phases add: runtime-asan (once MSYS2 CLANG64 is verified), e2e, ux-budget, release.
 name: CI
 
 on:
@@ -17,7 +18,7 @@ concurrency:
 jobs:
   ts:
     name: TypeScript (typecheck, lint, test)
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -31,7 +32,7 @@ jobs:
 
   i18n:
     name: Studio UI strings (EN/JA in sync)
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -91,45 +92,3 @@ jobs:
             runtime/build/win64-release/spike_b.exe
             runtime/build/win64-release/spike_c_ft.exe
             runtime/build/win64-release/spike_c_ttf.exe
-
-  runtime-linux:
-    name: Runtime, Linux preview build (sanitizers)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: runtime
-    steps:
-      - uses: actions/checkout@v5
-      - name: Install SDL build dependencies (SDL docs/README-linux.md)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
-            libasound2-dev libpulse-dev libpipewire-0.3-dev libx11-dev libxext-dev \
-            libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev \
-            libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
-            libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libwayland-dev \
-            wayland-protocols libdecor-0-dev
-      - name: Configure and build (linux-debug, ASan + UBSan)
-        run: |
-          cmake --preset linux-debug
-          cmake --build --preset linux-debug
-      - name: Unit tests
-        run: ctest --preset linux-debug
-      - name: Build the internal preview runtime (linux-preview)
-        run: |
-          cmake --preset linux-preview
-          cmake --build --preset linux-preview
-
-  fuzz:
-    name: Fuzz loaders (60 s per target)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: runtime
-    steps:
-      - uses: actions/checkout@v5
-      - run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build
-      - run: |
-          cmake --preset fuzz
-          cmake --build --preset fuzz
-      - run: ./build/fuzz/fuzz_utf8 -max_total_time=60

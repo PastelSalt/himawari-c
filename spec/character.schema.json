@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://pastelsalt.github.io/himawari/spec/character/1.0.json",
+  "$id": "https://pastelsalt.github.io/himawari-c/spec/character/1.0.json",
   "title": "Himawari character file frontmatter (characters/*.md)",
   "description": "Draft 1.0.0-draft. Plan §6.3. This schema covers the YAML frontmatter only; the Markdown body below it is the free-form character bible. Cross-file rules (preset values must name real attributes, sprite folders must exist, rules must reference known attributes) are checked by @himawari/core's validator.",
   "type": "object",
@@ -18,7 +18,7 @@
         {
           "type": "object",
           "minProperties": 1,
-          "propertyNames": { "$ref": "https://pastelsalt.github.io/himawari/spec/manifest/1.0.json#/$defs/languageTag" },
+          "propertyNames": { "$ref": "https://pastelsalt.github.io/himawari-c/spec/manifest/1.0.json#/$defs/languageTag" },
           "additionalProperties": { "type": "string", "minLength": 1 }
         }
       ]
