@@ -16,7 +16,7 @@
 | **Game output** | Windows x64 only |
 | **Studio** | Windows, UI in English (default) + Japanese |
 | **AI role** | Development assistant only. **No media generation** |
-| **Phase** | **Phase 1 in progress** (as of session 9): sanitizers verified; lexer, CST parser, AST, formatter, `hwc check`/`fmt` done. Next: semantic validator, edit API, bytecode + compiler |
+| **Phase** | **Phase 1 in progress** (as of session 9): sanitizers verified; lexer, CST parser, AST, formatter, semantic validator, `hwc check`/`fmt` done. Next: edit API, spec docs, bytecode + compiler |
 | **Owner** | Moesoft (GitHub: `PastelSalt`) |
 | **Repo** | **https://github.com/PastelSalt/himawari-c** (public) |
 
@@ -304,10 +304,21 @@ You then asked to commit and push: `0419238`.
   - `hwc check [paths]`: parses every `.hws` (default `./script`, else the current folder), prints diagnostics in the plan §2.2 style, exits 1 on errors.
   - `hwc fmt [--check] [paths]`: formats in place; reserves every existing line ID in the project first, so new IDs are unique across files; skips (and explains) files with syntax errors; `--check` exits 1 if anything needs formatting (for CI).
   - Tried end to end on a scratch project: friendly diagnostics, 3 IDs assigned, second run changes nothing, broken file skipped.
-- **Checks at this point:** `pnpm check` 96 tests ✅; GCC `win64-debug` build + `ctest` ✅. (ASan/fuzz verified earlier in this session.) **Nothing committed yet.**
+- **Checks at this point:** `pnpm check` 96 tests ✅; GCC `win64-debug` build + `ctest` ✅. (ASan/fuzz verified earlier in this session.)
+- 📦 **Committed and pushed** at your request: `b055cd1` "Phase 1: sanitizers, parser, AST, formatter, hwc check/fmt".
+- ✅ **Milestone 6: semantic validator** (`packages/core/src/project/`):
+  - `parseAst` now also returns `refs`: every name used in the file with its exact span (scene declarations, scenes, speakers, characters, attributes with owner and `-`, positions, transitions with arg count, assets with channel, variables incl. assignments and `{select}` cases, functions). Drives the validator now and editor features later.
+  - Diagnostics gained `help`, `note`, and `fixes` (one-click text edits). New codes HW0101–HW0111 (manifest/characters), HW0201–HW0217 (names, types, assets, duplicates), HW0310/0320/0321/0331 (flow). `renderDiagnostic` prints `= help:` / `= note:` lines.
+  - `manifest.ts` (plain-language checks of `himawari.json`), `character.ts` (YAML frontmatter → presets and layer attributes, plus attributes found in `assets/<root>/<group>/<attr>.png`, ignoring blink/lip-flap frames), `suggest.ts` (edit distance), `check.ts` (`checkProject({manifest, characters, scripts, assets})` → per-file diagnostics; pure, no I/O).
+  - P5 respected: missing assets are warnings ("a placeholder will be used"); attribute checks are skipped for characters without sprites.
+  - Core now depends on `yaml` 2.9.1 (lockfile updated).
+  - Tests (`check.test.ts`, 38): a realistic correct project yields **zero** diagnostics (no false positives); every code has a failing case; suggestions, quick-fix spans, and the "Hana's expressions" note are checked; P5 (no-sprite characters accept any attribute; asset checks skipped without an asset list; variable checks skipped without a manifest).
+  - **Language bug found by the tests and fixed:** `"{select g: m="he" other="they"} waved."` ended the string at the first inner quote. The lexer now treats quotes inside a `{…}` tag as part of the tag (literal `{` is `\{`). Documented in `spec/language.md` §2.2; parser test added.
+  - **`hwc check` is now a project check** (`packages/cli/src/project.ts`): finds the nearest `himawari.json` upward, loads `characters/*.md`, every `script/**/*.hws` (cross-file checks need all of them even when you pass one file), and the `assets/` listing. Outside a project it falls back to syntax-only with a note. Tried on a sample project built from the spec examples: HW0204 with "did you mean smile" and Hana's expression list, HW0201 "hanna" → "hana", HW0210 `[player_nmae]` → `player_name`, HW0208, and HW0320, all with exact carets.
+- **Checks:** `pnpm check` **135 tests** ✅ (typecheck, lint, i18n). Not committed yet (milestone 6 is new since `b055cd1`).
 
 **Remaining Phase 1 work (plan §18), in order:**
-1. **Project model + semantic validator** (`packages/core/src/project/`): load `himawari.json` and `characters/*.md` (schemas from `spec/`), build the scene/variable/character/attribute index, then report HW02xx (unknown speaker, attribute, asset, position, transition, scene, variable; type errors; "did you mean" suggestions via edit distance) and HW03xx (dead ends HW0320, empty options HW0330, menus that can vanish HW0331, `return` outside `call` HW0310), each with a quick-fix description.
+1. ~~Project model + semantic validator~~ ✅ done (milestone 6). Known gaps to revisit: manifest/character diagnostics have no line positions yet (they point at line 1); `if`/`elif` type errors point at the `if` line; a test asserting the TS manifest reader and `spec/manifest.schema.json` agree on shared fixtures.
 2. **Structured edit API** (`edit.ts`): insert_after(line_id), replace_text(line_id), set_attrs, delete, move, add_menu_option, all on the CST so comments and layout survive; property test: random edits keep the file parseable and round-trippable.
 3. **Spec documents:** `spec/grammar.ebnf` (from the parser), `spec/ast.schema.json` (from `ast.ts` types), resolve the open questions in `spec/language.md` §5.
 4. **Bytecode:** `spec/bytecode.md` v1 (header, sections, ISA from plan §5.4), compiler in Core, `hwc build` (writes `.hwb`) and `hwc disasm`; conformance harness (compile half) in `tests/conformance/`.
@@ -357,5 +368,5 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 ## Next Steps (after session 9)
 
 1. ~~CI: confirm `ts` and `i18n` pass~~ ✅ confirmed in session 9.
-2. **Phase 1 continues** with the "Remaining Phase 1 work" list at the end of session 9 (validator → edit API → spec docs → bytecode + compiler).
-3. **You:** the session 9 work is not committed yet. Ask for a commit/push when ready; the new `runtime-asan` CI job runs for the first time on that push.
+2. **Phase 1 continues** with the "Remaining Phase 1 work" list at the end of session 9 (edit API → spec docs → bytecode + compiler).
+3. **You:** milestone 6 (validator) is not committed yet; `b055cd1` has everything before it.

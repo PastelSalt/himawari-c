@@ -55,6 +55,7 @@ If control reaches the end of a scene's body without `jump`, `call`, `return`, o
 
 - `speaker <attrs…> "text"`: attributes before the text apply to the speaker's sprite exactly like `show` (§2.4), then the line is spoken.
 - Strings use `"…"`. Escapes: `\"`, `\\`, `\n`, `\[`, `\{`.
+- Inside a `{…}` tag, quotes don't end the string, so `"{select g: m="he" other="they"} waved."` needs no escaping. A literal `{` in text is written `\{`.
 - **Interpolation:** `[var]` inserts a variable's value.
 - **Variants:** `{select var: m="he" f="she" other="they"}` picks text by a string-enum variable. `other` is required and used as the fallback. Translators may add or remove cases for their language.
 - **Inline tags:** `{b}…{/b}`, `{i}…{/i}`, `{color=#rrggbb}…{/color}`, `{size=N}…{/size}`, `{w=ms}`, `{speed=N}…{/speed}`, `{nw}`, `{shake}…{/shake}`, ruby `{rb=reading}base{/rb}`, `{alt=text}`. Unknown tags are errors.

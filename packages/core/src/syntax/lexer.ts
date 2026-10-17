@@ -152,14 +152,20 @@ export function lex(source: string): LexResult {
     }
 
     if (c === '"') {
+      // Quotes inside a {…} text tag belong to the tag, so writers can use
+      // {select gender_p: m="he" other="they"} without escaping. Literal braces are written \{.
       let j = i + 1;
       let closed = false;
+      let depth = 0;
       while (j < source.length && source[j] !== "\n" && source[j] !== "\r") {
-        if (source[j] === "\\" && j + 1 < source.length && source[j + 1] !== "\n" && source[j + 1] !== "\r") {
+        const ch = source[j];
+        if (ch === "\\" && j + 1 < source.length && source[j + 1] !== "\n" && source[j + 1] !== "\r") {
           j += 2;
           continue;
         }
-        if (source[j] === '"') {
+        if (ch === "{") depth++;
+        else if (ch === "}" && depth > 0) depth--;
+        else if (ch === '"' && depth === 0) {
           closed = true;
           j++;
           break;

@@ -1,7 +1,17 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
-import { join, relative } from "node:path";
-import { CORE_VERSION, SPEC_VERSIONS, format, lex, parseAst, renderDiagnostic } from "@himawari/core";
+import { join, relative, resolve } from "node:path";
+import {
+  CORE_VERSION,
+  type Diagnostic,
+  SPEC_VERSIONS,
+  checkProject,
+  format,
+  lex,
+  parseAst,
+  renderDiagnostic,
+} from "@himawari/core";
+import { findProjectRoot, loadProject } from "./project.js";
 
 // Commands from plan §9.2. `check` and `fmt` work; the rest land later in Phase 1+.
 const PLANNED = ["init", "build", "run", "playtest", "l10n", "sprites", "graph", "report", "migrate", "disasm"];
@@ -11,7 +21,8 @@ const HELP = `hwc ${CORE_VERSION}
 Usage: hwc <command> [options] [files or folders]
 
 Commands:
-  check [paths]          Parse and validate .hws files; exit 1 on errors
+  check [paths]          Validate the project (scripts, himawari.json, characters,
+                         assets); exit 1 on errors
   fmt [--check] [paths]  Format files in place and add missing #line: IDs
                          (--check: only report files that need formatting)
   --version              Show versions of hwc and the specs
@@ -46,21 +57,41 @@ class UsageError extends Error {}
 const display = (file: string) => relative(process.cwd(), file).replaceAll("\\", "/") || file;
 
 function check(paths: readonly string[]): number {
-  const files = findScripts(paths);
-  let errors = 0;
-  let warnings = 0;
-  for (const file of files) {
-    const source = readFileSync(file, "utf8");
-    const { diagnostics } = parseAst(source, display(file));
+  const counts = { error: 0, warning: 0, info: 0 };
+  const print = (file: string, source: string, diagnostics: Diagnostic[]) => {
     for (const d of diagnostics) {
-      console.log(renderDiagnostic(d, display(file), source) + "\n");
-      if (d.severity === "error") errors++;
-      else if (d.severity === "warning") warnings++;
+      console.log(renderDiagnostic(d, file, source) + "\n");
+      counts[d.severity]++;
     }
+  };
+
+  const root = findProjectRoot(paths[0] ?? ".");
+  let checked: number;
+  if (root) {
+    // Cross-file checks (scenes, line IDs) need every script, even when only some are reported.
+    const result = checkProject(loadProject(root));
+    const wanted = paths.length > 0 ? new Set(findScripts(paths).map((f) => relative(root, resolve(f)).replaceAll("\\", "/"))) : undefined;
+    const reports = result.files.filter((f) => !wanted || wanted.has(f.file));
+    for (const f of reports) print(display(join(root, f.file)), f.source, f.diagnostics);
+    checked = reports.length;
+  } else {
+    console.log("note: no himawari.json found here or above, so only syntax was checked\n");
+    const files = findScripts(paths);
+    for (const file of files) {
+      const source = readFileSync(file, "utf8");
+      print(display(file), source, parseAst(source, display(file)).diagnostics);
+    }
+    checked = files.length;
   }
-  const files_ = `${files.length} file${files.length === 1 ? "" : "s"}`;
-  console.log(errors + warnings === 0 ? `✓ ${files_} checked, no problems` : `${files_} checked: ${errors} error(s), ${warnings} warning(s)`);
-  return errors > 0 ? 1 : 0;
+
+  const files_ = `${checked} file${checked === 1 ? "" : "s"}`;
+  const total = counts.error + counts.warning + counts.info;
+  console.log(
+    total === 0
+      ? `✓ ${files_} checked, no problems`
+      : `${files_} checked: ${counts.error} error(s), ${counts.warning} warning(s), ${counts.info} note(s)`,
+  );
+  return counts.error > 0 ? 1 : 0;
 }
 
 function fmt(args: readonly string[]): number {

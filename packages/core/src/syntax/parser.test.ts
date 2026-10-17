@@ -132,6 +132,14 @@ describe("structure", () => {
     expect(tags).toEqual(["#line:k3f9a1"]);
   });
 
+  test("quotes inside a {…} tag don't end the string", () => {
+    const src = 'scene s:\n    "{select g: m="he" other="they"} waved."\n';
+    const { root: r, diagnostics: d } = parse(src);
+    expect(d).toEqual([]);
+    const strings = [...tokensOf(r)].filter((t) => t.kind === "String").map((t) => t.text);
+    expect(strings).toEqual(['"{select g: m="he" other="they"} waved."']);
+  });
+
   test("a line tag may be followed by a comment", () => {
     const { root: r, diagnostics: d } = parse('scene s:\n    "hi"   #line:k3f9a1  # note\n');
     expect(d).toEqual([]);

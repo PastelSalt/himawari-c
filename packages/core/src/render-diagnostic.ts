@@ -17,11 +17,15 @@ export function renderDiagnostic(d: Diagnostic, file: string, source: string, in
   const width = Math.max(1, end.line === line ? end.col - col + 1 : text.length - col + 1);
   const gutter = String(line).length;
   const pad = " ".repeat(gutter);
-  return [
+  const out = [
     `${d.severity}[${d.code}]: ${d.message}`,
     `${pad} ┌─ ${file}:${line}:${col}`,
     `${pad} │`,
     `${line} │ ${text}`,
     `${pad} │ ${" ".repeat(col - 1)}${"^".repeat(width)}`,
-  ].join("\n");
+  ];
+  if (d.help || d.note) out.push(`${pad} │`);
+  if (d.help) out.push(`${pad} = help: ${d.help}${d.fixes?.length ? "   [fix available]" : ""}`);
+  if (d.note) out.push(`${pad} = note: ${d.note}`);
+  return out.join("\n");
 }

@@ -21,9 +21,17 @@ const NEEDS_VALUE = new Set(["color", "size", "speed", "rb", "w", "alt"]);
 
 const IDENT = /^[a-z_][a-z0-9_]*$/;
 
+/** A variable used in text: `[name]`, or the variable of a `{select …}` with its case keys. */
+export interface TextRef {
+  name: string;
+  span: { start: number; end: number };
+  selectCases?: string[];
+}
+
 export interface TextResult {
   parts: TextPart[];
   diagnostics: Diagnostic[];
+  refs: TextRef[];
 }
 
 /**
@@ -32,6 +40,7 @@ export interface TextResult {
  */
 export function parseText(token: string, offset: number): TextResult {
   const diagnostics: Diagnostic[] = [];
+  const refs: TextRef[] = [];
   const closed = token.length >= 2 && token.endsWith('"') && !token.endsWith('\\"');
   const body = token.slice(1, closed ? -1 : undefined);
   const base = offset + 1;
@@ -66,6 +75,7 @@ export function parseText(token: string, offset: number): TextResult {
       }
       flush();
       out().push({ var: name });
+      refs.push({ name, span: { start: base + i, end: base + end + 1 } });
       i = end + 1;
       continue;
     }
@@ -97,7 +107,10 @@ export function parseText(token: string, offset: number): TextResult {
       if (inner.startsWith("select ") || inner.startsWith("select\t")) {
         flush();
         const sel = parseSelect(inner.slice(7), base, span, diagnostics);
-        if (sel) out().push(sel);
+        if (sel && "select" in sel) {
+          out().push(sel);
+          refs.push({ name: sel.select, span, selectCases: Object.keys(sel.cases) });
+        }
         continue;
       }
 
@@ -131,7 +144,7 @@ export function parseText(token: string, offset: number): TextResult {
     diagnostics.push(diagnostic("HW0017", { start: top.start, end: top.start + top.tag.length + 2 }, { tag: top.tag }));
     out().push(...top.children);
   }
-  return { parts: mergeText(root), diagnostics };
+  return { parts: mergeText(root), diagnostics, refs };
 }
 
 /** Index of the `}` closing the `{` at `from`, skipping quoted strings inside (for select). */

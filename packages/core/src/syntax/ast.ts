@@ -6,7 +6,7 @@
 import { type CstElement, type CstNode, childNodes, childTokens, isNode, spanOf } from "./cst.js";
 import type { Diagnostic, Span } from "./diagnostics.js";
 import type { Token } from "./lexer.js";
-import { type ParseResult, parse } from "./parser.js";
+import { KEYWORDS, type ParseResult, parse } from "./parser.js";
 import { type TextPart, parseText } from "./text.js";
 
 export const AST_VERSION = "1.0";
@@ -76,10 +76,34 @@ export interface Ast {
   scenes: Scene[];
 }
 
+/**
+ * A name used somewhere in the file, with its exact span. This index drives the
+ * validator, and later go-to-definition, find-references, and rename.
+ */
+export interface Ref {
+  kind: "sceneDecl" | "scene" | "speaker" | "character" | "attr" | "position" | "transition" | "asset" | "variable" | "function";
+  name: string;
+  span: Span;
+  /** attr: the character it applies to. */
+  owner?: string;
+  /** attr: written as `-attr`. */
+  remove?: boolean;
+  /** asset: bg, cg, music, sfx, ambient, voice, or rule (a rule-transition mask). */
+  channel?: string;
+  /** variable: the target of an assignment. */
+  assign?: boolean;
+  /** variable: used by `{select …}`, with its case keys. */
+  selectCases?: string[];
+  /** transition: number of arguments given. */
+  argCount?: number;
+}
+
 export interface AstResult {
   ast: Ast;
   /** Syntax and text diagnostics, sorted by position. */
   diagnostics: Diagnostic[];
+  /** Every name used in the file, in source order. */
+  refs: Ref[];
   cst: ParseResult["root"];
 }
 
@@ -89,7 +113,94 @@ export function parseAst(source: string, file = "<memory>"): AstResult {
   const b = new Builder();
   const scenes = childNodes(parsed.root, "SceneDecl").map((n) => b.scene(n));
   const diagnostics = [...parsed.diagnostics, ...b.diagnostics].sort((x, y) => x.span.start - y.span.start);
-  return { ast: { version: AST_VERSION, file, scenes }, diagnostics, cst: parsed.root };
+  const refs = [...collectRefs(parsed.root), ...b.textRefs].sort((x, y) => x.span.start - y.span.start);
+  return { ast: { version: AST_VERSION, file, scenes }, diagnostics, refs, cst: parsed.root };
+}
+
+const tokSpan = (t: Token): Span => ({ start: t.start, end: t.start + t.text.length });
+
+/** Structural references from the CST (text interpolation refs come from the text parser). */
+function collectRefs(root: CstNode): Ref[] {
+  const refs: Ref[] = [];
+  const idents = (n: CstNode) => childTokens(n, "Identifier");
+  const add = (kind: Ref["kind"], t: Token | undefined, extra: Partial<Ref> = {}) => {
+    if (t && !KEYWORDS.has(t.text)) refs.push({ kind, name: t.text, span: tokSpan(t), ...extra });
+  };
+  const attrs = (n: CstNode, owner: string) => {
+    for (const a of childNodes(n, "Attr")) {
+      add("attr", idents(a)[0], { owner, remove: childTokens(a, "Minus").length > 0 });
+    }
+  };
+  const clauses = (n: CstNode) => {
+    const at = childNodes(n, "AtClause")[0];
+    if (at) add("position", idents(at)[1]);
+    const w = childNodes(n, "WithClause")[0];
+    const tr = w ? childNodes(w, "Transition")[0] : undefined;
+    if (tr) {
+      const args = childNodes(tr, "ArgList")[0];
+      const argNodes = args ? childNodes(args) : [];
+      add("transition", idents(tr)[0], { argCount: argNodes.length });
+      const first = argNodes[0];
+      if (idents(tr)[0]?.text === "rule" && first?.kind === "NameRef") add("asset", idents(first)[0], { channel: "rule" });
+    }
+  };
+
+  const visit = (n: CstNode, inExpr: boolean) => {
+    const ids = idents(n);
+    switch (n.kind) {
+      case "SceneHeader":
+        add("sceneDecl", ids[1]);
+        break;
+      case "SayStmt":
+        add("speaker", ids[0]);
+        attrs(n, ids[0]?.text ?? "");
+        break;
+      case "ShowStmt":
+      case "HideStmt":
+      case "MoveStmt":
+        add("character", ids[1]);
+        attrs(n, ids[1]?.text ?? "");
+        clauses(n);
+        break;
+      case "BgStmt":
+      case "CgStmt":
+        add("asset", ids[1], { channel: ids[0]?.text ?? "" });
+        clauses(n);
+        break;
+      case "AudioStmt":
+        add("asset", ids[1], { channel: ids[0]?.text ?? "" });
+        break;
+      case "JumpStmt":
+      case "CallStmt":
+        add("scene", ids[1]);
+        break;
+      case "AssignStmt":
+        add("variable", ids[0], { assign: true });
+        break;
+      case "CallExpr":
+        add("function", ids[0]);
+        break;
+      case "NameRef":
+        if (inExpr) add("variable", ids[0]);
+        break;
+      default:
+        break;
+    }
+    // Names inside transitions, fades, waits, and effects are arguments, not variables.
+    const exprContext = !["Transition", "FadeClause", "WaitStmt", "EffectStmt", "WithClause"].includes(n.kind);
+    for (const c of n.children) {
+      if (isNode(c)) visit(c, inExpr ? exprContext : exprContext && isExprRoot(n, c));
+    }
+  };
+  visit(root, false);
+  return refs;
+}
+
+const EXPR_KINDS: ReadonlySet<string> = new Set(["BinaryExpr", "UnaryExpr", "ParenExpr", "NameRef", "CallExpr", "Literal"]);
+
+/** True when `child` is the expression of a header or assignment (where names are variables). */
+function isExprRoot(parent: CstNode, child: CstNode): boolean {
+  return EXPR_KINDS.has(child.kind) && ["IfHeader", "ElifHeader", "OptionHeader", "AssignStmt"].includes(parent.kind);
 }
 
 const sig = (n: CstNode): Token[] =>
@@ -111,6 +222,7 @@ const blockOf = (n: CstNode): CstNode | undefined => childNodes(n, "Block")[0];
 
 class Builder {
   readonly diagnostics: Diagnostic[] = [];
+  readonly textRefs: Ref[] = [];
 
   scene(n: CstNode): Scene {
     const header = n.children[0] as CstNode;
@@ -134,6 +246,13 @@ class Builder {
     if (!tok) return [];
     const r = parseText(tok.text, tok.start);
     this.diagnostics.push(...r.diagnostics);
+    for (const ref of r.refs) {
+      this.textRefs.push(
+        ref.selectCases
+          ? { kind: "variable", name: ref.name, span: ref.span, selectCases: ref.selectCases }
+          : { kind: "variable", name: ref.name, span: ref.span },
+      );
+    }
     return r.parts;
   }
 

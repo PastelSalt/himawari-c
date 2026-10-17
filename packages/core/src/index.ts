@@ -27,6 +27,12 @@ export { type TextPart, parseText, plainText } from "./syntax/text.js";
 export { type LineCol, LineIndex } from "./syntax/position.js";
 export { renderDiagnostic } from "./render-diagnostic.js";
 export { type FormatOptions, type FormatResult, format } from "./format.js";
+export { DIAGNOSTICS, type Fix, SEMANTIC_DIAGNOSTICS } from "./syntax/diagnostics.js";
+export { type Ref } from "./syntax/ast.js";
+export { type FileReport, type ProjectCheck, type ProjectInput, type SourceFile, checkProject } from "./project/check.js";
+export { type Character, characterWords, readCharacter } from "./project/character.js";
+export { DEFAULT_POSITIONS, type Manifest, type VarType, type VariableDecl, readManifest } from "./project/manifest.js";
+export { editDistance, suggest } from "./project/suggest.js";
 export {
   AST_VERSION,
   type Ast,
