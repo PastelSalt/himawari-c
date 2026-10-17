@@ -16,7 +16,7 @@
 | **Game output** | Windows x64 only |
 | **Studio** | Windows, UI in English (default) + Japanese |
 | **AI role** | Development assistant only. **No media generation** |
-| **Phase** | **Phase 1 in progress** (as of session 9): sanitizers verified; lexer, CST parser, AST, formatter, semantic validator, `hwc check`/`fmt` done. Next: edit API, spec docs, bytecode + compiler |
+| **Phase** | **Phase 1 in progress** (as of session 9): sanitizers verified; lexer, CST parser, AST, formatter, semantic validator, edit API, `hwc check`/`fmt` done. Next: spec docs, bytecode + compiler |
 | **Owner** | Moesoft (GitHub: `PastelSalt`) |
 | **Repo** | **https://github.com/PastelSalt/himawari-c** (public) |
 
@@ -315,11 +315,19 @@ You then asked to commit and push: `0419238`.
   - Tests (`check.test.ts`, 38): a realistic correct project yields **zero** diagnostics (no false positives); every code has a failing case; suggestions, quick-fix spans, and the "Hana's expressions" note are checked; P5 (no-sprite characters accept any attribute; asset checks skipped without an asset list; variable checks skipped without a manifest).
   - **Language bug found by the tests and fixed:** `"{select g: m="he" other="they"} waved."` ended the string at the first inner quote. The lexer now treats quotes inside a `{…}` tag as part of the tag (literal `{` is `\{`). Documented in `spec/language.md` §2.2; parser test added.
   - **`hwc check` is now a project check** (`packages/cli/src/project.ts`): finds the nearest `himawari.json` upward, loads `characters/*.md`, every `script/**/*.hws` (cross-file checks need all of them even when you pass one file), and the `assets/` listing. Outside a project it falls back to syntax-only with a note. Tried on a sample project built from the spec examples: HW0204 with "did you mean smile" and Hana's expression list, HW0201 "hanna" → "hana", HW0210 `[player_nmae]` → `player_name`, HW0208, and HW0320, all with exact carets.
-- **Checks:** `pnpm check` **135 tests** ✅ (typecheck, lint, i18n). Not committed yet (milestone 6 is new since `b055cd1`).
+- **Checks:** `pnpm check` **135 tests** ✅ (typecheck, lint, i18n).
+- 📦 **Committed and pushed** at your request: `850419d` "Phase 1: semantic validator; hwc check validates projects".
+- ✅ **Milestone 7: structured edit API** (`packages/core/src/edit.ts`, `applyEdits(source, ops, {takenIds, random})`):
+  - Operations, all anchored on **line IDs** (never line numbers or diffs, plan §10.2): `insert_after`, `insert_before`, `append_to_scene`, `replace_text`, `set_attrs` (add/remove, keeps other attributes), `delete` (an option goes with its block; nested IDs are merged), `move` (keeps IDs, re-indents; refuses moving a line into its own block). A menu option's line ID addresses the whole option.
+  - Only the touched lines change; comments and odd spacing elsewhere stay byte-for-byte. Inserted snippets are dedented and re-indented to the anchor's level.
+  - `addLineIds(source, span, …)`: tags only the inserted lines (dialogue, narration, options), putting the tag before any comment. Existing lines are never re-tagged.
+  - Batches are atomic: if any op fails (unknown ID, wrong line kind, bad name) or the result has more syntax errors than the input (e.g. emptying a menu, a broken snippet, an unescaped quote), nothing is applied and the original text is returned with a reason.
+  - Tests (`edit.test.ts`, 19): exact output for every op, rejections, an atomic-batch failure, and a **property test of 400 random batches** (184 accepted, 216 rejected): accepted batches never have syntax errors, IDs stay unique, every dialogue/narration/option line keeps exactly one ID; rejected batches return the input unchanged.
+- **Checks:** `pnpm check` **154 tests** ✅. Not committed yet (milestone 7 is new since `850419d`).
 
 **Remaining Phase 1 work (plan §18), in order:**
 1. ~~Project model + semantic validator~~ ✅ done (milestone 6). Known gaps to revisit: manifest/character diagnostics have no line positions yet (they point at line 1); `if`/`elif` type errors point at the `if` line; a test asserting the TS manifest reader and `spec/manifest.schema.json` agree on shared fixtures.
-2. **Structured edit API** (`edit.ts`): insert_after(line_id), replace_text(line_id), set_attrs, delete, move, add_menu_option, all on the CST so comments and layout survive; property test: random edits keep the file parseable and round-trippable.
+2. ~~Structured edit API~~ ✅ done (milestone 7). `add_menu_option` is `insert_after` on an option's line ID. Later: rename refactors across files (scenes, characters, variables) using the `refs` index.
 3. **Spec documents:** `spec/grammar.ebnf` (from the parser), `spec/ast.schema.json` (from `ast.ts` types), resolve the open questions in `spec/language.md` §5.
 4. **Bytecode:** `spec/bytecode.md` v1 (header, sections, ISA from plan §5.4), compiler in Core, `hwc build` (writes `.hwb`) and `hwc disasm`; conformance harness (compile half) in `tests/conformance/`.
 5. `hwc l10n` (string tables, CSV/XLIFF) can follow, or move to Phase 2 if time is short.
@@ -368,5 +376,5 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 ## Next Steps (after session 9)
 
 1. ~~CI: confirm `ts` and `i18n` pass~~ ✅ confirmed in session 9.
-2. **Phase 1 continues** with the "Remaining Phase 1 work" list at the end of session 9 (edit API → spec docs → bytecode + compiler).
-3. **You:** milestone 6 (validator) is not committed yet; `b055cd1` has everything before it.
+2. **Phase 1 continues** with the "Remaining Phase 1 work" list at the end of session 9 (spec docs → bytecode + compiler).
+3. **You:** milestone 7 (edit API) is not committed yet; `850419d` has everything before it.

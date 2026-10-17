@@ -27,6 +27,7 @@ export { type TextPart, parseText, plainText } from "./syntax/text.js";
 export { type LineCol, LineIndex } from "./syntax/position.js";
 export { renderDiagnostic } from "./render-diagnostic.js";
 export { type FormatOptions, type FormatResult, format } from "./format.js";
+export { type EditOp, type EditOptions, type EditResult, addLineIds, applyEdits } from "./edit.js";
 export { DIAGNOSTICS, type Fix, SEMANTIC_DIAGNOSTICS } from "./syntax/diagnostics.js";
 export { type Ref } from "./syntax/ast.js";
 export { type FileReport, type ProjectCheck, type ProjectInput, type SourceFile, checkProject } from "./project/check.js";

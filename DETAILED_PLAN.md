@@ -1148,7 +1148,7 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 - ✅ First: verify `win64-asan` / `win64-fuzz` in MSYS2 CLANG64 (done 2026-10-17; both work, §14.3).
 - ✅ Lossless CST parser with recovery, typed AST, line IDs, formatter, `hwc check` / `hwc fmt` (2026-10-17).
 - ✅ Validator with codes, suggestions, and quick fixes; `hwc check` validates whole projects (2026-10-17).
-- ⏳ Structured `edit` API.
+- ✅ Structured `edit` API, line-ID anchored, atomic and validated (2026-10-17).
 - Character and layered-sprite schema, presets, attribute resolution, l10n string tables and placeholders.
 - `bytecode.md` v1, compiler, `hwc check|fmt|build|disasm|l10n`.
 - Conformance harness (compile half).

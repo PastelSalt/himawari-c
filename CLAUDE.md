@@ -2,7 +2,7 @@
 
 Himawari is an open-source, AI-assisted **visual novel engine** for other developers. It is made by Moesoft (GitHub: `PastelSalt`). Repo: **https://github.com/PastelSalt/himawari-c** (public).
 
-**Status:** **Phase 1 in progress.** Done: sanitizers verified, lexer, lossless CST parser, AST + refs index, formatter, semantic validator, `hwc check`/`fmt` (`packages/core/src/syntax/`, `format.ts`, `project/`, `packages/cli`). Next: edit API, spec docs, bytecode + compiler. The latest LOG.md session ends with the exact remaining list. Read these before doing anything substantial:
+**Status:** **Phase 1 in progress.** Done: sanitizers verified, lexer, lossless CST parser, AST + refs index, formatter, semantic validator, structured edit API, `hwc check`/`fmt` (`packages/core/src/syntax/`, `format.ts`, `edit.ts`, `project/`, `packages/cli`). Next: spec docs (`grammar.ebnf`, `ast.schema.json`), bytecode + compiler. The latest LOG.md session ends with the exact remaining list. Read these before doing anything substantial:
 - [DETAILED_PLAN.md](DETAILED_PLAN.md): the plan (v0.5). Section numbers are referenced everywhere.
 - [LOG.md](LOG.md): decision history, the decision register (D01–D24), and next steps.
 - [RESEARCH.md](RESEARCH.md): evidence behind decisions (🔬§N in the plan = RESEARCH.md §N).
