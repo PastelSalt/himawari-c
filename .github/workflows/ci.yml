@@ -142,7 +142,10 @@ jobs:
           cmake --build --preset win64-fuzz
           ctest --preset win64-fuzz
           ./build/win64-fuzz/fuzz_utf8.exe -max_total_time=60
-          mkdir -p corpus-hwb && cp ../tests/conformance/cases/*/expected.hwb corpus-hwb/
+          mkdir -p corpus-hwb
+          for c in ../tests/conformance/cases/*/; do
+            if [ -f "$c/expected.hwb" ]; then cp "$c/expected.hwb" "corpus-hwb/$(basename "$c").hwb"; fi
+          done
           ./build/win64-fuzz/fuzz_hwb.exe -max_total_time=60 corpus-hwb
           mkdir -p corpus-save && HW_WRITE_SAVE=corpus-save/basic.hwsav ./build/win64-fuzz/test_save.exe
           ./build/win64-fuzz/fuzz_save.exe -max_total_time=60 corpus-save
