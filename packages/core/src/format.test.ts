@@ -36,20 +36,20 @@ scene ch1_intro:
 
     hana "Spacing   inside   strings stays."   #line:000001
     $ x = -1 + (2 * 3)
-    menu "Pick":
-        "One":   #line:000002
+    menu "Pick":   #line:000002
+        "One":   #line:000003
             jump a
-        once "Two" if x >= 2 and not (y):   #line:000003
+        once "Two" if x >= 2 and not (y):   #line:000004
             wait(500)
             shake(200)
 # trailing comment block
 scene ch1_hub:
-    "Tabs become spaces."   #line:000004  # a comment
+    "Tabs become spaces."   #line:000005  # a comment
 `;
 
 /** AST with spans and line IDs removed, for semantic comparison. */
 const shape = (src: string) =>
-  JSON.stringify(parseAst(src).ast.scenes, (k, v: unknown) => (k === "span" || k === "lineId" ? undefined : v));
+  JSON.stringify(parseAst(src).ast.scenes, (k, v: unknown) => (k === "span" || k === "lineId" || k === "promptLineId" ? undefined : v));
 
 describe("format", () => {
   const r = format(MESSY, { random: counter() });
@@ -58,7 +58,7 @@ describe("format", () => {
     expect(r.refused).toBeNull();
     expect(r.text).toBe(EXPECTED);
     expect(r.changed).toBe(true);
-    expect(r.added).toEqual(["000001", "000002", "000003", "000004"]);
+    expect(r.added).toEqual(["000001", "000002", "000003", "000004", "000005"]);
   });
 
   test("idempotent", () => {
@@ -89,6 +89,25 @@ describe("format", () => {
     const out = format('scene s:\n    "a"\n    hana "b"\n');
     expect(out.added).toHaveLength(2);
     for (const id of out.added) expect(isLineId(id)).toBe(true);
+  });
+
+  test("menu prompts get IDs, menus without a prompt don't", () => {
+    const src = `scene s:
+    menu "Where?":
+        "a":
+            end
+    menu:
+        "b":
+            end
+`;
+    expect(format(src, { random: counter() }).text).toBe(`scene s:
+    menu "Where?":   #line:000001
+        "a":   #line:000002
+            end
+    menu:
+        "b":   #line:000003
+            end
+`);
   });
 
   test("lineIds: false only formats", () => {

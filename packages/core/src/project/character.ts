@@ -11,6 +11,8 @@ export interface Character {
   file: string;
   /** Display name in the source language (or the id). */
   displayName: string;
+  /** Display names by language tag, when the frontmatter gives `name: { en: …, ja: … }`. */
+  names: Record<string, string>;
   /** `#rrggbb` from the frontmatter, if set. */
   color: string | null;
   /** True when the file declares a layered sprite (`sprite:`). */
@@ -20,6 +22,32 @@ export interface Character {
   presets: Set<string>;
   /** Attributes per layer group, from frontmatter and (when known) asset files. */
   groups: Map<string, Set<string>>;
+  /** The layered sprite as the runtime needs it (plan §6.1), or null without one. */
+  sprite: SpriteDef | null;
+}
+
+export interface SpriteGroup {
+  name: string;
+  /** Drawn whatever the attributes (a body base). */
+  always: boolean;
+  /** Several attributes at once (accessories); otherwise a new attribute replaces the old one. */
+  multiple: boolean;
+  blink: boolean;
+  lipflap: boolean;
+  defaults: string[];
+  attrs: string[];
+}
+
+export interface SpriteDef {
+  root: string;
+  /** Anchor in the sprite's own canvas (0..1), placed on the stage position. */
+  anchor: [number, number];
+  scale: number;
+  /** Bottom to top. */
+  groups: SpriteGroup[];
+  presets: { name: string; layers: [group: string, attr: string][] }[];
+  /** Hide or show an attribute while every word in `when` is active (an attribute, or a preset whose attributes are all active). */
+  rules: { hide: string | null; show: string | null; when: string[] }[];
 }
 
 const NOWHERE = { start: 0, end: 0 };
@@ -60,6 +88,10 @@ export function readCharacter(
   const name = f["name"];
   const displayName =
     typeof name === "string" ? name : typeof name === "object" && name !== null ? String(Object.values(name)[0] ?? id) : id;
+  const names: Record<string, string> = {};
+  if (typeof name === "object" && name !== null && !Array.isArray(name)) {
+    for (const [lang, v] of Object.entries(name)) if (typeof v === "string") names[lang] = v;
+  }
 
   const presets = new Set<string>();
   const groups = new Map<string, Set<string>>();
@@ -102,9 +134,50 @@ export function readCharacter(
     if (!FRAME_SUFFIX.test(attr)) groupOf(group).add(attr);
   }
 
+  let spriteDef: SpriteDef | null = null;
+  if (hasSprite || groups.size > 0) {
+    const s = (hasSprite ? sprite : {}) as Record<string, unknown>;
+    const declared = (typeof s["groups"] === "object" && s["groups"] !== null ? s["groups"] : {}) as Record<string, unknown>;
+    const num = (v: unknown, d: number) => (typeof v === "number" && Number.isFinite(v) ? v : d);
+    const anchor = Array.isArray(s["anchor"]) ? (s["anchor"] as unknown[]) : [];
+    const words = (v: unknown) => (typeof v === "string" ? v.split(/\s+/).filter(Boolean) : []);
+    spriteDef = {
+      root: spriteRoot,
+      anchor: [num(anchor[0], 0.5), num(anchor[1], 1)],
+      scale: num(s["scale"], 1),
+      groups: [...groups].map(([name, attrs]) => {
+        const d = declared[name] as Record<string, unknown> | null | undefined;
+        const def = d?.["default"];
+        const defaults = (Array.isArray(def) ? def : def === undefined ? [] : [def]).filter((x): x is string => typeof x === "string");
+        return {
+          name,
+          // A folder-only group with one attribute is a fixed layer (plan §6.2).
+          always: d ? d["always"] === true : attrs.size === 1,
+          multiple: d?.["multiple"] === true,
+          blink: d?.["blink"] === true,
+          lipflap: d?.["lipflap"] === true,
+          defaults,
+          attrs: [...attrs].sort(),
+        };
+      }),
+      presets: Object.entries((typeof s["presets"] === "object" && s["presets"] !== null ? s["presets"] : {}) as Record<string, unknown>).map(
+        ([name, layers]) => ({
+          name,
+          layers: Object.entries((layers ?? {}) as Record<string, unknown>).filter((e): e is [string, string] => typeof e[1] === "string"),
+        }),
+      ),
+      rules: (Array.isArray(s["rules"]) ? (s["rules"] as Record<string, unknown>[]) : []).map((r) => ({
+        hide: typeof r?.["hide"] === "string" ? r["hide"] : null,
+        show: typeof r?.["show"] === "string" ? r["show"] : null,
+        when: words(r?.["when"]),
+      })),
+    };
+  }
+
   return {
     character: {
-      id, file, displayName,
+      sprite: spriteDef,
+      id, file, displayName, names,
       color: typeof f["color"] === "string" && /^#[0-9a-fA-F]{6}$/.test(f["color"]) ? f["color"] : null,
       hasSprite: hasSprite || groups.size > 0, spriteRoot, presets, groups,
     },

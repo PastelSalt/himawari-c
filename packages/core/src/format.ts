@@ -46,7 +46,7 @@ const COMPOUND: ReadonlySet<string> = new Set([
   "SceneDecl", "DefineDecl", "IfStmt", "IfClause", "MenuStmt", "MenuOption",
 ]);
 
-/** Line kinds that carry a line ID. */
+/** Line kinds that carry a line ID (plus menu headers that have a prompt). */
 const NEEDS_ID: ReadonlySet<string> = new Set(["SayStmt", "NarrationStmt", "OptionHeader"]);
 
 const INDENT = "    ";
@@ -129,7 +129,8 @@ class Formatter {
       text += cur.tok.text;
     }
 
-    if (this.lineIds && NEEDS_ID.has(n.kind)) {
+    const isPrompt = n.kind === "MenuHeader" && sig.some((p) => p.tok.kind === "String");
+    if (this.lineIds && (NEEDS_ID.has(n.kind) || isPrompt)) {
       const id = tag?.slice(6);
       if (!id) {
         const fresh = this.fresh();

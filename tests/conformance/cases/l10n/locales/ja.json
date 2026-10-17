@@ -1,0 +1,55 @@
+{
+  "language": "ja",
+  "sourceLanguage": "en",
+  "lines": [
+    {
+      "id": "100001",
+      "source": "Hello, [player_name]!",
+      "text": "こんにちは、[player_name]！",
+      "status": "ok",
+      "provenance": "human"
+    },
+    {
+      "id": "100002",
+      "source": "The wind was {b}warm{/b}.",
+      "text": "風は{b}暖かかった{/b}。",
+      "status": "ok",
+      "provenance": "human"
+    },
+    {
+      "id": "100003",
+      "source": "Where to?",
+      "text": "どこへ行く？",
+      "status": "ok",
+      "provenance": "human"
+    },
+    {
+      "id": "100004",
+      "source": "The park.",
+      "text": "公園。",
+      "status": "ok",
+      "provenance": "human"
+    },
+    {
+      "id": "100005",
+      "source": "Let's go!",
+      "text": "行こう！",
+      "status": "ok",
+      "provenance": "human"
+    },
+    {
+      "id": "100006",
+      "source": "Home.",
+      "text": "家。",
+      "status": "ok",
+      "provenance": "human"
+    },
+    {
+      "id": "100007",
+      "source": "Maybe next time.",
+      "text": "また今度。",
+      "status": "ok",
+      "provenance": "human"
+    }
+  ]
+}

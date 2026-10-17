@@ -1,0 +1,9 @@
+scene start:
+    hana "Hello, [player_name]!"   #line:100001
+    "The wind was {b}warm{/b}."   #line:100002
+    menu "Where to?":   #line:100003
+        "The park.":   #line:100004
+            hana "Let's go!"   #line:100005
+        "Home.":   #line:100006
+            "Maybe next time."   #line:100007
+    end

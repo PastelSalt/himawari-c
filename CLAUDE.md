@@ -2,11 +2,11 @@
 
 Himawari is an open-source, AI-assisted **visual novel engine** for other developers. It is made by Moesoft (GitHub: `PastelSalt`). Repo: **https://github.com/PastelSalt/himawari-c** (public).
 
-**Status:** **Phase 1 done** (2026-10-17): sanitizers verified, lexer, lossless CST parser, AST + refs index + `spec/ast.schema.json`, formatter, semantic validator, structured edit API, bytecode spec + compiler + validating reader + disassembler, conformance suite (compile half), localization (`packages/core/src/l10n/`), starter templates (`templates/`) and tutorial (`examples/tutorial/`), `hwc check/fmt/build/disasm/init/l10n`. Next: Phase 2 (C runtime MVP) on the owner's go-ahead. See the latest LOG.md session. Read these before doing anything substantial:
+**Status:** **Phase 2 done** (2026-10-17): the C runtime `himawari.exe` (`runtime/src/core/`: loader, VM, saves, rollback, playtests, warp; `runtime/src/app/`: windowed player, text, assets, audio, rule wipes, UI) plays the tutorial in EN and JA, headless playtests reach every ending, and the loader and save fuzzers ran clean for 10 minutes each. Bytecode 1.0 is frozen (rfcs/0004, rfcs/0005). Next: Phase 3 (MCP v1 and CLI polish) on the owner's go-ahead. See the latest LOG.md session. Read these before doing anything substantial:
 - [DETAILED_PLAN.md](DETAILED_PLAN.md): the plan (v0.5). Section numbers are referenced everywhere.
 - [LOG.md](LOG.md): decision history, the decision register (D01–D24), and next steps.
 - [RESEARCH.md](RESEARCH.md): evidence behind decisions (🔬§N in the plan = RESEARCH.md §N).
-- [rfcs/](rfcs/): accepted spike decisions (0001 static build, 0002 GPU transitions, 0003 text stack).
+- [rfcs/](rfcs/): accepted decisions (0001 static build, 0002 GPU transitions, 0003 text stack, 0004 bytecode before the freeze, 0005 layered sprites).
 
 ## Components
 | Package | Tech | License |
@@ -36,7 +36,9 @@ Himawari is an open-source, AI-assisted **visual novel engine** for other develo
 - TS: `corepack pnpm install`, then `corepack pnpm check` (typecheck, lint, vitest, i18n). pnpm is only reachable through corepack on this PC.
 - CLI (after `corepack pnpm exec tsc -b`): `node packages/cli/dist/main.js check|fmt [--check]|build [--release]|disasm <file.hwb>|init <folder> [--template adv|blank]|l10n sync|export --lang ja|import <file> --lang ja`. Templates and examples must check clean and compile (`tests/projects.test.ts`).
 - Conformance: `corepack pnpm vitest run tests/conformance`; regenerate expected files with `UPDATE_CONFORMANCE=1` and review the diff.
-- Runtime: from `runtime/`: `cmake --preset win64-debug`, `cmake --build --preset win64-debug`, `ctest --preset win64-debug`.
+- Runtime: from `runtime/`: `cmake --preset win64-debug`, `cmake --build --preset win64-debug`, `ctest --preset win64-debug`. Regenerate C conformance transcripts with `UPDATE_CONFORMANCE=1 ./build/win64-debug/test_conformance.exe` (TS writes `expected.hwb` first).
+- Player: `himawari --project <dir>` (dev: F3 overlay, F5 reload, `--warp scene|file:line`, `--no-gpu`), `himawari --headless --project <dir> --playtest [lang=ja]`, smoke tests with `--start --frames N --advance N --pick K --screenshot out.png`.
+- If a build "does nothing" after edits, outputs may be future-dated (the PC clock/timezone changed): delete our future-dated objects/exes, or `packages/*/dist` + `*.tsbuildinfo` for TS.
 - Git for Windows is at `C:\Program Files\Git\cmd` (may not be on `PATH` in older shells).
 - Shaders: DXC is at `%LOCALAPPDATA%\himawari-tools\dxc-1.9.2609\bin\x64\dxc.exe`; from `runtime/`: `cmake -DDXC=<that path> -P shaders/compile-shaders.cmake`. Pixel-shader inputs must be `TEXCOORD0`/`TEXCOORD1` (rfcs/0002, finding 1).
 

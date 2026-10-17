@@ -78,11 +78,13 @@ typedef struct {
     char brk;       /* LINEBREAK_* for the position after this item */
     uint32_t line;
     float x;        /* pen x of the glyph within its line */
+    uint32_t run;   /* index of the run it came from */
 } Item;
 
 typedef struct {
     size_t first, last; /* item range, inclusive */
     const char *ruby;
+    uint32_t run;
     float base_w, ruby_w;
 } Group;
 
@@ -162,13 +164,15 @@ bool hw_layout_paragraph(const HwRun *runs, size_t run_count, const HwLayoutPara
             i += hw_utf8_decode((const uint8_t *)runs[r].text + i, len - i, &cp);
             items[n].cp = cp;
             items[n].group = runs[r].ruby ? (int32_t)g : -1;
-            items[n].advance = cp == 0x0A ? 0.0f : advance(user, cp, HW_FONT_BASE);
+            items[n].run = (uint32_t)r;
+            items[n].advance = cp == 0x0A ? 0.0f : advance(user, cp, HW_FONT_BASE, (uint32_t)r);
             n++;
         }
         if (runs[r].ruby && n > first) {
             groups[g].first = first;
             groups[g].last = n - 1;
             groups[g].ruby = runs[r].ruby;
+            groups[g].run = (uint32_t)r;
             g++;
         } else if (runs[r].ruby) {
             groups[g].first = groups[g].last = 0;
@@ -219,7 +223,7 @@ bool hw_layout_paragraph(const HwRun *runs, size_t run_count, const HwLayoutPara
         for (size_t i = 0; i < rlen;) {
             uint32_t cp;
             i += hw_utf8_decode((const uint8_t *)gr->ruby + i, rlen - i, &cp);
-            gr->ruby_w += advance(user, cp, HW_FONT_RUBY);
+            gr->ruby_w += advance(user, cp, HW_FONT_RUBY, gr->run);
         }
         if (gr->ruby_w > gr->base_w) {
             float u = (gr->ruby_w - gr->base_w) / (2.0f * (float)(gr->last - gr->first + 1));
@@ -295,7 +299,7 @@ bool hw_layout_paragraph(const HwRun *runs, size_t run_count, const HwLayoutPara
         float line_top = (float)it->line * params->line_pitch;
         if (it->cp != 0x0A) {
             HwLayoutGlyph gl = { it->cp, HW_FONT_BASE, it->x, line_top + params->ruby_area + params->base_ascent,
-                                 reveal, it->line };
+                                 reveal, it->line, it->run };
             if (!push_glyph(out, gl)) {
                 goto done;
             }
@@ -315,11 +319,11 @@ bool hw_layout_paragraph(const HwRun *runs, size_t run_count, const HwLayoutPara
             for (size_t q = 0; q < rlen;) {
                 uint32_t cp;
                 q += hw_utf8_decode((const uint8_t *)gr->ruby + q, rlen - q, &cp);
-                HwLayoutGlyph rg = { cp, HW_FONT_RUBY, rx, line_top + params->ruby_ascent, group_reveal, first->line };
+                HwLayoutGlyph rg = { cp, HW_FONT_RUBY, rx, line_top + params->ruby_ascent, group_reveal, first->line, first->run };
                 if (!push_glyph(out, rg)) {
                     goto done;
                 }
-                rx += advance(user, cp, HW_FONT_RUBY) + 2.0f * u;
+                rx += advance(user, cp, HW_FONT_RUBY, gr->run) + 2.0f * u;
             }
         }
     }

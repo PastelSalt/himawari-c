@@ -42,6 +42,8 @@ export interface ProjectCheck {
   characters: Map<string, Character>;
   /** Parsed scripts by file, for callers that also need the AST or refs. */
   parsed: Map<string, AstResult>;
+  /** String tables from locales/ that could be read (the compiler builds LOCL from them). */
+  locales: L10nTable[];
 }
 
 /** Built-in transitions and how many arguments each accepts (spec/language.md §2.4). */
@@ -155,22 +157,26 @@ export function checkProject(input: ProjectInput): ProjectCheck {
   }
 
   // String tables: placeholder parity and freshness (plan §7).
+  const locales: L10nTable[] = [];
   if (input.locales?.length) {
     const lines = new Map(collectLines(parsed).map((l) => [l.id, l]));
-    for (const lf of input.locales) checkLocale(lf, lines, report(lf.file, lf.text).diagnostics);
+    for (const lf of input.locales) {
+      const table = checkLocale(lf, lines, report(lf.file, lf.text).diagnostics);
+      if (table) locales.push(table);
+    }
   }
 
   for (const r of reports.values()) r.diagnostics.sort((a, b) => a.span.start - b.span.start);
-  return { files: [...reports.values()], manifest, characters, parsed };
+  return { files: [...reports.values()], manifest, characters, parsed, locales };
 }
 
-function checkLocale(lf: SourceFile, lines: ReadonlyMap<string, SourceLine>, out: Diagnostic[]): void {
+function checkLocale(lf: SourceFile, lines: ReadonlyMap<string, SourceLine>, out: Diagnostic[]): L10nTable | null {
   let table: L10nTable;
   try {
     table = parseTable(lf.text);
   } catch (e) {
     out.push(diagnostic("HW0406", { start: 0, end: 0 }, { reason: (e as Error).message }));
-    return;
+    return null;
   }
   const lang = table.language;
   const at = (id: string): Span => {
@@ -194,6 +200,7 @@ function checkLocale(lf: SourceFile, lines: ReadonlyMap<string, SourceLine>, out
   missing += [...lines.keys()].filter((id) => !inTable.has(id)).length;
   if (missing > 0) out.push(diagnostic("HW0402", { start: 0, end: 0 }, { count: String(missing), lang }, { help: "run hwc l10n sync, then hwc l10n export" }));
   if (review > 0) out.push(diagnostic("HW0404", { start: 0, end: 0 }, { count: String(review), lang }));
+  return table;
 }
 
 interface Ctx {

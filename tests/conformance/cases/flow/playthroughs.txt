@@ -1,0 +1,5 @@
+# First, Set flag, Second, then the menu runs out of options.
+0 0 0
+seed=2 0 0 0
+# Stop at the first menu.
+seed=3

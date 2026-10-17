@@ -1,0 +1,33 @@
+== choices: 0 | language: en | seed: 1
+-- scene start
+Hana: Hello, Aoi!   #100001
+The wind was {b}warm{/b}.   #100002
+menu "Where to?"   #100003
+  [0] The park.   #100004
+  [1] Home.   #100006
+> 0
+Hana: Let's go!   #100005
+end
+-- vars: player_name=Aoi
+== choices: 0 | language: ja | seed: 1
+-- scene start
+花: こんにちは、Aoi！   #100001
+風は{b}暖かかった{/b}。   #100002
+menu "どこへ行く？"   #100003
+  [0] 公園。   #100004
+  [1] 家。   #100006
+> 0
+花: 行こう！   #100005
+end
+-- vars: player_name=Aoi
+== choices: 1 | language: ja | seed: 1
+-- scene start
+花: こんにちは、Aoi！   #100001
+風は{b}暖かかった{/b}。   #100002
+menu "どこへ行く？"   #100003
+  [0] 公園。   #100004
+  [1] 家。   #100006
+> 1
+また今度。   #100007
+end
+-- vars: player_name=Aoi

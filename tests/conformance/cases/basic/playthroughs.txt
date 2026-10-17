@@ -1,0 +1,6 @@
+# Overslept, the festival, the rumor, then leave.
+0 0 0 0
+# Overslept, leave right away.
+0 1
+# Stop at the first menu ("-" is a playthrough with no choices).
+-

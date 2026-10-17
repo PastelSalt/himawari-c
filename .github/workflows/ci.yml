@@ -75,12 +75,21 @@ jobs:
           cmake --build --preset win64-release
       - name: Unit tests
         run: ctest --preset win64-release
-      - name: Check the .exe imports no non-system DLLs
+      - name: Check the .exe files import no non-system DLLs
         run: |
-          objdump -p build/win64-release/spike_a.exe | grep "DLL Name" | tee imports.txt
-          if grep -Eiv "DLL Name: (kernel32|user32|gdi32|winmm|imm32|ole32|oleaut32|version|uuid|advapi32|setupapi|shell32|dinput8|cfgmgr32|hid|api-ms-win-[a-z0-9-]+)\.dll" imports.txt; then
-            echo "::error::spike_a.exe imports a non-system DLL"; exit 1
-          fi
+          for exe in himawari spike_a; do
+            objdump -p build/win64-release/$exe.exe | grep "DLL Name" | tee imports.txt
+            if grep -Eiv "DLL Name: (kernel32|user32|gdi32|winmm|imm32|ole32|oleaut32|version|uuid|advapi32|setupapi|shell32|dinput8|cfgmgr32|hid|api-ms-win-[a-z0-9-]+)\.dll" imports.txt; then
+              echo "::error::$exe.exe imports a non-system DLL"; exit 1
+            fi
+          done
+      - name: Player smoke test (window, title, a few lines, a menu; dummy audio)
+        env:
+          SDL_AUDIO_DRIVER: dummy
+        run: |
+          ./build/win64-release/himawari.exe --headless ../tests/conformance/cases/basic/expected.hwb --playtest
+          ./build/win64-release/himawari.exe ../tests/conformance/cases/l10n/expected.hwb --lang ja --start --frames 240 --advance 4 --screenshot player-ja.png
+          test -s player-ja.png
       - name: Spike A smoke test (window, audio on the dummy driver, JP text)
         env:
           SDL_AUDIO_DRIVER: dummy
@@ -98,6 +107,8 @@ jobs:
         with:
           name: spikes-windows-x64
           path: |
+            runtime/build/win64-release/himawari.exe
+            runtime/player-ja.png
             runtime/build/win64-release/spike_a.exe
             runtime/build/win64-release/spike_b.exe
             runtime/build/win64-release/spike_c_ft.exe
@@ -125,8 +136,13 @@ jobs:
           cmake --preset win64-asan
           cmake --build --preset win64-asan
           ctest --preset win64-asan
-      - name: Fuzz (60 s per target, win64-fuzz)
+      - name: Fuzz (regressions, then 60 s per target, win64-fuzz)
         run: |
           cmake --preset win64-fuzz
           cmake --build --preset win64-fuzz
+          ctest --preset win64-fuzz
           ./build/win64-fuzz/fuzz_utf8.exe -max_total_time=60
+          mkdir -p corpus-hwb && cp ../tests/conformance/cases/*/expected.hwb corpus-hwb/
+          ./build/win64-fuzz/fuzz_hwb.exe -max_total_time=60 corpus-hwb
+          mkdir -p corpus-save && HW_WRITE_SAVE=corpus-save/basic.hwsav ./build/win64-fuzz/test_save.exe
+          ./build/win64-fuzz/fuzz_save.exe -max_total_time=60 corpus-save

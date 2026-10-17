@@ -1,0 +1,103 @@
+; Himawari bytecode 1.0
+; 40 strings, 9 variables, 0 characters, 3 scenes, 14 lines, 131 code words
+; entry: start
+; game: "Conformance: flow" dev.moesoft.conformance.flow 1920x1080, languages en
+; positions: center(0.5, 1) left(0.25, 1) right(0.75, 1)
+
+var 0: endings int = 0 (global)
+var 1: flag bool = 0 (save)
+var 2: m int = 0 (save)
+var 3: mood str enum(calm, happy) = "calm" (save)
+var 4: n int = 7 (save)
+var 5: roll int = 0 (save)
+var 6: visits int = 0 (save)
+var 7: z int = 1 (save)
+var 8: zero int = 0 (save)
+
+
+scene helper:  ; script/flow.hws
+  0000  LOAD     visits   ; script/flow.hws:19
+  0002  PUSH     1
+  0004  ADD
+  0005  STORE    visits
+  0007  PUSH     6   ; script/flow.hws:20
+  0009  STORE    mood
+  0011  RET   ; script/flow.hws:21
+
+scene hub:  ; script/flow.hws
+  0012  PUSH     1   ; script/flow.hws:24
+  0014  LOAD     flag
+  0016  LOAD     flag
+  0018  NOT
+  0019  MENU     "Pick one" #200007
+                 option once "First" #200008 -> L30
+                 option once "Second" #200010 -> L34
+                 option "Set flag" #200012 -> L38
+  0028  JMP      L44
+L30:
+  0030  SAY      "first chosen" #200009   ; script/flow.hws:26
+  0032  JMP      hub   ; script/flow.hws:27
+L34:
+  0034  SAY      "second chosen" #200011   ; script/flow.hws:29
+  0036  JMP      hub   ; script/flow.hws:30
+L38:
+  0038  PUSH     1   ; script/flow.hws:32
+  0040  STORE    flag
+  0042  JMP      hub   ; script/flow.hws:33
+L44:
+  0044  SAY      "no options left" #200013   ; script/flow.hws:34
+  0046  LOAD     mood   ; script/flow.hws:35
+  0048  PUSH     6
+  0050  EQ
+  0051  JZ       L62
+  0053  LOAD     endings   ; script/flow.hws:36
+  0055  PUSH     1
+  0057  ADD
+  0058  STORE    endings
+  0060  SAY      "happy ending [endings]" #200014   ; script/flow.hws:37
+L62:
+  0062  END   ; script/flow.hws:38
+
+scene start:  ; script/flow.hws
+  0063  LOAD     n   ; script/flow.hws:2
+  0065  PUSH     2
+  0067  DIV
+  0068  STORE    n
+  0070  PUSH     7   ; script/flow.hws:3
+  0072  NEG
+  0073  PUSH     3
+  0075  MOD
+  0076  STORE    m
+  0078  LOAD     n   ; script/flow.hws:4
+  0080  LOAD     zero
+  0082  DIV
+  0083  STORE    z
+  0085  SAY      "n=[n] m=[m] z=[z] flag=[flag] mood=[mood]" #200001   ; script/flow.hws:5
+  0087  LOAD     n   ; script/flow.hws:6
+  0089  PUSH     3
+  0091  GT
+  0092  JZ       L98
+  0094  SAY      "big" #200002   ; script/flow.hws:7
+  0096  JMP      L115
+L98:
+  0098  LOAD     n
+  0100  PUSH     3
+  0102  EQ
+  0103  LOAD     flag
+  0105  NOT
+  0106  AND
+  0107  JZ       L113
+  0109  SAY      "three" #200003   ; script/flow.hws:9
+  0111  JMP      L115
+L113:
+  0113  SAY      "small" #200004   ; script/flow.hws:11
+L115:
+  0115  PUSH     6   ; script/flow.hws:12
+  0117  RAND
+  0118  PUSH     1
+  0120  ADD
+  0121  STORE    roll
+  0123  SAY      "roll=[roll]" #200005   ; script/flow.hws:13
+  0125  CALL     helper   ; script/flow.hws:14
+  0127  SAY      "back from helper, visits=[visits]" #200006   ; script/flow.hws:15
+  0129  JMP      hub   ; script/flow.hws:16

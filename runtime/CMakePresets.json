@@ -20,9 +20,14 @@
     {
       "name": "win64-release",
       "displayName": "Windows release (shipping build)",
-      "description": "-O2 + LTO, -static -static-libgcc -mwindows -s.",
+      "description": "-Os + LTO, -static -static-libgcc -mwindows -s (size budget, plan §8.1).",
       "inherits": "windows",
-      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "HW_RELEASE_STATIC": "ON" }
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_C_FLAGS_RELEASE": "-Os -DNDEBUG",
+        "CMAKE_CXX_FLAGS_RELEASE": "-Os -DNDEBUG",
+        "HW_RELEASE_STATIC": "ON"
+      }
     },
     {
       "name": "win64-asan",
@@ -54,6 +59,7 @@
   "testPresets": [
     { "name": "win64-debug", "configurePreset": "win64-debug", "output": { "outputOnFailure": true } },
     { "name": "win64-release", "configurePreset": "win64-release", "output": { "outputOnFailure": true } },
-    { "name": "win64-asan", "configurePreset": "win64-asan", "output": { "outputOnFailure": true } }
+    { "name": "win64-asan", "configurePreset": "win64-asan", "output": { "outputOnFailure": true } },
+    { "name": "win64-fuzz", "configurePreset": "win64-fuzz", "output": { "outputOnFailure": true } }
   ]
 }

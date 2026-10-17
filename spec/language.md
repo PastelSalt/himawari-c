@@ -90,7 +90,9 @@ If control reaches the end of a scene's body without `jump`, `call`, `return`, o
 | Audio | `music <asset> [fade(ms)]`, `sfx <asset>`, `ambient <asset> [fade(ms)]`, `voice <asset>`, `stop music\|ambient\|voice [fade(ms)]` |
 | Effects | `wait(ms)`, `shake [(ms)]`, `flash [(ms)]` |
 
-**Attribute merge** (Ren'Py's model, plan §6.1): `show hana casual` changes only the outfit group and keeps every other group. A word can be an attribute or a preset; presets expand to several attributes at once. `-attr` removes an attribute. Unknown words are compile errors with suggestions (`HW0204`).
+**What the stage keeps** (the runtime's display state, which saves and rewinds restore): one background, one CG (drawn over the characters; a new `bg` ends it), the characters on stage in the order they appeared (a new one starts at `center` unless `at` says otherwise), and the looping music and ambient tracks. `sfx` and `voice` play once.
+
+**Attribute merge** (Ren'Py's model, plan §6.1, `spec/bytecode.md` §2.9): `show hana casual` changes only the outfit group and keeps every other group. A word can be an attribute or a preset; presets expand to several attributes at once. `-attr` removes an attribute. Unknown words are compile errors with suggestions (`HW0204`).
 
 **Transitions:** `fade(ms)`, `dissolve(ms)`, `slide_left(ms)`, `slide_right(ms)`, `slide_up(ms)`, `slide_down(ms)`, `wipe(ms)`, `rule(<mask>, ms)`. The argument may be omitted to use the theme default.
 
@@ -118,7 +120,7 @@ Macros are expanded at compile time with typed parameters, so every expansion is
 
 ## 3. Line IDs
 
-- Every dialogue line, narration line, and menu option has a **line ID**: a trailing `#line:xxxxxx` comment.
+- Every dialogue line, narration line, menu option, and menu prompt (`menu "Where to?":`) has a **line ID**: a trailing `#line:xxxxxx` comment.
 - An ID is **6 characters of lowercase Crockford base32**: `0123456789abcdefghjkmnpqrstvwxyz` (no `i`, `l`, `o`, `u`). That gives 2³⁰ ≈ 1.07 billion IDs.
 - IDs are **persistent tags, not hashes.** Tooling (`hwc fmt`, Studio, MCP) assigns them; writers never type them, and Studio hides them.
 - Moving a line keeps its ID. Editing keeps the ID, but a large change marks translations and voice as `needs-review`. Duplicated IDs (from copy-paste) are reassigned on the copy.

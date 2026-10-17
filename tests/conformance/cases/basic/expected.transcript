@@ -1,0 +1,68 @@
+== choices: 0 0 0 0 | language: en | seed: 1
+-- scene ch1_intro
+bg classroom_day with dissolve(800)
+music morning_theme fade(1000)
+show hana (brows=neutral eyes=smile mouth=smile outfit=uniform) at left with fade(300)
+Hana: Good morning, Aoi! You're late {b}again{/b}.   #k3f9a1
+me: Sorry, sorry...   #m1n2p3
+The bell rang before I could finish.   #q4r5s6
+menu "What do you say?"
+  [0] I overslept.   #t7v8w9
+> 0
+show hana (outfit=uniform brows=down eyes=half mouth=flat) at left
+Hana: Classic.   #x0y1z2
+Hana: Anyway, let's go.   #g9h0j1
+-- scene ch1_hub
+menu "Ask Hana about..."
+  [0] The festival.   #p5q6r7
+  [1] Nothing, let's go.   #w1x2y3
+> 0
+-- scene talk_festival
+Hana: It's next week!   #z4a5b6
+-- scene ch1_hub
+menu "Ask Hana about..."
+  [0] Her transfer rumor.   #s8t9v0
+  [1] Nothing, let's go.   #w1x2y3
+> 0
+-- scene talk_rumor
+show hana (outfit=uniform brows=down eyes=half mouth=flat -accessories=glasses) at left
+Hana: ...Who told you that?   #c7d8e9
+-- scene ch1_hub
+menu "Ask Hana about..."
+  [0] Nothing, let's go.   #w1x2y3
+> 0
+end
+-- vars: courage=0 ending_true_seen=true hana_affection=1 heard_rumor=true player_name=Aoi
+== choices: 0 1 | language: en | seed: 1
+-- scene ch1_intro
+bg classroom_day with dissolve(800)
+music morning_theme fade(1000)
+show hana (brows=neutral eyes=smile mouth=smile outfit=uniform) at left with fade(300)
+Hana: Good morning, Aoi! You're late {b}again{/b}.   #k3f9a1
+me: Sorry, sorry...   #m1n2p3
+The bell rang before I could finish.   #q4r5s6
+menu "What do you say?"
+  [0] I overslept.   #t7v8w9
+> 0
+show hana (outfit=uniform brows=down eyes=half mouth=flat) at left
+Hana: Classic.   #x0y1z2
+Hana: Anyway, let's go.   #g9h0j1
+-- scene ch1_hub
+menu "Ask Hana about..."
+  [0] The festival.   #p5q6r7
+  [1] Nothing, let's go.   #w1x2y3
+> 1
+end
+-- vars: courage=0 ending_true_seen=true hana_affection=1 heard_rumor=false player_name=Aoi
+== choices: (none) | language: en | seed: 1
+-- scene ch1_intro
+bg classroom_day with dissolve(800)
+music morning_theme fade(1000)
+show hana (brows=neutral eyes=smile mouth=smile outfit=uniform) at left with fade(300)
+Hana: Good morning, Aoi! You're late {b}again{/b}.   #k3f9a1
+me: Sorry, sorry...   #m1n2p3
+The bell rang before I could finish.   #q4r5s6
+menu "What do you say?"
+  [0] I overslept.   #t7v8w9
+-- stopped: no more choices
+-- vars: courage=0 ending_true_seen=false hana_affection=1 heard_rumor=false player_name=Aoi

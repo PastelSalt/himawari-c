@@ -244,12 +244,13 @@
     },
     "menu": {
       "type": "object",
-      "required": ["kind", "span", "prompt", "options"],
+      "required": ["kind", "span", "prompt", "promptLineId", "options"],
       "additionalProperties": false,
       "properties": {
         "kind": { "const": "Menu" },
         "span": { "$ref": "#/$defs/span" },
         "prompt": { "oneOf": [{ "$ref": "#/$defs/text" }, { "type": "null" }] },
+        "promptLineId": { "$ref": "#/$defs/lineId" },
         "options": { "type": "array", "items": { "$ref": "#/$defs/option" } }
       }
     },

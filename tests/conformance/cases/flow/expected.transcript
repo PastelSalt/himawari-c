@@ -1,0 +1,61 @@
+== choices: 0 0 0 | language: en | seed: 1
+-- scene start
+n=3 m=-1 z=0 flag=false mood=calm   #200001
+three   #200003
+roll=2   #200005
+back from helper, visits=1   #200006
+-- scene hub
+menu "Pick one"   #200007
+  [0] First   #200008
+  [1] Set flag   #200012
+> 0
+first chosen   #200009
+menu "Pick one"   #200007
+  [0] Set flag   #200012
+> 0
+menu "Pick one"   #200007
+  [0] Second   #200010
+> 0
+second chosen   #200011
+no options left   #200013
+happy ending 1   #200014
+end
+-- division by zero: 1 time(s)
+-- vars: endings=1 flag=true m=-1 mood=happy n=3 roll=2 visits=1 z=0 zero=0
+== choices: 0 0 0 | language: en | seed: 2
+-- scene start
+n=3 m=-1 z=0 flag=false mood=calm   #200001
+three   #200003
+roll=5   #200005
+back from helper, visits=1   #200006
+-- scene hub
+menu "Pick one"   #200007
+  [0] First   #200008
+  [1] Set flag   #200012
+> 0
+first chosen   #200009
+menu "Pick one"   #200007
+  [0] Set flag   #200012
+> 0
+menu "Pick one"   #200007
+  [0] Second   #200010
+> 0
+second chosen   #200011
+no options left   #200013
+happy ending 1   #200014
+end
+-- division by zero: 1 time(s)
+-- vars: endings=1 flag=true m=-1 mood=happy n=3 roll=5 visits=1 z=0 zero=0
+== choices: (none) | language: en | seed: 3
+-- scene start
+n=3 m=-1 z=0 flag=false mood=calm   #200001
+three   #200003
+roll=5   #200005
+back from helper, visits=1   #200006
+-- scene hub
+menu "Pick one"   #200007
+  [0] First   #200008
+  [1] Set flag   #200012
+-- stopped: no more choices
+-- division by zero: 1 time(s)
+-- vars: endings=0 flag=false m=-1 mood=happy n=3 roll=5 visits=1 z=0 zero=0

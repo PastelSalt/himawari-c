@@ -6,12 +6,12 @@
  */
 import { crc32 } from "./crc32.js";
 import {
-  HEADER_SIZE, HWB_MAJOR, HWB_MINOR, type HwbModule, MAGIC, NONE, OP_NAMES, Op, TextOp, expectedArgc,
+  HEADER_SIZE, HWB_MAJOR, HWB_MINOR, type HwbModule, type LocaleEntry, MAGIC, NONE, OP_NAMES, Op, type SpriteEntry, TextOp, expectedArgc,
 } from "./format.js";
 
 export class HwbError extends Error {}
 
-const REQUIRED = ["STRS", "VARS", "CHAR", "SCNE", "LINE", "TEXT", "CODE"] as const;
+const REQUIRED = ["META", "STRS", "VARS", "CHAR", "SCNE", "LINE", "TEXT", "CODE"] as const;
 
 export function readHwb(bytes: Uint8Array): HwbModule {
   const fail = (msg: string): never => {
@@ -89,6 +89,20 @@ export function readHwb(bytes: Uint8Array): HwbModule {
   if (strings[0] !== "") fail("string 0 must be empty");
   const str = (i: number, what: string) => (i < strings.length ? i : fail(`${what}: string index ${i} out of range`));
 
+  // META
+  const ms = section("META");
+  const [title, id, width, height, sourceLanguage] = ms.take(5) as [number, number, number, number, number];
+  const meta = {
+    title: str(title, "title"), id: str(id, "game id"), width, height, sourceLanguage: str(sourceLanguage, "source language"),
+    languages: ms.take(ms.next()).map((l) => str(l, "language")),
+    positions: Array.from({ length: ms.next() }, () => {
+      const [name, x, y] = ms.take(3) as [number, number, number];
+      return { name: str(name, "position name"), x: x | 0, y: y | 0 };
+    }),
+  };
+  if (width === 0 || height === 0 || width > 16384 || height > 16384) fail("invalid resolution");
+  if (meta.languages[0] !== meta.sourceLanguage) fail("the first language must be the source language");
+
   // VARS
   const vs = section("VARS");
   const vCount = vs.next();
@@ -118,7 +132,7 @@ export function readHwb(bytes: Uint8Array): HwbModule {
   const tCount = ts.next();
   const tOffsets = ts.take(tCount);
   const tWords = ts.take(ts.next());
-  const texts = tOffsets.map((o) => readTextProgram(tWords, o, tCount, vars.length, strings.length, fail));
+  const texts = tOffsets.map((o, self) => readTextProgram(tWords, o, self, vars.length, strings.length, fail));
 
   // LINE
   const ls = section("LINE");
@@ -148,6 +162,31 @@ export function readHwb(bytes: Uint8Array): HwbModule {
   for (const pc of opStarts) {
     const op = (code[pc] as number) & 0xff;
     const a = (k: number) => code[pc + 1 + k] as number;
+    const s = (k: number) => {
+      if (a(k) >>> 0 >= strings.length) fail(`pc ${pc}: string index out of range`);
+    };
+    const trans = (k: number) => {
+      s(k);
+      if (a(k) !== 0 && strings[a(k)] === "rule") s(k + 1);
+    };
+    if (op === Op.SHOW) {
+      s(0);
+      s(1);
+      trans(2);
+      for (let i = 0; i < a(5) + a(6); i++) s(7 + i);
+    }
+    if (op === Op.HIDE || op === Op.BG || op === Op.CG) {
+      s(0);
+      trans(1);
+    }
+    if (op === Op.MOVE) {
+      s(0);
+      s(1);
+      trans(2);
+    }
+    if (op === Op.AUDIO) s(1);
+    if ((op === Op.AUDIO || op === Op.STOP) && a(0) >>> 0 > 3) fail(`pc ${pc}: invalid audio channel`);
+    if (op === Op.EFFECT && a(0) >>> 0 > 1) fail(`pc ${pc}: invalid effect`);
     if (op === Op.JMP || op === Op.JZ || op === Op.CALL) target(a(0), "jump");
     if (op === Op.SAY && a(0) >>> 0 >= lines.length) fail(`SAY at pc ${pc}: line out of range`);
     if (op === Op.LOAD || op === Op.STORE) if (a(0) >>> 0 >= vars.length) fail(`pc ${pc}: variable out of range`);
@@ -179,11 +218,68 @@ export function readHwb(bytes: Uint8Array): HwbModule {
     });
   }
 
-  return { major, minor, strings, vars, chars, scenes, entryScene, lines, texts, code, debug };
+  // LOCL (optional)
+  const locales: LocaleEntry[] = [];
+  if (sections.has("LOCL")) {
+    const lc = section("LOCL");
+    const entries = Array.from({ length: lc.next() }, () => lc.take(2) as [number, number]);
+    const table = lc.take(lc.next());
+    const per = lines.length + chars.length;
+    for (const [language, offset] of entries) {
+      if (offset + per > table.length) fail("LOCL table out of range");
+      const lineTexts = table.slice(offset, offset + lines.length);
+      for (const t of lineTexts) if (t !== NONE && t >= texts.length) fail("LOCL text out of range");
+      locales.push({
+        language: str(language, "LOCL language"),
+        lineTexts,
+        charNames: table.slice(offset + lines.length, offset + per).map((n) => str(n, "LOCL character name")),
+      });
+    }
+  }
+
+  // SPRT (optional)
+  const sprites: SpriteEntry[] = [];
+  if (sections.has("SPRT")) {
+    const sp = section("SPRT");
+    const entries = Array.from({ length: sp.next() }, () => sp.take(11));
+    const groups = Array.from({ length: sp.next() }, () => sp.take(6));
+    const presets = Array.from({ length: sp.next() }, () => sp.take(3));
+    const rules = Array.from({ length: sp.next() }, () => sp.take(4));
+    const pool = sp.take(sp.next());
+    const range = <T>(xs: readonly T[], first: number, count: number, what: string): T[] =>
+      first + count <= xs.length ? xs.slice(first, first + count) : fail(`SPRT ${what} out of range`);
+    const strs = (first: number, count: number) => range(pool, first, count, "list").map((i) => str(i, "SPRT string"));
+    for (const e of entries) {
+      const [char, root, anchorX, anchorY, scale, gf, gc, pf, pc, rf, rc] = e as [number, number, number, number, number, number, number, number, number, number, number];
+      if (char >= chars.length) fail("SPRT character out of range");
+      if (scale === 0 || scale > 1000000) fail("SPRT scale out of range");
+      const gs = range(groups, gf, gc, "groups").map(([name, flags, df, dc, af, ac]) => ({
+        name: str(name as number, "SPRT group"), flags: flags as number, defaults: strs(df as number, dc as number), attrs: strs(af as number, ac as number),
+      }));
+      sprites.push({
+        char, root: str(root, "SPRT root"), anchorX: anchorX | 0, anchorY: anchorY | 0, scale,
+        groups: gs,
+        presets: range(presets, pf, pc, "presets").map(([name, lf, lc]) => {
+          const flat = range(pool, lf as number, 2 * (lc as number), "preset layers");
+          const layers: [number, number][] = [];
+          for (let i = 0; i < flat.length; i += 2) {
+            if ((flat[i] as number) >= gs.length) fail("SPRT preset group out of range");
+            layers.push([flat[i] as number, str(flat[i + 1] as number, "SPRT preset attribute")]);
+          }
+          return { name: str(name as number, "SPRT preset"), layers };
+        }),
+        rules: range(rules, rf, rc, "rules").map(([hide, show, wf, wc]) => ({
+          hide: str(hide as number, "SPRT rule"), show: str(show as number, "SPRT rule"), when: strs(wf as number, wc as number),
+        })),
+      });
+    }
+  }
+
+  return { major, minor, meta, strings, vars, chars, scenes, entryScene, lines, texts, code, debug, locales, sprites };
 }
 
 function readTextProgram(
-  words: readonly number[], start: number, textCount: number, varCount: number, strCount: number,
+  words: readonly number[], start: number, self: number, varCount: number, strCount: number,
   fail: (msg: string) => never,
 ): number[] {
   const out: number[] = [];
@@ -213,7 +309,8 @@ function readTextProgram(
       const n = next();
       for (let k = 0; k < n; k++) {
         strArg();
-        if (next() >= textCount) fail("select case text out of range");
+        // Case texts are compiled before the text that uses them, so evaluation can't loop.
+        if (next() >= self) fail("select case text out of range");
       }
     } else {
       fail(`unknown text op ${op}`);

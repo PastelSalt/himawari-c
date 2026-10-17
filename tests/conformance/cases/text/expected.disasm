@@ -1,6 +1,8 @@
 ; Himawari bytecode 1.0
-; 51 strings, 3 variables, 0 characters, 1 scenes, 9 lines, 19 code words
+; 58 strings, 3 variables, 0 characters, 1 scenes, 9 lines, 19 code words
 ; entry: start
+; game: "Conformance: text" dev.moesoft.conformance.text 1920x1080, languages en ja
+; positions: center(0.5, 1) left(0.25, 1) right(0.75, 1)
 
 var 0: gender_p str enum(m, f, other) = "other" (save)
 var 1: name str = "Aoi" (save)

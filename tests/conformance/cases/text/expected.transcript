@@ -1,0 +1,26 @@
+== choices: (none) | language: en | seed: 1
+-- scene start
+Plain text.   #000001
+Hello, Aoi. Score: 3.   #000002
+{b}Bold{/b}, {i}italic{/i}, {color=#ff8800}orange{/color}, {size=48}big{/size}.   #000003
+Wait{w=500} for it{nw}   #000004
+{speed=20}Slow {shake}shaky{/shake} text.{/speed}   #000005
+They waved.   #000006
+{rb=かんじ}漢字{/rb}の{rb=よ}読{/rb}み方。   #000007
+Escapes: "quoted", \[not a var], \{not a tag}.   #000008
+{alt=A sunflower}🌻   #000009
+end
+-- vars: gender_p=other name=Aoi score=3
+== choices: (none) | language: ja | seed: 1
+-- scene start
+Plain text.   #000001
+Hello, Aoi. Score: 3.   #000002
+{b}Bold{/b}, {i}italic{/i}, {color=#ff8800}orange{/color}, {size=48}big{/size}.   #000003
+Wait{w=500} for it{nw}   #000004
+{speed=20}Slow {shake}shaky{/shake} text.{/speed}   #000005
+They waved.   #000006
+{rb=かんじ}漢字{/rb}の{rb=よ}読{/rb}み方。   #000007
+Escapes: "quoted", \[not a var], \{not a tag}.   #000008
+{alt=A sunflower}🌻   #000009
+end
+-- vars: gender_p=other name=Aoi score=3

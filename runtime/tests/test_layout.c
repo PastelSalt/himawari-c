@@ -16,9 +16,10 @@ static int failures = 0;
         }                                                                            \
     } while (0)
 
-static float fixed_advance(void *user, uint32_t cp, HwFontRole role)
+static float fixed_advance(void *user, uint32_t cp, HwFontRole role, uint32_t run)
 {
     (void)user;
+    (void)run;
     if (role == HW_FONT_RUBY) {
         return 5.0f;
     }
@@ -160,6 +161,8 @@ int main(void)
         CHECK(ga && near(ga->x, 15.0f)); /* next character starts after the whole group */
         CHECK(sa && hana && sa->reveal == hana->reveal);
         CHECK(sa && near(sa->y, 6.0f) && hana && near(hana->y, 20.0f));
+        /* Glyphs (ruby included) know which run they came from, for styles. */
+        CHECK(hana && hana->run == 0 && sa && sa->run == 0 && ga && ga->run == 1);
         hw_layout_free(&l);
     }
     /* Ruby narrower than its base: the ruby is spread 1:2:1. */

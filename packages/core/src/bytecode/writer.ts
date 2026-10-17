@@ -46,7 +46,10 @@ export function writeHwb(m: HwbModule): Uint8Array {
     textWords.push(...t);
   }
 
+  const mt = m.meta;
   const sections: [string, Uint8Array][] = [
+    ["META", words(mt.title, mt.id, mt.width, mt.height, mt.sourceLanguage, mt.languages.length, mt.languages,
+      mt.positions.length, mt.positions.flatMap((p) => [p.name, p.x, p.y]))],
     ["STRS", stringsSection(m.strings)],
     ["VARS", words(m.vars.length, varEntries, enumValues.length, enumValues)],
     ["CHAR", words(m.chars.length, m.chars.flatMap((c) => [c.id, c.name, c.color]))],
@@ -55,6 +58,35 @@ export function writeHwb(m: HwbModule): Uint8Array {
     ["TEXT", words(m.texts.length, textOffsets, textWords.length, textWords)],
     ["CODE", words(m.code.length, m.code)],
   ];
+  if (m.locales.length > 0) {
+    const table: number[] = [];
+    const entries: number[] = [];
+    for (const l of m.locales) {
+      entries.push(l.language, table.length);
+      table.push(...l.lineTexts, ...l.charNames);
+    }
+    sections.push(["LOCL", words(m.locales.length, entries, table.length, table)]);
+  }
+  if (m.sprites.length > 0) {
+    const entries: number[] = [];
+    const groups: number[] = [];
+    const presets: number[] = [];
+    const rules: number[] = [];
+    const pool: number[] = [];
+    const list = (xs: readonly number[]) => {
+      pool.push(...xs);
+      return [pool.length - xs.length, xs.length];
+    };
+    for (const s of m.sprites) {
+      entries.push(s.char, s.root, s.anchorX, s.anchorY, s.scale, groups.length / 6, s.groups.length, presets.length / 3, s.presets.length,
+        rules.length / 4, s.rules.length);
+      for (const g of s.groups) groups.push(g.name, g.flags, ...list(g.defaults), ...list(g.attrs));
+      for (const p of s.presets) presets.push(p.name, ...list(p.layers.flat()).map((v, i) => (i === 1 ? v / 2 : v)));
+      for (const r of s.rules) rules.push(r.hide, r.show, ...list(r.when));
+    }
+    sections.push(["SPRT", words(m.sprites.length, entries, groups.length / 6, groups, presets.length / 3, presets, rules.length / 4, rules,
+      pool.length, pool)]);
+  }
   if (m.debug) sections.push(["DBUG", words(m.debug.length, m.debug.flatMap((d) => [d.pc, d.file, d.line]))]);
 
   const tableSize = sections.length * 12;

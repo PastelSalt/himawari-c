@@ -1,0 +1,38 @@
+scene start:
+    $ n = n / 2
+    $ m = -7 % 3
+    $ z = n / zero
+    "n=[n] m=[m] z=[z] flag=[flag] mood=[mood]"   #line:200001
+    if n > 3:
+        "big"   #line:200002
+    elif n == 3 and not flag:
+        "three"   #line:200003
+    else:
+        "small"   #line:200004
+    $ roll = rand(6) + 1
+    "roll=[roll]"   #line:200005
+    call helper
+    "back from helper, visits=[visits]"   #line:200006
+    jump hub
+
+scene helper:
+    $ visits += 1
+    $ mood = "happy"
+    return
+
+scene hub:
+    menu "Pick one":   #line:200007
+        once "First":   #line:200008
+            "first chosen"   #line:200009
+            jump hub
+        once "Second" if flag:   #line:200010
+            "second chosen"   #line:200011
+            jump hub
+        "Set flag" if not flag:   #line:200012
+            $ flag = true
+            jump hub
+    "no options left"   #line:200013
+    if mood == "happy":
+        $ endings += 1
+        "happy ending [endings]"   #line:200014
+    end

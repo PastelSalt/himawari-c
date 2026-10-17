@@ -1,0 +1,35 @@
+; Himawari bytecode 1.0
+; 36 strings, 1 variables, 1 characters, 1 scenes, 7 lines, 22 code words
+; entry: start
+; game: "Conformance: l10n" dev.moesoft.conformance.l10n 1920x1080, languages en ja
+; positions: center(0.5, 1) left(0.25, 1) right(0.75, 1)
+
+var 0: player_name str = "Aoi" (save)
+char hana "Hana" #f2a541
+
+
+scene start:  ; script/start.hws
+  0000  SAY      hana "Hello, [player_name]!" #100001   ; script/start.hws:2
+  0002  SAY      "The wind was {b}warm{/}." #100002   ; script/start.hws:3
+  0004  PUSH     1   ; script/start.hws:4
+  0006  PUSH     1
+  0008  MENU     "Where to?" #100003
+                 option "The park." #100004 -> L15
+                 option "Home." #100006 -> L19
+L15:
+  0015  SAY      hana "Let's go!" #100005   ; script/start.hws:6
+  0017  JMP      L21
+L19:
+  0019  SAY      "Maybe next time." #100007   ; script/start.hws:8
+L21:
+  0021  END   ; script/start.hws:9
+
+locale ja:
+  char hana "花"
+  #100001 "こんにちは、[player_name]！"
+  #100002 "風は{b}暖かかった{/}。"
+  #100003 "どこへ行く？"
+  #100004 "公園。"
+  #100006 "家。"
+  #100005 "行こう！"
+  #100007 "また今度。"

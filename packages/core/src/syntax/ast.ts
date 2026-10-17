@@ -45,7 +45,7 @@ export type Stmt =
   | (Base & { kind: "Jump" | "Call"; target: string })
   | (Base & { kind: "Return" | "End" })
   | (Base & { kind: "If"; clauses: { cond: Expr | null; body: Stmt[] }[] })
-  | (Base & { kind: "Menu"; prompt: TextPart[] | null; options: MenuOption[] });
+  | (Base & { kind: "Menu"; prompt: TextPart[] | null; promptLineId: string | null; options: MenuOption[] });
 
 export interface AttrChange {
   add: string[];
@@ -360,6 +360,7 @@ class Builder {
         return {
           kind: "Menu", span: s,
           prompt: childNodes(header, "Literal").length > 0 ? this.text(header) : null,
+          promptLineId: childNodes(header, "Literal").length > 0 ? lineIdOf(header) : null,
           options: block ? childNodes(block, "MenuOption").map((o) => this.option(o)) : [],
         };
       }

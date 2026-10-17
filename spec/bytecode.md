@@ -1,6 +1,6 @@
 # Himawari Bytecode (`.hwb`) Specification
 
-> **Version:** 1.0 (format major 1, minor 0) · **Status:** Phase 1 draft; frozen once the Phase 2 runtime loads it.
+> **Version:** 1.0 (format major 1, minor 0) · **Status:** **frozen** at the end of Phase 2 (2026-10-17). `META`, `LOCL`, menu prompt line IDs, and the stricter loader rules were added before the freeze (rfcs/0004), then `SPRT` (rfcs/0005). From now on, additions bump the minor version (§5.6) and unknown sections are skipped.
 > **License:** CC-BY-4.0 · **Producer:** `@himawari/core` compiler (`hwc build`) · **Consumer:** Himawari-C runtime.
 > Plan references: DETAILED_PLAN.md §5.4, §5.6, §8.4.
 
@@ -34,6 +34,7 @@ A runtime accepts a file when `major` equals its own and `minor` is equal or low
 
 | Tag | Required | Content |
 |---|---|---|
+| `META` | yes | Game information from `himawari.json` |
 | `STRS` | yes | String pool |
 | `VARS` | yes | Variables |
 | `CHAR` | yes | Characters |
@@ -41,13 +42,23 @@ A runtime accepts a file when `major` equals its own and `minor` is equal or low
 | `LINE` | yes | Line table |
 | `TEXT` | yes | Rich text programs |
 | `CODE` | yes | Instructions |
+| `LOCL` | no | Translations: per-language line texts and character names |
+| `SPRT` | no | Layered sprites: groups, presets, and rules per character (rfcs/0005) |
 | `DBUG` | no | pc → source location (stripped in release builds) |
 
-Reserved for later minor versions: `ASST` (asset table and per-scene prefetch lists), `LOCx` (per-language text), `XTNS` (extension statements). Layer tables for layered sprites (plan §6.5) extend `CHAR` in a later minor version.
+Reserved for later minor versions: `ASST` (asset table and per-scene prefetch lists), `XTNS` (extension statements).
 
 ## 2. Sections
 
 All counts and fields are u32 unless noted.
+
+### 2.0 `META`: game information
+```
+title: str, id: str, width, height, source_language: str
+language_count, languages[language_count]: str     every language the game offers; the first is the source language
+position_count, positions[position_count] = { name: str, x: i32, y: i32 }
+```
+`width`/`height` are the virtual canvas (`resolution`), 1–16384. Positions (`at left`) are in 1/10000 of the canvas: `x` is the sprite anchor's horizontal position, `y` its vertical position (10000 = bottom edge). Sorted by name.
 
 ### 2.1 `STRS`: string pool
 ```
@@ -100,6 +111,8 @@ entries[count] = { line_id: u32, speaker: str, text: u32, flags: u32 }
 - `text`: index into `TEXT`.
 - `flags`: bit 0 menu option, bit 1 `once` option, bit 2 menu prompt.
 
+Menu prompts carry a line ID like dialogue (`menu "Where to?":   #line:k3f9a1`), so they can be translated.
+
 ### 2.6 `TEXT`: rich text programs
 Text markup is compiled into small word programs so the runtime never parses tags.
 ```
@@ -121,6 +134,10 @@ Each program is a sequence of ops ending with `END`:
 | SELECT | 6 | var, case_count, then case_count × { key: str, text: u32 } | choose the case whose key equals the variable's value, else the `other` case |
 
 `tag` is the string index of the tag name; `value` is 0 when the tag has none. Ruby is `OPEN rb <reading>` … `CLOSE`, which the runtime turns into a ruby run for its layout (rfcs/0003).
+
+A `SELECT` case's text index is always **lower** than the index of the text that contains it (the compiler emits case texts first), so evaluating text can never loop.
+
+**Values as text** (`VAR`): an int prints in decimal with a leading `-` when negative; a bool prints `true` or `false`; a str prints the string.
 
 ### 2.7 `CODE`: instructions
 ```
@@ -166,11 +183,46 @@ Transitions use three words `ttype, targ0, targ1`: `ttype` is the string index o
 | EQ NE LT LE GT GE | 0x29–0x2E | | a b → 0/1 |
 | NOT | 0x2F | | a → !a |
 | AND OR | 0x30, 0x31 | | a b → 0/1 (both sides are always evaluated; expressions have no side effects except `rand`) |
-| RAND | 0x32 | | n → a uniform value in [0, n) from the seeded RNG; 0 if n ≤ 0 |
+| RAND | 0x32 | | n → `(u32 × n) >> 32` where u32 is the next PCG32 output; 0 if n ≤ 0 |
 
 Integer overflow wraps (two's complement); language.md open question 3 tracks whether release builds should clamp instead.
 
-### 2.8 `DBUG`: debug info
+**RNG.** PCG32 (XSH-RR, 64-bit state, multiplier 6364136223846793005, increment 1442695040888963407). Seeding with `s`: state = 0, step, state += s, step. The RNG state is part of the saved game state, so rollback and loading replay the same values. Playtests and conformance transcripts seed with 1 unless told otherwise.
+
+**Limits.** The value stack holds 256 values and the call stack 64 frames. Exceeding either, or popping an empty stack, stops the game with a content error (it never aborts); the compiler never produces code that does this, except through unbounded `call` recursion, which it can't rule out.
+
+### 2.8 `LOCL`: translations
+```
+language_count
+entries[language_count] = { language: str, table: u32 }     table = word offset into words
+word_count
+words[word_count]
+```
+Each language's table holds `line_count` TEXT indices (one per `LINE` entry, in order; 0xFFFFFFFF = untranslated, show the source text), then `char_count` string indices (one per `CHAR` entry; 0 = use the source name). Only target languages with a string table appear; the source language never does. Entries are sorted by language. Translated texts are ordinary `TEXT` programs.
+
+### 2.9 `SPRT`: layered sprites
+```
+sprite_count
+sprites[sprite_count] = { char, root: str, anchor_x, anchor_y, scale, group_first, group_count, preset_first, preset_count, rule_first, rule_count }
+group_total, groups[group_total] = { name: str, flags, default_first, default_count, attr_first, attr_count }
+preset_total, presets[preset_total] = { name: str, layer_first, layer_count }
+rule_total, rules[rule_total] = { hide: str, show: str, when_first, when_count }
+pool_total, pool[pool_total]
+```
+- `char` is a `CHAR` index; `root` the sprite folder under `assets/`. `anchor_*` and `scale` are in 1/10000.
+- Groups are listed **bottom to top**. `flags`: bit 0 `always` (drawn whatever the attributes), bit 1 `multiple` (several attributes at once), bit 2 `blink`, bit 3 `lipflap`. `default_*` and `attr_*` are runs of string indices in `pool`.
+- A preset's layers are `layer_count` pairs in `pool` starting at `layer_first`: `{ group index within this sprite, attribute: str }`.
+- A rule hides (`hide` ≠ 0) or shows (`show` ≠ 0) an attribute while every word in its `when` run is active: an attribute in effect, or a preset whose attributes are all in effect.
+
+**Attribute state** (what `SHOW` does with its words when the character has a sprite):
+- A preset sets each of its layers; an attribute sets its group (the first group that lists it). In a group without `multiple`, a new attribute **replaces** the group's previous one; in a `multiple` group it is added.
+- `-attr` removes the attribute. If it is one of its group's defaults, the default stays off until the attribute is added again (so `-glasses` hides default glasses).
+- **In effect** per group: its set attributes, else its defaults (minus removed ones); an `always` group draws all of its attributes. Then rules apply.
+- Without a sprite (or for words no group lists), attributes are a plain set, as before.
+
+The runtime draws `<root>/<group>/<attr>.png` for each attribute in effect, bottom to top. **Auto-blink:** a `blink` group with `<attr>_half` and `<attr>_closed` frames blinks every 2–6 s. **Lip-flap:** a `lipflap` group with `<attr>_open` alternates while that character's line is appearing or their voice is playing.
+
+### 2.10 `DBUG`: debug info
 ```
 count
 entries[count] = { pc: u32, file: str, line: u32 }
@@ -182,16 +234,16 @@ Sorted by `pc`; an entry applies from its pc until the next entry. `line` is 1-b
 The loader validates everything **once**, before running (plan §5.4), and rejects the file with a friendly error otherwise (content errors never `abort()`):
 1. Magic, major/minor, `file_size`, and CRC.
 2. Every section lies inside the file, is 4-byte aligned, and its counts fit its size.
-3. Every string index < string count; every string is NUL-terminated inside `STRS`.
-4. Every var, char, line, text, and scene index is in range; `TEXT` programs end with `END` inside the section and nested `SELECT` texts are in range.
-5. Every instruction's `argc` matches its opcode (fixed for most ops; computed for SHOW and MENU), every instruction ends inside `CODE`, and every pc argument (JMP, JZ, CALL, MENU targets, scene entries) points at an op word.
+3. Every string index < string count, including every string operand of SHOW, HIDE, MOVE, BG, CG, and AUDIO (and a `rule` transition's mask); every string is NUL-terminated inside `STRS` and is valid UTF-8.
+4. Every var, char, line, text, and scene index is in range; `TEXT` programs end with `END` inside the section and `SELECT` case texts have a lower index than their text. `META` has a valid resolution and lists the source language first; `LOCL` tables fit and their texts are in range; every `SPRT` range, string, and preset group index is in range and the scale is non-zero.
+5. Every instruction's `argc` matches its opcode (fixed for most ops; computed for SHOW and MENU), every instruction ends inside `CODE`, and every pc argument (JMP, JZ, CALL, MENU targets, scene entries) points at an op word. AUDIO and STOP channels are 0–3; EFFECT kinds are 0–1.
 
 After validation the interpreter needs no further bounds checks.
 
 ## 4. Compilation notes
 
-- Scenes are compiled in name order; each scene's body ends with `END` when it can fall off its end (warned as HW0320).
+- Scenes are compiled in name order; each scene's body ends with `END` when it can fall off its end (warned as HW0320) or when a jump lands right after its last statement. Code that can never run gets no `END`, so headless playtests don't report it as an unreachable ending.
 - `speaker attrs "text"` compiles to `SHOW speaker` (attributes only, position kept) followed by `SAY`.
-- `if/elif/else` compiles to `JZ`/`JMP` chains. A menu compiles its option conditions (`PUSH 1` for options without one), then `MENU`, then each option body; bodies that fall through end with `JMP` to the gather point after the menu.
+- `if/elif/else` compiles to `JZ`/`JMP` chains. A menu compiles its option conditions (`PUSH 1` for options without one), then `MENU`, then each option body; bodies that fall through end with `JMP` to the gather point after the menu. `MENU` is followed by a `JMP` to the gather point (taken when no option can be shown) only when the menu can run out: when no option is both unconditional and not `once`.
 - `$ x += e` compiles to `LOAD x`, `e`, `ADD`, `STORE x`.
 - The compiler is deterministic: the same project always produces identical bytes.

@@ -1,6 +1,8 @@
 ; Himawari bytecode 1.0
-; 47 strings, 5 variables, 1 characters, 6 scenes, 16 lines, 142 code words
+; 66 strings, 5 variables, 1 characters, 6 scenes, 16 lines, 137 code words
 ; entry: ch1_intro
+; game: "Conformance: basic" dev.moesoft.conformance.basic 1920x1080, languages en
+; positions: center(0.5, 1) left(0.25, 1) right(0.75, 1)
 
 var 0: courage int = 0 (save)
 var 1: ending_true_seen bool = 0 (global)
@@ -8,6 +10,18 @@ var 2: hana_affection int = 0 (save)
 var 3: heard_rumor bool = 0 (save)
 var 4: player_name str = "Aoi" (save)
 char hana "Hana" #f2a541
+sprite hana sprites/hana anchor(0.5, 1) scale 1
+  group body [always]
+  group outfit default(uniform): uniform
+  group brows default(neutral): down neutral up
+  group eyes [blink] default(neutral): half neutral smile wide
+  group mouth [lipflap] default(neutral): flat neutral o smile
+  group accessories [multiple] default(glasses): glasses
+  preset neutral: brows=neutral eyes=neutral mouth=neutral
+  preset smile: brows=neutral eyes=smile mouth=smile
+  preset surprised: brows=up eyes=wide mouth=o
+  preset annoyed: brows=down eyes=half mouth=flat
+  rule hide glasses when surprised
 
 
 scene ch1_class:  ; script/ch1.hws
@@ -22,65 +36,61 @@ scene ch1_hub:  ; script/ch1.hws
   0008  LOAD     heard_rumor
   0010  PUSH     1
   0012  MENU     "Ask Hana about..."
-                 option once "The festival." #p5q6r7 -> L23
-                 option once "Her transfer rumor." #s8t9v0 -> L27
-                 option "Nothing, let's go." #w1x2y3 -> L31
-  0021  JMP      L36
-L23:
-  0023  CALL     talk_festival   ; script/ch1.hws:34
-  0025  JMP      ch1_hub   ; script/ch1.hws:35
-L27:
-  0027  CALL     talk_rumor   ; script/ch1.hws:37
-  0029  JMP      ch1_hub   ; script/ch1.hws:38
-L31:
-  0031  PUSH     1   ; script/ch1.hws:40
-  0033  STORE    ending_true_seen
-  0035  END   ; script/ch1.hws:41
-L36:
-  0036  END
+                 option once "The festival." #p5q6r7 -> L21
+                 option once "Her transfer rumor." #s8t9v0 -> L25
+                 option "Nothing, let's go." #w1x2y3 -> L29
+L21:
+  0021  CALL     talk_festival   ; script/ch1.hws:34
+  0023  JMP      ch1_hub   ; script/ch1.hws:35
+L25:
+  0025  CALL     talk_rumor   ; script/ch1.hws:37
+  0027  JMP      ch1_hub   ; script/ch1.hws:38
+L29:
+  0029  PUSH     1   ; script/ch1.hws:40
+  0031  STORE    ending_true_seen
+  0033  END   ; script/ch1.hws:41
 
 scene ch1_intro:  ; script/ch1.hws
-  0037  BG       classroom_day with dissolve(800)   ; script/ch1.hws:3
-  0042  AUDIO    music morning_theme fade 1000   ; script/ch1.hws:4
-  0046  SHOW     hana smile uniform at left with fade(300)   ; script/ch1.hws:5
-  0056  SAY      hana "Good morning, [player_name]! You're late {b}again{/}." #k3f9a1   ; script/ch1.hws:7
-  0058  SAY      me "Sorry, sorry..." #m1n2p3   ; script/ch1.hws:8
-  0060  SAY      "The bell rang before I could finish." #q4r5s6   ; script/ch1.hws:9
-  0062  LOAD     hana_affection   ; script/ch1.hws:10
-  0064  PUSH     1
-  0066  ADD
-  0067  STORE    hana_affection
-  0069  PUSH     1   ; script/ch1.hws:12
-  0071  LOAD     courage
-  0073  PUSH     2
-  0075  GE
-  0076  MENU     "What do you say?"
-                 option "I overslept." #t7v8w9 -> L85
-                 option "I was helping someone." #a3b4c5 -> L98
-  0083  JMP      L119
-L85:
-  0085  SHOW     hana annoyed   ; script/ch1.hws:14
-  0094  SAY      hana "Classic." #x0y1z2
-  0096  JMP      L119
-L98:
-  0098  LOAD     hana_affection   ; script/ch1.hws:16
-  0100  PUSH     2
-  0102  ADD
-  0103  STORE    hana_affection
-  0105  SHOW     hana surprised -glasses   ; script/ch1.hws:17
-  0115  SAY      hana "Really? That's... actually kind of sweet." #d6e7f8
-  0117  JMP      ch1_helped   ; script/ch1.hws:18
-L119:
-  0119  SAY      hana "Anyway, let's go." #g9h0j1   ; script/ch1.hws:21
-  0121  JMP      ch1_class   ; script/ch1.hws:22
+  0034  BG       classroom_day with dissolve(800)   ; script/ch1.hws:3
+  0039  AUDIO    music morning_theme fade 1000   ; script/ch1.hws:4
+  0043  SHOW     hana smile uniform at left with fade(300)   ; script/ch1.hws:5
+  0053  SAY      hana "Good morning, [player_name]! You're late {b}again{/}." #k3f9a1   ; script/ch1.hws:7
+  0055  SAY      me "Sorry, sorry..." #m1n2p3   ; script/ch1.hws:8
+  0057  SAY      "The bell rang before I could finish." #q4r5s6   ; script/ch1.hws:9
+  0059  LOAD     hana_affection   ; script/ch1.hws:10
+  0061  PUSH     1
+  0063  ADD
+  0064  STORE    hana_affection
+  0066  PUSH     1   ; script/ch1.hws:12
+  0068  LOAD     courage
+  0070  PUSH     2
+  0072  GE
+  0073  MENU     "What do you say?"
+                 option "I overslept." #t7v8w9 -> L80
+                 option "I was helping someone." #a3b4c5 -> L93
+L80:
+  0080  SHOW     hana annoyed   ; script/ch1.hws:14
+  0089  SAY      hana "Classic." #x0y1z2
+  0091  JMP      L114
+L93:
+  0093  LOAD     hana_affection   ; script/ch1.hws:16
+  0095  PUSH     2
+  0097  ADD
+  0098  STORE    hana_affection
+  0100  SHOW     hana surprised -glasses   ; script/ch1.hws:17
+  0110  SAY      hana "Really? That's... actually kind of sweet." #d6e7f8
+  0112  JMP      ch1_helped   ; script/ch1.hws:18
+L114:
+  0114  SAY      hana "Anyway, let's go." #g9h0j1   ; script/ch1.hws:21
+  0116  JMP      ch1_class   ; script/ch1.hws:22
 
 scene talk_festival:  ; script/ch1.hws
-  0123  SAY      hana "It's next week!" #z4a5b6   ; script/ch1.hws:44
-  0125  PUSH     1   ; script/ch1.hws:45
-  0127  STORE    heard_rumor
-  0129  RET   ; script/ch1.hws:46
+  0118  SAY      hana "It's next week!" #z4a5b6   ; script/ch1.hws:44
+  0120  PUSH     1   ; script/ch1.hws:45
+  0122  STORE    heard_rumor
+  0124  RET   ; script/ch1.hws:46
 
 scene talk_rumor:  ; script/ch1.hws
-  0130  SHOW     hana -glasses   ; script/ch1.hws:49
-  0139  SAY      hana "...Who told you that?" #c7d8e9
-  0141  RET   ; script/ch1.hws:50
+  0125  SHOW     hana -glasses   ; script/ch1.hws:49
+  0134  SAY      hana "...Who told you that?" #c7d8e9
+  0136  RET   ; script/ch1.hws:50

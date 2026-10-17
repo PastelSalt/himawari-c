@@ -146,9 +146,10 @@ typedef struct {
 
 static AdvanceEntry advance_cache[CACHE_SLOTS];
 
-static float cached_advance(void *user, uint32_t cp, HwFontRole role)
+static float cached_advance(void *user, uint32_t cp, HwFontRole role, uint32_t run)
 {
     (void)user;
+    (void)run;
     uint32_t key = atlas_key(cp, role, false);
     uint32_t h = (key * 2654435761u) % CACHE_SLOTS;
     while (advance_cache[h].key != 0 && advance_cache[h].key != key) {
@@ -332,7 +333,7 @@ int main(int argc, char *argv[])
             if (g->cp != ' ') {
                 last = g;
             }
-            if (g->cp != ' ' && g->x + cached_advance(NULL, g->cp, HW_FONT_BASE) > width + 0.5f) {
+            if (g->cp != ' ' && g->x + cached_advance(NULL, g->cp, HW_FONT_BASE, g->run) > width + 0.5f) {
                 /* Trailing spaces may overflow by design: they are invisible. */
                 if (hw_kinsoku_hangable(g->cp)) {
                     hanging_count++;

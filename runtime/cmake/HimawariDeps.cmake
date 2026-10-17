@@ -52,6 +52,27 @@ hw_force(SDL_TESTS OFF)
 hw_force(SDL_EXAMPLES OFF)
 hw_force(SDL_INSTALL OFF)
 
+# Size budget (plan §8.1: <= 4 MB): only what a visual novel uses on Windows.
+# Kept: video, audio (WASAPI + dummy for CI), the GPU renderer on D3D12 (rule
+# wipes, rfcs/0002), the D3D11 renderer as the fallback, keyboard, mouse, and
+# gamepads through XInput and raw input.
+hw_force(SDL_CAMERA OFF)
+hw_force(SDL_HAPTIC OFF)
+hw_force(SDL_HIDAPI OFF)
+hw_force(SDL_POWER OFF)
+hw_force(SDL_SENSOR OFF)
+hw_force(SDL_DIALOG OFF)
+hw_force(SDL_TRAY OFF)
+hw_force(SDL_OPENGL OFF)
+hw_force(SDL_OPENGLES OFF)
+hw_force(SDL_VULKAN OFF)
+hw_force(SDL_RENDER_VULKAN OFF)
+hw_force(SDL_RENDER_D3D OFF)
+hw_force(SDL_RENDER_D3D12 OFF) # the GPU renderer already drives D3D12
+hw_force(SDL_OFFSCREEN OFF)
+hw_force(SDL_DISKAUDIO OFF)
+hw_force(SDL_VIRTUAL_JOYSTICK OFF)
+
 # SDL3_mixer 3.2: built-in decoders only (WAV/AIFF/VOC/AU plus the bundled
 # stb_vorbis and dr_mp3). No external codec libraries, nothing loaded at runtime.
 hw_force(SDLMIXER_DEPS_SHARED OFF)
@@ -86,6 +107,12 @@ hw_force(SDLTTF_SAMPLES OFF)
 hw_force(SDLTTF_INSTALL OFF)
 
 FetchContent_MakeAvailable(sdl3 sdl3_mixer freetype)
+
+# FreeType: register only the modules in cmake/freetype/hw_ftmodule.h; the rest
+# are never referenced, so the linker drops them.
+# C sources only: windres (FreeType's version resource) can't take the angle brackets.
+target_compile_definitions(freetype PRIVATE "$<$<COMPILE_LANGUAGE:C>:FT_CONFIG_MODULES_H=<hw_ftmodule.h$<ANGLE-R>>")
+target_include_directories(freetype PRIVATE "${PROJECT_SOURCE_DIR}/cmake/freetype")
 
 # SDL3_ttf links Freetype::Freetype; FreeType's own build only defines `freetype`.
 if(NOT TARGET Freetype::Freetype)

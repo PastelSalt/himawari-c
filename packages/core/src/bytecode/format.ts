@@ -70,9 +70,53 @@ export interface DebugEntry {
   line: number;
 }
 
+/** Game information from himawari.json (META). Positions are in 1/10000 of the canvas. */
+export interface MetaInfo {
+  title: number;
+  id: number;
+  width: number;
+  height: number;
+  sourceLanguage: number;
+  /** Every language the game offers, source first. */
+  languages: number[];
+  positions: { name: number; x: number; y: number }[];
+}
+
+/** One target language's compiled translations (LOCL). */
+export interface LocaleEntry {
+  language: number;
+  /** One per LINE entry: a TEXT index, or NONE when untranslated (the source text is shown). */
+  lineTexts: number[];
+  /** One per CHAR entry: the display name's string index, or 0 for the source name. */
+  charNames: number[];
+}
+
+export const POSITION_SCALE = 10000;
+
+export const SPRITE_ALWAYS = 1;
+export const SPRITE_MULTIPLE = 2;
+export const SPRITE_BLINK = 4;
+export const SPRITE_LIPFLAP = 8;
+
+/** A layered sprite (SPRT, plan §6). Strings are string indices; fractions are in 1/10000. */
+export interface SpriteEntry {
+  char: number;
+  root: number;
+  anchorX: number;
+  anchorY: number;
+  scale: number;
+  /** Bottom to top. */
+  groups: { name: number; flags: number; defaults: number[]; attrs: number[] }[];
+  /** Layers are [group index in this sprite, attribute]. */
+  presets: { name: number; layers: [number, number][] }[];
+  /** hide/show: an attribute or 0. */
+  rules: { hide: number; show: number; when: number[] }[];
+}
+
 export interface HwbModule {
   major: number;
   minor: number;
+  meta: MetaInfo;
   strings: string[];
   vars: VarEntry[];
   chars: CharEntry[];
@@ -82,6 +126,8 @@ export interface HwbModule {
   texts: number[][];
   code: number[];
   debug: DebugEntry[] | null;
+  locales: LocaleEntry[];
+  sprites: SpriteEntry[];
 }
 
 /** Argument count an instruction must have, given its op and (for SHOW/MENU) its leading arguments. */

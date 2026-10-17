@@ -1,0 +1,11 @@
+{
+  "name": "Layered Sprites",
+  "id": "dev.moesoft.example.layered",
+  "version": "0.1.0",
+  "engine": "^1.0.0",
+  "entry": "start",
+  "sourceLanguage": "en",
+  "languages": ["en"],
+  "resolution": [1920, 1080],
+  "variables": {}
+}

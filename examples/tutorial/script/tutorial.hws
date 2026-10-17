@@ -8,7 +8,7 @@ scene start:
     jump hub
 
 scene hub:
-    menu "Which lesson would you like?":
+    menu "Which lesson would you like?":   #line:ag2t08
         once "Dialogue and narration":   #line:42wdtg
             call lesson_dialogue
             jump hub
@@ -36,7 +36,7 @@ scene lesson_dialogue:
 
 scene lesson_choices:
     show kai at center
-    menu "Kai offers you a drink.":
+    menu "Kai offers you a drink.":   #line:qa3fqv
         "Tea, please.":   #line:76vj3v
             $ liked_tea = true
             kai "Good choice."   #line:wq7pjf

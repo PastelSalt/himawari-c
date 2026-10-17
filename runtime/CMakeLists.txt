@@ -41,6 +41,11 @@ endif()
 # core/: no SDL, no I/O. Shared by the game, headless playtests, tests, and fuzzers (plan §8.3).
 add_library(hw_core STATIC
   src/core/hw_utf8.c
+  src/core/hw_crc32.c
+  src/core/hw_hwb.c
+  src/core/hw_vm.c
+  src/core/hw_play.c
+  src/core/hw_save.c
 )
 target_include_directories(hw_core PUBLIC src/core)
 target_link_libraries(hw_core PRIVATE hw_warnings)
@@ -49,6 +54,15 @@ enable_testing()
 add_executable(test_utf8 tests/test_utf8.c)
 target_link_libraries(test_utf8 PRIVATE hw_core hw_warnings)
 add_test(NAME utf8 COMMAND test_utf8)
+
+# Tests that read the conformance cases (tests/conformance/cases/*/expected.hwb, written by the TS half).
+set(HW_CONFORMANCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../tests/conformance/cases")
+foreach(t hwb conformance save sprite)
+  add_executable(test_${t} tests/test_${t}.c)
+  target_link_libraries(test_${t} PRIVATE hw_core hw_warnings)
+  target_compile_definitions(test_${t} PRIVATE HW_CONFORMANCE_DIR="${HW_CONFORMANCE_DIR}")
+  add_test(NAME ${t} COMMAND test_${t})
+endforeach()
 
 if(HW_FUZZ)
   # MSYS2 CLANG64 ships libFuzzer, but clang rejects -fsanitize=fuzzer for MinGW
@@ -66,6 +80,27 @@ if(HW_FUZZ)
   target_link_options(fuzz_utf8 PRIVATE -fsanitize=address)
   target_link_libraries(fuzz_utf8 PRIVATE hw_warnings "${hw_clang_rt_dir}/libclang_rt.fuzzer-x86_64.a")
   set_target_properties(fuzz_utf8 PROPERTIES LINKER_LANGUAGE CXX)
+
+  add_executable(fuzz_hwb fuzz/fuzz_hwb.c
+    src/core/hw_utf8.c src/core/hw_crc32.c src/core/hw_hwb.c src/core/hw_vm.c src/core/hw_play.c src/core/hw_save.c)
+  target_include_directories(fuzz_hwb PRIVATE src/core)
+  target_compile_options(fuzz_hwb PRIVATE ${hw_fuzz_flags})
+  target_link_options(fuzz_hwb PRIVATE -fsanitize=address)
+  target_link_libraries(fuzz_hwb PRIVATE hw_warnings "${hw_clang_rt_dir}/libclang_rt.fuzzer-x86_64.a")
+  set_target_properties(fuzz_hwb PROPERTIES LINKER_LANGUAGE CXX)
+
+  add_executable(fuzz_save fuzz/fuzz_save.c
+    src/core/hw_utf8.c src/core/hw_crc32.c src/core/hw_hwb.c src/core/hw_vm.c src/core/hw_play.c src/core/hw_save.c)
+  target_include_directories(fuzz_save PRIVATE src/core)
+  target_compile_definitions(fuzz_save PRIVATE HW_CONFORMANCE_DIR="${HW_CONFORMANCE_DIR}")
+  target_compile_options(fuzz_save PRIVATE ${hw_fuzz_flags})
+  target_link_options(fuzz_save PRIVATE -fsanitize=address)
+  target_link_libraries(fuzz_save PRIVATE hw_warnings "${hw_clang_rt_dir}/libclang_rt.fuzzer-x86_64.a")
+  set_target_properties(fuzz_save PROPERTIES LINKER_LANGUAGE CXX)
+
+  # Inputs that once crashed a target are replayed on every fuzz build.
+  file(GLOB hw_hwb_regressions "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/regressions/hwb/*")
+  add_test(NAME fuzz_hwb_regressions COMMAND fuzz_hwb ${hw_hwb_regressions})
 endif()
 
 if(HW_WITH_SDL)
@@ -79,6 +114,29 @@ if(HW_WITH_SDL)
   add_executable(test_layout tests/test_layout.c)
   target_link_libraries(test_layout PRIVATE hw_text hw_warnings)
   add_test(NAME layout COMMAND test_layout)
+
+  # The game runtime: windowed player and --headless playtests (plan §8).
+  add_executable(himawari
+    src/main.c
+    src/app/hw_headless.c
+    src/app/hw_game.c
+    src/app/hw_text_draw.c
+    src/app/hw_assets.c
+    src/app/hw_audio.c
+    src/app/hw_persist.c
+    src/app/hw_ui_text.c
+    src/app/hw_rulewipe.c
+  )
+  target_include_directories(himawari PRIVATE src/app shaders/generated)
+  target_link_libraries(himawari PRIVATE
+    hw_core hw_text hw_warnings
+    SDL3::SDL3-static SDL3_mixer::SDL3_mixer-static freetype)
+
+  # Headless playtest of a conformance case: every ending reached, no errors.
+  add_test(NAME playtest_basic
+    COMMAND himawari --headless "${HW_CONFORMANCE_DIR}/basic/expected.hwb" --playtest)
+  add_test(NAME playtest_flow
+    COMMAND himawari --headless "${HW_CONFORMANCE_DIR}/flow/expected.hwb" --playtest)
 
   # Spike A: static SDL3 + SDL3_mixer + FreeType window, sound, and JP text (rfcs/0001).
   add_executable(spike_a spikes/a_static/main.c)

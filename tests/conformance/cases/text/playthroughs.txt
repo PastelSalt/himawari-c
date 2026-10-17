@@ -1,0 +1,3 @@
+# No menus: one playthrough in each language (ja has no table, so it falls back).
+-
+@ja

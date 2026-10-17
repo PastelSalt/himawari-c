@@ -16,7 +16,8 @@
 | **Game output** | Windows x64 only |
 | **Studio** | Windows, UI in English (default) + Japanese |
 | **AI role** | Development assistant only. **No media generation** |
-| **Phase** | **Phase 1 done** (session 9): sanitizers; lexer, CST parser, AST + `ast.schema.json`, formatter, validator, edit API, bytecode spec + compiler, conformance (compile half), localization, templates + tutorial, `hwc check/fmt/build/disasm/init/l10n`. Next: **Phase 2, runtime MVP** (waiting on your go-ahead) |
+| **Phase** | **Phase 1 done** (session 9): sanitizers; lexer, CST parser, AST + `ast.schema.json`, formatter, validator, edit API, bytecode spec + compiler, conformance (compile half), localization, templates + tutorial, `hwc check/fmt/build/disasm/init/l10n`. Next: Phase 2 |
+| **Phase 2** | **Done** (session 10): `himawari.exe` (loader, VM, saves, rollback, headless playtests, windowed player with layered sprites, rule wipes, EN/JA), bytecode 1.0 frozen, 2.38 MB release. Next: **Phase 3, MCP v1 and CLI polish** (waiting on your go-ahead) |
 | **Owner** | Moesoft (GitHub: `PastelSalt`) |
 | **Repo** | **https://github.com/PastelSalt/himawari-c** (public) |
 
@@ -361,7 +362,8 @@ You then asked to commit and push: `0419238`.
   - Not yet: compiling translations into `.hwb` (`LOCx` sections) for in-game language switching; menu prompts have no line IDs, so they can't be translated yet (a small spec change for Phase 2).
 
 - ✅ **Milestone 9d: `spec/ast.schema.json`** (JSON Schema 2020-12, `$id` `…/spec/ast/1.0.json`): the JSON form of `parseAst()`'s `ast` (scenes, all 15 statement kinds, expressions, text parts, menu options with `fallsThrough`, spans, line IDs). Closed objects (`additionalProperties: false`), so any AST change must update the schema. Tests in `tests/spec/schemas.test.ts` validate the real AST of every conformance case, example, and template, plus a script that uses every statement and expression kind, under Ajv strict mode.
-- ✅ **Phase 1 complete.** `corepack pnpm check`: 212 tests, typecheck, lint, i18n all pass; runtime `win64-debug` builds and ctest passes. Not committed yet (everything after `bac5bc2`).
+- ✅ **Phase 1 complete.** `corepack pnpm check`: 212 tests, typecheck, lint, i18n all pass; runtime `win64-debug` builds and ctest passes.
+- 📦 **Committed and pushed** at your request: `df0c634` "Phase 1: templates, hwc init, tutorial, localization, AST schema".
 
 **Phase 1 exit (plan §18), final state:**
 1. ✅ Project model + semantic validator (milestone 6). Known gaps: manifest/character diagnostics point at line 1; `if`/`elif` type errors point at the `if` line; no test yet that the TS manifest reader and `spec/manifest.schema.json` agree on shared fixtures.
@@ -371,6 +373,74 @@ You then asked to commit and push: `0419238`.
 5. ✅ Tutorial + starter templates (9a, 9b), `hwc l10n` (9c), `ast.schema.json` (9d). Friendly multi-error diagnostics with fixes and CST round-trip property tests were already met.
 
 **Carried into Phase 2:** compile `locales/*.json` into `.hwb` (`LOCx` sections) for in-game language switching; give menu prompts line IDs so they can be translated; execution transcripts for the conformance suite once the C VM runs.
+
+## Session 10: 2026-10-17 · Phase 2: the runtime MVP
+**You asked:** continue with Phase 2 and keep logging after every milestone. This entry is updated after each one.
+
+**Work order (plan §18 Phase 2):** bytecode additions the runtime needs → C loader → C VM → headless playtests + conformance transcripts → saves and rollback → windowed player (renderer, text, menus, audio, EN/JA) → dev tools → fuzzing and size.
+
+- ✅ **Milestone 10a: bytecode additions before the freeze** (rfcs/0004, accepted under your Phase 2 go-ahead; `spec/bytecode.md` stays 1.0 because nothing has shipped against it):
+  - `META` (required): title, id, resolution, languages (source first), named positions. The runtime never reads `himawari.json` (D01), so it needs these compiled in.
+  - `LOCL` (optional): per target language, a TEXT index per line (or "untranslated" → source text) and a name per character. Built from `locales/*.json` by the compiler; the disassembler lists it.
+  - **Menu prompts get line IDs** (`menu "Where to?":   #line:…`): formatter, AST (`promptLineId`, also in `ast.schema.json`), string tables (`kind: "prompt"`), compiler. The tutorial got 2 new IDs from `hwc fmt`.
+  - Stricter loader rules (string operands, channels, effect kinds, `SELECT` case order so text evaluation can't loop) in the spec and the TS reader. RNG specified (PCG32), values-as-text specified, VM limits (256 stack, 64 frames).
+  - Characters keep per-language names (`names`); `checkProject` returns the readable string tables (`locales`).
+  - Conformance: compile cases now commit **`expected.hwb`** (byte-exact) for the C side; new cases `l10n` (JA table, character names, prompt ID) and `flow` (integer division/modulo edge cases, division by zero, `rand`, call/return, `once` options, a menu that runs out of options, string enums, a global variable).
+  - `corepack pnpm check`: 217 tests pass.
+
+- ✅ **Milestone 10b: the C loader** (`runtime/src/core/hw_hwb.{h,c}`, `hw_crc32.{h,c}`): a port of `reader.ts` that validates everything once (spec §3, including the new rules) and never aborts; refusals are one-line reasons. Lookups for scenes, variables, strings, locales; pc → scene and pc → file:line from `DBUG`.
+  - `tests/test_hwb.c`: loads the committed conformance `.hwb` files, then damages copies **with the CRC recomputed** so each deeper rule is reached (unknown opcode, wrong argc, string index, jump into an instruction's arguments, scene entry, resolution, source language, truncated counts, misaligned and runaway section tables, LOCL range) and refuses every truncation of a real file.
+- ✅ **Milestone 10c: the VM, text, and headless play** (`hw_vm.{h,c}`, `hw_play.{h,c}`; no SDL, no I/O):
+  - **VM:** `hw_vm_next()` runs until an event (SAY, MENU, SHOW, HIDE, MOVE, BG, CG, AUDIO, STOP, WAIT, EFFECT, END, ERROR). It never renders; it keeps the display state (bg, cg, music, ambient, up to 16 characters with positions and attributes) so saves and rollback restore the screen without replaying. Wrapping arithmetic without undefined behavior (`INT_MIN / -1`, division by zero → 0 and counted), the PCG32 RNG, stack/frame limits and a 1,000,000-instruction "endless loop" guard as content errors. A **checkpoint hook** fires before each SAY/MENU (plan §8.9). Snapshots are fixed-size (`hw_vm_core` + variables + spent `once` options); restoring keeps global variables.
+  - **Text:** evaluates TEXT programs into a sink (run/open/close/mark) with variables and selects resolved and tags always balanced; per-language line text and speaker names from `LOCL`, falling back to the source; canonical markup output for transcripts.
+  - **Display rules decided (documented in the spec work for 10e):** `bg` clears a CG; `show` adds an absent character at `center`; attributes are a set of words. **Gap:** Ren'Py-style group replacement (`show hana casual` swapping only the outfit) needs layer groups in `CHAR`; until then the transcript shows `smile` and `annoyed` together. Tracked for the layered-sprite milestone.
+  - **Headless** (`runtime/src/main.c`, `src/app/hw_headless.c`): `himawari --headless [game.hwb | --project DIR] --playtest [max_steps=N] [seed=N] [lang=xx] [--out report.json]` explores every menu choice depth-first, merging menu states it has already explored (hash of the snapshot), and reports endings reached vs. reachable `END`s, errors, line/option coverage, unseen line IDs, and divisions by zero; exit 1 when something is wrong. `--transcript "0 1 2"` prints every event.
+  - **Conformance, execution half:** `runtime/tests/test_conformance.c` plays each case's committed `expected.hwb` with `playthroughs.txt` and compares with `expected.transcript` (`UPDATE_CONFORMANCE=1` to regenerate). The transcripts check integer semantics, `rand`, call/return, `once` exhaustion, a menu running out, gather points, Japanese text and names, and fallback to the source.
+  - **Compiler fix found by the playtest:** a menu that can never run out of options no longer gets a `JMP` to its gather point, and a scene that can't fall off its end no longer gets a dead `END`, so playtests don't report phantom unreachable endings (spec §4 updated).
+  - **The tutorial, headless:** 62 paths, 70 menu states, every ending reached, 21/21 lines seen, 7/7 options chosen.
+  - ctest: utf8, hwb, conformance, layout, playtest_basic, playtest_flow pass.
+  - **Fuzzing (Phase 2 exit item):** `fuzz_hwb` (loader + VM + text + snapshots + playtest; the harness fixes up the CRC so mutations reach the structural checks). The first run found a real bug within seconds: a top-level `return` counts as an ending but isn't an `END` instruction, so "total minus reached" underflowed and the report wrote out of bounds. Fixed (a separate unreached count) and the input kept as `runtime/fuzz/regressions/hwb/`, replayed by `ctest --preset win64-fuzz`. **The second run: 10 minutes, 2.05 million inputs, no crashes.** CI now replays regressions and fuzzes `.hwb` for 60 s per push.
+- ✅ **Milestone 10d: saves and rollback** (`runtime/src/core/hw_save.{h,c}`, plan §8.9):
+  - **Save format v1** (`HWSV`, CRC-checked): the game id, the build's CRC, the save screen info (time, play time, scene, preview, language), the RNG, the position, call frames, save-scope variables, spent `once` options, and the stage, all stored **by name and line ID**, not by index.
+  - **Same build → exact restore. Another build → remapped:** the position by line ID; if that line was deleted, the newest of up to 16 earlier checkpoints that still exists (from the rollback history), then the scene's start (`HW_SAVE_FALLBACK`, so the game can tell the player). Call frames are anchored as "the k-th `call X` inside scene Y", which survives edits elsewhere. Variables by name and type (gone or retyped → default), `once` options by line ID, stage by asset and character names. Every pc from a save is checked against instruction starts before use, so a crafted save can't make the VM read out of bounds.
+  - **Rollback history:** a ring of checkpoint snapshots (256 × ~2.5 KB ≈ 640 KB for the basic case, under the plan's 1 MB). `hw_rollback()` steps back one line and replays it.
+  - `tests/test_save.c`: exact round trip inside a `call`, a simulated rebuild (same story after remapping), a deleted line (fallback to an earlier checkpoint), damaged and foreign saves refused without touching the VM, rollback replaying the previous line and stopping at the first, and the ring's eviction. A `fuzz_save` target feeds edited save files to both the exact and the remap paths.
+- ✅ **Milestone 10e: the windowed player** (`runtime/src/app/`, plan §8.4–§8.11). `himawari [game.hwb] [--lang xx]` and `himawari --project DIR` (dev mode):
+  - **Loop:** the VM runs until a line, menu, wait, or transition blocks; each event updates the shown stage. The scene is drawn into an offscreen texture every frame, so transitions blend the old and new scene: `fade` (through black), `dissolve`, `slide_*`, `wipe`; `rule` falls back to a dissolve until the GPU shader path from rfcs/0002 is wired in. `shake` and `flash` effects; `wait` (click skips).
+  - **Text:** typewriter reveal with per-run `{speed}`, `{w=…}` pauses, `{nw}`, `{color}`, `{size}`, `{b}`, `{i}`, `{shake}`, ruby, kinsoku; FreeType through `src/app/hw_text_draw.{h,c}` (fallback chain: `assets/fonts/main.*`, Segoe UI, Yu Gothic, Meiryo; synthetic bold and italic; stroked outlines; paged atlas). `hw_layout` glyphs now carry their run index and the advance callback gets it.
+  - **UI (default theme):** title screen, textbox with name plate (character color), menus (mouse, arrows, Enter, number keys), a quick bar (Rewind, History, Auto, Skip, Save, Load, Menu), system menu (save, load, history, language, text speed, title, quit), six save slots plus a quick slot (F6 / F9) with date, play time, and the line, history (backlog), quit confirmation, "The End", and an error card (dev: the message with file:line and "press F5"; release: a friendly message). UI strings in English and Japanese (`hw_ui_text.c`; they move into theme files with the theme loader).
+  - **Rewind** (mouse wheel up, PageUp, the quick bar) through the rollback ring; **skip** (Ctrl or Tab) passes read lines only, any line in dev mode; **auto** mode; read lines and global variables persist in `global.dat`; atomic save writes (temp file + rename) under `SDL_GetPrefPath`. Language: settings, else the OS locale if the game offers it, else the source language; switching relayouts the current line.
+  - **Placeholders (P5):** missing backgrounds and CGs become name-colored gradients with a label (dev mode adds the expected path); characters without `assets/sprites/<id>.png` become silhouettes in their color with name and attributes. Missing audio is silence (the dev overlay lists it). Images: PNG and BMP via `SDL_LoadSurface`; JPG/WebP report "not supported yet". Voice plays `voice/<lang>/<line id>` when it exists.
+  - **Audio** (`hw_audio.c`, SDL3_mixer): music crossfades on two tracks, ambient, a 6-track SFX pool, voice; looping music is not restarted when the same track is requested again; after loads, rewinds, and reloads the music follows the restored state.
+  - **Dev mode:** F3 overlay (scene, file:line, pc, stack, rewind depth, variables, missing audio, divisions by zero), **F5 reload in place** (re-reads the `.hwb`, carries the position over through a save so it remaps by line ID, keeps read lines and globals, flushes cached art).
+  - **Smoke-test flags:** `--start`, `--frames N`, `--advance N`, `--screenshot out.png`; startup errors are logged and skip the modal box in unattended runs. Checked by screenshots: the tutorial's title, a menu, Kai's placeholder and name plate mid-typewriter, and the `l10n` case in Japanese (花, translated prompt and options, Japanese UI). CI now runs a player smoke test and uploads the screenshot.
+  - Release build: 5.72 MB, system DLLs only. Headless output from the GUI-subsystem release exe now honors redirection (it only attaches to the parent console when stdout/stderr aren't already redirected).
+  - **Gotcha found:** the PC clock went backwards between sessions, leaving object files with future timestamps, so ninja silently skipped recompiling changed sources. Fixed by deleting our future-dated outputs; worth remembering if a build ever "does nothing".
+  - Save fuzzing: **10 minutes, 11.3 million inputs, no crashes** (`fuzz_save`, seeded with a real save); CI fuzzes saves for 60 s too.
+
+- ✅ **Milestone 10f: the tutorial in Japanese** (Phase 2 exit: "the starter VN plays in EN and JA"): all 30 tutorial lines translated into `examples/tutorial/locales/ja.json`, imported as **AI-provided** (`provenance: ai`, `needs-review`, so `hwc check` notes 30 lines awaiting human review). Headless in Japanese: every ending, 21/21 lines, 7/7 options. Screenshots confirm Japanese line breaking, ruby (向日葵 / ひまわり), and bold, italic, and colored runs. Added `--pick K` (choose option K) to the smoke-test flags.
+- ✅ **Milestone 10g: layered sprites** (rfcs/0005, `spec/bytecode.md` §2.9, plan §6):
+  - Core: characters keep their full sprite definition (`sprite`: groups bottom to top with `always`/`multiple`/`blink`/`lipflap`, defaults, attributes from frontmatter and asset folders, presets, rules, anchor, scale; a folder-only group with one attribute is `always`, plan §6.2). The compiler emits a new optional **`SPRT`** section; the reader validates it; the disassembler lists it.
+  - VM: **attribute merge** (presets set several groups; an attribute replaces its group's previous one unless the group is `multiple`; `-attr` keeps a default off until re-added). State entries are (attribute, group) pairs, because one word can live in several groups (eyes=smile, mouth=smile); the first version collapsed them, and the new transcripts caught it. `hw_sprite_layers()` resolves what is in effect (set attributes, else defaults, `always` groups, then rules; a rule's `when` matches an attribute or a preset whose attributes are all in effect). Saves store `[-]group/attr`.
+  - Player: draws `<root>/<group>/<attr>.png` bottom to top at the anchor and scale; **auto-blink** (`_half`/`_closed`, every 2–6 s) and **lip-flap** (`_open`, while that character's line appears or their voice plays). Without art, the silhouette lists the attributes in effect.
+  - `tests/test_sprite.c`: defaults on first show, presets sharing words across groups, replacement instead of piling up, the hide-when-preset rule turning on and off, removing a default, removing a set attribute. The `basic` transcript now shows `show hana (brows=neutral eyes=smile mouth=smile outfit=uniform)` → `annoyed` replacing group by group.
+  - **`examples/layered/`**: Mio, a test character whose layers are drawn by `make-art.mjs` (procedural shapes, plan §1.5), and a short script showing a preset, an outfit change that keeps the expression, and the ribbon rule. Screenshots confirm all of it, including lip-flap mid-line.
+  - The clock problem also hit `tsc -b` (stale `packages/*/dist`, so the CLI compiled without `SPRT`); cleaned and rebuilt. Example build outputs (`examples/*/build/`) are now gitignored.
+  - Checks: `corepack pnpm check` 219 tests; runtime ctest 8/8.
+
+- ✅ **Milestone 10h: rule wipes, warp, and size** (Phase 2's last items):
+  - **Rule wipes on the GPU render state** (`src/app/hw_rulewipe.{h,c}`, rfcs/0002): the player now asks for the GPU renderer (D3D12 here), builds the committed DXIL/SPIR-V shader and a render state per mask (`assets/rules/<mask>.png`, or a procedural diagonal mask when it's missing, P5), and **self-tests at startup** (a 4×4 wipe must come out white; a silently failing pipeline leaves black) before using it. No GPU device, a failed self-test, or `--no-gpu` → the default renderer and a dissolve. Screenshots confirm both paths; text, sprites, and lip-flap look the same on the GPU renderer.
+  - **Warp** (plan §8.11): `himawari --project DIR --warp scene|file:line` (`ch1.hws:49` matches `script/ch1.hws`). `hw_warp()` in core explores paths like a playtest until it reaches that line and starts from the checkpoint right before it, so the variables are ones a real path set (test: warping to `talk_rumor` arrives with `heard_rumor = true`, inside the call).
+  - **Size** (plan §8.1, ≤ 4 MB): 5.72 MB → **2.38 MB** release `.exe`. SDL without camera, haptics, HIDAPI (gamepads still work through XInput and raw input; PlayStation/Switch-specific features need it back later), sensors, power, dialogs, tray, OpenGL/GLES, Vulkan, and the D3D9 and D3D12 2D renderers (the GPU renderer drives D3D12; D3D11 is the fallback); FreeType registers only TrueType, CFF, autofit, and smooth (`runtime/cmake/freetype/hw_ftmodule.h`; C sources only, because `windres` can't take the angle brackets); and the release preset builds with `-Os`, which alone saved about 2 MB over `-O2`. System DLLs only.
+  - **ASan/UBSan** (CLANG64): clang found one error GCC allows (enum and float arithmetic in the procedural mask); fixed. All 8 tests pass under the sanitizers, and the windowed player ran clean under ASan on the layered example, the rule-wipe project, and the Japanese tutorial with warp.
+- ✅ **Phase 2 complete** (plan §18, exit criteria):
+  - **"The starter VN plays in EN and JA on Windows":** the tutorial, in both languages (screenshots); the `adv` template plays too (one language until a project adds `ja`).
+  - **"Headless reaches every ending":** tutorial (62 paths, EN and JA), conformance cases, CI runs it.
+  - **"Loaders survive 10 minutes of fuzzing":** `.hwb` (2.05 M inputs) and saves (11.3 M inputs), after the one bug the first run found.
+  - Bytecode **1.0 is frozen** (`spec/bytecode.md`); later additions bump the minor version.
+  - Not done in Phase 2 (none were in its list): JPG/WebP images (PNG/BMP only), side portraits and tinted views, `theme.json` themes (UI strings live in `hw_ui_text.c` for now), `.hwp` packs, gamepad remapping, measured cold-start/frame/memory budgets, Windows manifest via `windres` and crash minidumps (plan §8.13), backlog voice replay, save thumbnails.
+  - Checks at the end: `corepack pnpm check` 219 tests; runtime ctest 8/8 (debug, release, ASan); spikes A and B OK on the trimmed SDL.
+  - **Nothing from session 10 is committed yet** (everything after `df0c634`).
 
 ---
 
@@ -402,6 +472,9 @@ You then asked to commit and push: `0419238`.
 | D22 | Runtime build recipe: pinned tarballs + SHA-256, fully static, native MSYS2 UCRT64 (rfcs/0001) | v0.5 | ✅ Active |
 | D23 | Transitions/effects via `SDL_GPURenderState` on the explicitly requested GPU renderer; HLSL → DXIL + SPIR-V with DXC, committed headers; crossfade fallback after a startup self-test (rfcs/0002) | v0.5 | ✅ Active |
 | D24 | Text stack: FreeType directly + libunibreak + our layout with a strict JLREQ kinsoku table; no SDL3_ttf (rfcs/0003) | v0.5 | ✅ Active |
+| D25 | Bytecode 1.0 gains `META`, `LOCL` (compiled translations), menu prompt line IDs, stricter loader rules, PCG32 (rfcs/0004), and `SPRT` layered sprites with attribute merge in the VM (rfcs/0005); **1.0 frozen** at the end of Phase 2 | session 10 | ✅ Active |
+| D26 | Shipping runtime size: SDL subsystems a VN doesn't use are off (incl. HIDAPI and Vulkan), FreeType registers TrueType/CFF only, release builds use `-Os` + LTO → 2.38 MB | session 10 | ✅ Active |
+| D27 | Saves store names and line IDs (not indices) and remap across script edits; call frames anchor on "k-th call to X in scene Y" | session 10 | ✅ Active |
 
 Also: **D13** (games export for Windows x64 only) stays active; its "internal Linux runtime" clause is superseded by D21.
 
@@ -412,9 +485,9 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 9)
+## Next Steps (after session 10)
 
-1. ~~CI: confirm `ts` and `i18n` pass~~ ✅ confirmed in session 9.
-2. ~~Finish Phase 1~~ ✅ done (milestones 9a–9d).
-3. **You:** decide whether to commit and push the Phase 1 finish (templates, `hwc init`, tutorial, localization, `ast.schema.json`); `bac5bc2` has everything before it. Check the `runtime-asan` CI job result on the next push.
-4. **Phase 2: the runtime MVP**, on your go-ahead (plan §18): C VM + loader following `spec/bytecode.md` and `reader.ts`, renderer, text, audio, `--headless` playtests that complete the conformance suite (execution transcripts), plus the Phase 2 items carried over above (`LOCx`, menu prompt IDs).
+1. **You:** decide whether to commit and push the Phase 2 work (everything after `df0c634`). Then check CI on that push: the new player smoke test, the 60 s `.hwb` and save fuzzing, and the release size.
+2. **Phase 3: MCP v1 and CLI polish**, on your go-ahead (plan §18): the shared `packages/tools` registry, `himawari-mcp` on spec 2026-07-28, `llm-reference`, `agent-guide.md` v1, `render_line`, and `hwc run`/`playtest` wrappers around `himawari.exe`.
+3. Runtime follow-ups that can come any time: JPG/WebP, side portraits, `theme.json`, `.hwp` packs, gamepad remapping, the Windows manifest and crash minidumps, and measuring the cold-start, frame, and memory budgets.
+4. A human review of the 30 AI-translated tutorial lines (`examples/tutorial/locales/ja.json`, marked `needs-review`).

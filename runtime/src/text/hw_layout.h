@@ -33,8 +33,8 @@ typedef struct {
     const char *ruby; /* UTF-8, or NULL */
 } HwRun;
 
-/* Returns the advance width in pixels of `cp` in the given font role. */
-typedef float (*HwAdvanceFn)(void *user, uint32_t cp, HwFontRole role);
+/* Returns the advance width in pixels of `cp` in the given font role, for the run it belongs to (runs may differ in size). */
+typedef float (*HwAdvanceFn)(void *user, uint32_t cp, HwFontRole role, uint32_t run);
 
 typedef struct {
     float max_width;     /* textbox width in px */
@@ -53,6 +53,7 @@ typedef struct {
     float x, y;      /* pen position: left edge of the advance box, baseline */
     uint32_t reveal; /* reveal order; ruby shares the index of its group's first base char */
     uint32_t line;
+    uint32_t run;    /* index of the HwRun it came from (for styles: color, size, emphasis) */
 } HwLayoutGlyph;
 
 typedef struct {

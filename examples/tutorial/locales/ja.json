@@ -1,0 +1,216 @@
+{
+  "language": "ja",
+  "sourceLanguage": "en",
+  "lines": [
+    {
+      "id": "y2815z",
+      "source": "Welcome to Himawari. This short tutorial shows how a visual novel script works.",
+      "text": "Himawariへようこそ。この短いチュートリアルでは、ビジュアルノベルのスクリプトの仕組みを紹介します。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "xbbgse",
+      "source": "Each line you read is one line in script/tutorial.hws.",
+      "text": "ここで読む一行一行が、script/tutorial.hws の一行に対応しています。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "ag2t08",
+      "source": "Which lesson would you like?",
+      "text": "どのレッスンにしますか？",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "42wdtg",
+      "source": "Dialogue and narration",
+      "text": "台詞と地の文",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "12m7es",
+      "source": "Choices",
+      "text": "選択肢",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "n8zbhy",
+      "source": "Variables and conditions",
+      "text": "変数と条件",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "jy3y1g",
+      "source": "Formatting text",
+      "text": "テキストの装飾",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "xpjbmm",
+      "source": "I'm done for now.",
+      "text": "今日はここまで。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "30rwxc",
+      "source": "A line in quotes on its own is narration, like this one.",
+      "text": "このように、引用符だけの行は地の文になります。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "5w7x58",
+      "source": "A line that starts with a name is dialogue. I'm Kai, a character from characters/kai.md.",
+      "text": "名前で始まる行は台詞です。ぼくはカイ、characters/kai.md のキャラクターです。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "xve47p",
+      "source": "Words between the name and the quotes change my expression, if I have a sprite for it.",
+      "text": "名前と引用符のあいだの言葉で、ぼくの表情が変わります。対応する立ち絵があれば、ですが。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "7ykd79",
+      "source": "Kai has no art yet, so Himawari draws a labeled placeholder. Your art is never required to start writing.",
+      "text": "カイにはまだ絵がないので、Himawari はラベル付きの仮の絵を表示します。絵がなくても、すぐに書き始められます。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "qa3fqv",
+      "source": "Kai offers you a drink.",
+      "text": "カイが飲み物をすすめてくれた。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "76vj3v",
+      "source": "Tea, please.",
+      "text": "お茶をください。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "wq7pjf",
+      "source": "Good choice.",
+      "text": "いい選択ですね。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "ae5kgq",
+      "source": "Just water.",
+      "text": "お水でいいです。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "esnce4",
+      "source": "Coming right up.",
+      "text": "すぐにお持ちします。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "yxz83c",
+      "source": "Both options continued here, because neither ended with jump. This is called a gather point.",
+      "text": "どちらの選択肢も jump で終わっていないので、ここで合流しました。これを合流点と呼びます。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "pq9x96",
+      "source": "In the lesson list, \\\"once\\\" options disappear after you pick them.",
+      "text": "レッスン一覧の「once」付きの選択肢は、一度選ぶと消えます。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "8sq8wh",
+      "source": "Lines that start with $ change variables, which are declared in himawari.json.",
+      "text": "$ で始まる行は変数を変更します。変数は himawari.json で宣言します。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "r17vr1",
+      "source": "You have finished [lessons_done] lesson(s) so far.",
+      "text": "ここまでに [lessons_done] 個のレッスンを終えました。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "e344er",
+      "source": "You chose tea earlier, so this line only appears for tea drinkers.",
+      "text": "さっきお茶を選んだので、この行はお茶を選んだ人にだけ表示されます。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "01xehw",
+      "source": "You haven't had tea, but you're making good progress.",
+      "text": "お茶は飲んでいませんが、順調に進んでいますね。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "02ty47",
+      "source": "An if line checks a condition. Try the choices lesson, then come back.",
+      "text": "if の行は条件を確かめます。選択肢のレッスンを試してから、また来てください。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "wydn6s",
+      "source": "Text can be {b}bold{/b}, {i}italic{/i}, or {color=#d65a4f}colored{/color}.",
+      "text": "テキストは{b}太字{/b}や{i}斜体{/i}、{color=#d65a4f}色付き{/color}にできます。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "r7fa4w",
+      "source": "It can pause{w=600}... and continue.",
+      "text": "途中で止めて{w=600}……また続けることもできます。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "17czt7",
+      "source": "Names from variables appear in brackets: hello, [player_name]!",
+      "text": "変数の値はかっこで表示されます：こんにちは、[player_name]さん！",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "qqzvs4",
+      "source": "Japanese text can carry ruby: {rb=ひまわり}向日葵{/rb} means sunflower.",
+      "text": "日本語にはルビを付けられます：{rb=ひまわり}向日葵{/rb}は sunflower のことです。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "rz1350",
+      "source": "That's the tutorial. You finished [lessons_done] lesson(s).",
+      "text": "チュートリアルはここまでです。[lessons_done] 個のレッスンを終えました。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "25d2rm",
+      "source": "Next, create your own project with: hwc init my-novel",
+      "text": "次は、hwc init my-novel で自分のプロジェクトを作ってみましょう。",
+      "status": "needs-review",
+      "provenance": "ai"
+    }
+  ]
+}

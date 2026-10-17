@@ -1,6 +1,6 @@
 /** Human-readable listing of an HwbModule (`hwc disasm`, golden conformance files). */
 import { numberToLineId } from "../ids.js";
-import { type HwbModule, NONE, OP_NAMES, TextOp } from "./format.js";
+import { type HwbModule, NONE, OP_NAMES, POSITION_SCALE, TextOp } from "./format.js";
 
 export function disassemble(m: HwbModule): string {
   const s = (i: number) => JSON.stringify(m.strings[i] ?? `?${i}`);
@@ -11,6 +11,9 @@ export function disassemble(m: HwbModule): string {
   out.push(`; ${m.strings.length} strings, ${m.vars.length} variables, ${m.chars.length} characters, ${m.scenes.length} scenes, ${m.lines.length} lines, ${m.code.length} code words`);
   const entry = m.scenes[m.entryScene];
   out.push(`; entry: ${entry ? (m.strings[entry.name] ?? "?") : "(none)"}`);
+  const mt = m.meta;
+  out.push(`; game: ${s(mt.title)} ${m.strings[mt.id]} ${mt.width}x${mt.height}, languages ${mt.languages.map((l) => m.strings[l]).join(" ")}`);
+  out.push(`; positions: ${mt.positions.map((p) => `${m.strings[p.name]}(${p.x / POSITION_SCALE}, ${p.y / POSITION_SCALE})`).join(" ")}`);
   out.push("");
 
   for (const [i, v] of m.vars.entries()) {
@@ -21,6 +24,21 @@ export function disassemble(m: HwbModule): string {
   }
   for (const c of m.chars) {
     out.push(`char ${m.strings[c.id]} ${s(c.name)}${c.color !== NONE ? ` #${c.color.toString(16).padStart(6, "0")}` : ""}`);
+  }
+  const words = (xs: readonly number[]) => xs.map((x) => m.strings[x]).join(" ");
+  for (const sp of m.sprites) {
+    const scale = (v: number) => v / POSITION_SCALE;
+    out.push(`sprite ${m.strings[m.chars[sp.char]?.id ?? 0]} ${m.strings[sp.root]} anchor(${scale(sp.anchorX)}, ${scale(sp.anchorY)}) scale ${scale(sp.scale)}`);
+    for (const g of sp.groups) {
+      const flags = ["always", "multiple", "blink", "lipflap"].filter((_, i) => g.flags & (1 << i));
+      out.push(`  group ${m.strings[g.name]}${flags.length ? ` [${flags.join(" ")}]` : ""}${g.defaults.length ? ` default(${words(g.defaults)})` : ""}${g.attrs.length ? `: ${words(g.attrs)}` : ""}`);
+    }
+    for (const p of sp.presets) {
+      out.push(`  preset ${m.strings[p.name]}: ${p.layers.map(([gi, a]) => `${m.strings[sp.groups[gi]?.name ?? 0]}=${m.strings[a]}`).join(" ")}`);
+    }
+    for (const r of sp.rules) {
+      out.push(`  rule ${r.hide ? `hide ${m.strings[r.hide]}` : `show ${m.strings[r.show]}`} when ${words(r.when)}`);
+    }
   }
   out.push("");
 
@@ -108,6 +126,17 @@ export function disassemble(m: HwbModule): string {
     const loc = d ? `   ; ${m.strings[d.file]}:${d.line}` : "";
     out.push(`  ${String(pc).padStart(4, "0")}  ${text}${loc}`);
     pc += 1 + argc;
+  }
+  for (const l of m.locales) {
+    out.push(`\nlocale ${m.strings[l.language]}:`);
+    l.charNames.forEach((n, i) => {
+      if (n) out.push(`  char ${m.strings[m.chars[i]?.id ?? 0]} ${s(n)}`);
+    });
+    l.lineTexts.forEach((t, i) => {
+      const line = m.lines[i];
+      const id = line && line.lineId >>> 0 !== NONE ? `#${numberToLineId(line.lineId)}` : `line ${i}`;
+      out.push(`  ${id} ${t >>> 0 === NONE ? "(untranslated)" : JSON.stringify(textPreview(m, t))}`);
+    });
   }
   return `${out.join("\n")}\n`;
 }

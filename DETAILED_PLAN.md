@@ -570,7 +570,7 @@ Reveal her transfer plans before ch4_rooftop.
 ### 8.1 Goals and budgets
 | Metric | Target |
 |---|---|
-| Release `.exe` (static, stripped, HarfBuzz off) | ≤ 4 MB (Phase 0 spikes measured 5.1 MB; SDL alone is 4.1 MB, so SDL subsystem and FreeType module trimming are required, RFC 0001) |
+| Release `.exe` (static, stripped, HarfBuzz off) | ≤ 4 MB. **Measured 2.38 MB** at the end of Phase 2 (`-Os` + LTO; SDL without camera, haptics, HIDAPI, sensors, power, dialogs, tray, OpenGL/GLES, Vulkan, D3D9/D3D12 2D renderers; FreeType with TrueType, CFF, autofit, and smooth only). Phase 0 spikes measured 5.1 MB, and the first Phase 2 player 5.72 MB at `-O2`. |
 | Cold start to first frame | ≤ 250 ms (SSD) |
 | Frame time | 60 FPS vsync, ≤ 2 ms CPU typical |
 | Memory, typical 1080p scene | ≤ 150 MB |
@@ -1155,14 +1155,14 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 - ✅ Tutorial (`examples/tutorial/`) and starter templates (`adv`, `blank`); `spec/ast.schema.json` (2026-10-17).
 - ✅ **Exit:** the tutorial and starter projects compile. Broken inputs produce friendly multi-error diagnostics with fixes. CST round-trip passes property tests.
 
-### Phase 2: Runtime MVP (⏱ 6)
-- `core/` VM, loader, saves, and rollback. Carried from Phase 1: `LOCx` string tables in `.hwb`, line IDs on menu prompts, conformance execution transcripts.
-- Renderer with layered characters (blink and lip-flap), fade/dissolve.
-- Text: atlas, line breaking, kinsoku, ruby, fallback.
-- Textbox, menus. Audio via SDL3_mixer, including voice.
-- `--dev` with placeholders, reload-in-place, warp, and dev overlay. `--headless` playtest.
-- Size work: trim SDL subsystems and FreeType modules toward the 4 MB budget (§8.1).
-- ✅ **Exit:** the starter VN plays in EN and JA on Windows. Headless reaches every ending. Loaders survive 10 minutes of fuzzing (or the §14.3 fallback checks).
+### Phase 2: Runtime MVP (⏱ 6) ✅ done 2026-10-17
+- ✅ `core/` VM, loader, saves (remapped by line ID across script edits), and rollback. ✅ From Phase 1: translations in `.hwb` (`LOCL`, rfcs/0004), line IDs on menu prompts, conformance execution transcripts.
+- ✅ Renderer with layered characters (`SPRT`, rfcs/0005; blink and lip-flap), fade, dissolve, slides, wipe, and **rule wipes on the GPU render state** with the startup self-test and dissolve fallback (rfcs/0002).
+- ✅ Text: atlas, line breaking, kinsoku, ruby, fallback, styles (`{b}`, `{i}`, `{color}`, `{size}`, `{shake}`, `{speed}`, `{w}`, `{nw}`).
+- ✅ Textbox, menus, title, save/load (6 slots + quick), history, system menu. Audio via SDL3_mixer, including voice by line ID.
+- ✅ `--dev` with placeholders, reload-in-place (F5), warp (`--warp`), and dev overlay (F3). `--headless` playtest and transcripts.
+- ✅ Size work: SDL subsystems and FreeType modules trimmed, `-Os`: **2.38 MB** release `.exe` (budget 4 MB).
+- ✅ **Exit:** the tutorial plays in EN and JA on Windows; headless reaches every ending; the `.hwb` loader and VM survived 10 minutes of libFuzzer (2.05 M inputs) and save loading 10 minutes (11.3 M inputs) after one fixed bug. Not yet: JPG/WebP images, side portraits, themes from `theme.json`, `.hwp` packs, gamepad remapping.
 
 ### Phase 3: MCP v1 and CLI polish (⏱ 2)
 - Shared `packages/tools` registry. All tools on spec 2026-07-28, `llm-reference`, **`agent-guide.md` v1**, prompts, `render_line`, tasks extension.

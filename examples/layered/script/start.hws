@@ -1,0 +1,11 @@
+# Layered sprites (plan §6): groups stack bottom to top, presets set several
+# groups at once, and attributes replace others in the same group.
+scene start:
+    show mio at center with dissolve(400)
+    mio "I'm drawn from layers: body, outfit, eyes, mouth, and a ribbon."   #line:169jke
+    mio "Watch my eyes for a moment. They blink on their own."   #line:fa4a6k
+    mio happy "A preset sets my eyes and mouth together."   #line:zga5y8
+    mio casual "Changing my outfit keeps my expression. The ribbon hides with this outfit, by a rule."   #line:yxvx2r
+    mio uniform neutral "And back again."   #line:18bkrr
+    hide mio with fade(400)
+    end

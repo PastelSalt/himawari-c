@@ -8,9 +8,10 @@ import type { ProjectCheck } from "../project/check.js";
 import { type Expr, type MenuOption, type Scene, type Stmt, type Transition, endsFlow } from "../syntax/ast.js";
 import type { Diagnostic } from "../syntax/diagnostics.js";
 import { LineIndex } from "../syntax/position.js";
-import type { TextPart } from "../syntax/text.js";
+import { type TextPart, parseText } from "../syntax/text.js";
 import {
-  Channel, type DebugEntry, HWB_MAJOR, HWB_MINOR, type HwbModule, LINE_ONCE, LINE_OPTION, LINE_PROMPT, NONE, Op, type OpName, TextOp,
+  Channel, type DebugEntry, HWB_MAJOR, HWB_MINOR, type HwbModule, LINE_ONCE, LINE_OPTION, LINE_PROMPT, type LocaleEntry, NONE, Op, type OpName,
+  POSITION_SCALE, SPRITE_ALWAYS, SPRITE_BLINK, SPRITE_LIPFLAP, SPRITE_MULTIPLE, type SpriteEntry, TextOp,
 } from "./format.js";
 
 export interface CompileResult {
@@ -45,9 +46,13 @@ class Compiler {
   private readonly code: number[] = [];
   private readonly texts: number[][] = [];
   private readonly lines: HwbModule["lines"] = [];
+  /** The `#line:` ID of each LINE entry, for LOCL. */
+  private readonly lineIds: (string | null)[] = [];
   private readonly debug: DebugEntry[] = [];
   private readonly sceneLabels = new Map<string, Label>();
   private varIndex = new Map<string, number>();
+  /** Code position where a label with pending jumps was placed last; an instruction must follow it. */
+  private landing = -1;
   private file = "";
   private index: LineIndex = new LineIndex("");
 
@@ -68,9 +73,49 @@ class Compiler {
       return { name: this.str(name), type: type as 0 | 1 | 2, scope: (v.scope === "global" ? 1 : 0) as 0 | 1, default: def, enumValues: (v.enum ?? []).map((e) => this.str(e)) };
     });
 
-    const chars = [...this.check.characters.values()]
-      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
-      .map((c) => ({ id: this.str(c.id), name: this.str(c.displayName), color: c.color ? parseInt(c.color.slice(1), 16) : NONE }));
+    const sortedChars = [...this.check.characters.values()].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    const chars = sortedChars.map((c) => ({
+      id: this.str(c.id),
+      name: this.str(c.names[manifest.sourceLanguage] ?? c.displayName),
+      color: c.color ? parseInt(c.color.slice(1), 16) : NONE,
+    }));
+    const sprites: SpriteEntry[] = [];
+    sortedChars.forEach((c, index) => {
+      const s = c.sprite;
+      if (!s) return;
+      const groupIndex = new Map(s.groups.map((g, i) => [g.name, i]));
+      sprites.push({
+        char: index,
+        root: this.str(s.root),
+        anchorX: Math.round(s.anchor[0] * POSITION_SCALE),
+        anchorY: Math.round(s.anchor[1] * POSITION_SCALE),
+        scale: Math.round(s.scale * POSITION_SCALE),
+        groups: s.groups.map((g) => ({
+          name: this.str(g.name),
+          flags: (g.always ? SPRITE_ALWAYS : 0) | (g.multiple ? SPRITE_MULTIPLE : 0) | (g.blink ? SPRITE_BLINK : 0) | (g.lipflap ? SPRITE_LIPFLAP : 0),
+          defaults: g.defaults.map((a) => this.str(a)),
+          attrs: g.attrs.map((a) => this.str(a)),
+        })),
+        presets: s.presets.map((p) => ({
+          name: this.str(p.name),
+          layers: p.layers.filter(([g]) => groupIndex.has(g)).map(([g, a]) => [groupIndex.get(g) as number, this.str(a)] as [number, number]),
+        })),
+        rules: s.rules.map((r) => ({ hide: r.hide ? this.str(r.hide) : 0, show: r.show ? this.str(r.show) : 0, when: r.when.map((w) => this.str(w)) })),
+      });
+    });
+    const languages = [manifest.sourceLanguage, ...manifest.languages.filter((l) => l !== manifest.sourceLanguage)];
+    const meta = {
+      title: this.str(manifest.name),
+      id: this.str(manifest.id),
+      width: manifest.resolution[0],
+      height: manifest.resolution[1],
+      sourceLanguage: this.str(manifest.sourceLanguage),
+      languages: languages.map((l) => this.str(l)),
+      positions: Object.keys(manifest.positions).sort().map((name) => {
+        const [x, y] = manifest.positions[name] as [number, number];
+        return { name: this.str(name), x: Math.round(x * POSITION_SCALE), y: Math.round(y * POSITION_SCALE) };
+      }),
+    };
 
     // Scenes in name order, each with its file for debug info.
     const all: { scene: Scene; file: string; source: string }[] = [];
@@ -87,21 +132,40 @@ class Compiler {
       const label = this.sceneLabels.get(scene.id) as Label;
       this.place(label);
       this.block(scene.body);
-      // END unless the scene literally ends in jump/return/end. Even when every path ends
-      // (an if with else, an unskippable menu), internal labels such as a menu's gather
-      // point must land on an instruction inside this scene.
-      const last = scene.body[scene.body.length - 1];
-      if (!last || (last.kind !== "Jump" && last.kind !== "Return" && last.kind !== "End")) this.emit("END");
+      // END when play can fall off the scene's end, or when a jump still lands right
+      // here (labels must point at an instruction inside this scene). Code that can't
+      // run gets no END, so playtests don't report it as an unreachable ending.
+      if (!endsFlow(scene.body) || this.landing === this.code.length) this.emit("END");
       return { name: this.str(scene.id), entryPc: label.pc as number, file: this.str(file) };
     });
 
     for (const label of this.sceneLabels.values()) this.patch(label);
     const entryScene = all.findIndex((s) => s.scene.id === manifest.entry);
 
+    // Translations: one LOCL entry per target language that has a string table.
+    const locales: LocaleEntry[] = [];
+    const tables = this.check.locales
+      .filter((t) => t.language !== manifest.sourceLanguage && manifest.languages.includes(t.language))
+      .sort((a, b) => (a.language < b.language ? -1 : a.language > b.language ? 1 : 0));
+    for (const table of tables) {
+      const byId = new Map(table.lines.filter((e) => e.text !== "").map((e) => [e.id, e.text]));
+      locales.push({
+        language: this.str(table.language),
+        lineTexts: this.lineIds.map((id) => {
+          const text = id === null ? undefined : byId.get(id);
+          return text === undefined ? NONE : this.text(parseText(`"${text}"`, 0).parts);
+        }),
+        charNames: sortedChars.map((c) => {
+          const name = c.names[table.language];
+          return name === undefined ? 0 : this.str(name);
+        }),
+      });
+    }
+
     return {
-      major: HWB_MAJOR, minor: HWB_MINOR, strings: this.strings, vars, chars, scenes,
+      major: HWB_MAJOR, minor: HWB_MINOR, meta, strings: this.strings, vars, chars, scenes,
       entryScene: entryScene < 0 ? NONE : entryScene, lines: this.lines, texts: this.texts, code: this.code,
-      debug: this.withDebug ? this.debug : null,
+      debug: this.withDebug ? this.debug : null, locales, sprites,
     };
   }
 
@@ -123,6 +187,7 @@ class Compiler {
 
   private place(l: Label): void {
     l.pc = this.code.length;
+    if (l.refs.length > 0) this.landing = l.pc;
     this.patch(l);
   }
 
@@ -167,6 +232,7 @@ class Compiler {
 
   private line(lineId: string | null, speaker: string, text: TextPart[], flags: number): number {
     this.lines.push({ lineId: lineId ? lineIdToNumber(lineId) : NONE, speaker: speaker ? this.str(speaker) : 0, text: this.text(text), flags });
+    this.lineIds.push(lineId);
     return this.lines.length - 1;
   }
 
@@ -277,7 +343,7 @@ class Compiler {
         break;
       }
       case "Menu":
-        this.menu(s.prompt, s.options);
+        this.menu(s.prompt, s.promptLineId, s.options);
         break;
     }
   }
@@ -287,12 +353,12 @@ class Compiler {
       ...add.map((a) => this.str(a)), ...remove.map((r) => this.str(r)));
   }
 
-  private menu(prompt: TextPart[] | null, options: readonly MenuOption[]): void {
+  private menu(prompt: TextPart[] | null, promptLineId: string | null, options: readonly MenuOption[]): void {
     for (const o of options) {
       if (o.cond) this.expr(o.cond);
       else this.emit("PUSH", 1);
     }
-    const promptLine = prompt ? this.line(null, "", prompt, LINE_PROMPT) : NONE;
+    const promptLine = prompt ? this.line(promptLineId, "", prompt, LINE_PROMPT) : NONE;
     const labels = options.map(() => this.label());
     const args: (number | Label)[] = [promptLine, options.length];
     options.forEach((o, i) => {
@@ -300,7 +366,9 @@ class Compiler {
     });
     this.emit("MENU", ...args);
     const gather = this.label();
-    this.emit("JMP", gather); // no option could be shown
+    // When no option can be shown, MENU continues with the next instruction. That can't
+    // happen if some option is always shown (unconditional and not `once`).
+    if (!options.some((o) => o.cond === null && !o.once)) this.emit("JMP", gather);
     options.forEach((o, i) => {
       this.place(labels[i] as Label);
       this.mark(o.span);

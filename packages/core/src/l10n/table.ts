@@ -33,19 +33,19 @@ export interface SourceLine {
   scene: string;
   /** Character id for dialogue; "" for narration and menu options. */
   speaker: string;
-  kind: "say" | "narration" | "option";
+  kind: "say" | "narration" | "option" | "prompt";
   /** The text between the quotes, as written. */
   text: string;
 }
 
-/** Every tagged dialogue line, narration line, and menu option, in script order. */
+/** Every tagged dialogue line, narration line, menu option, and menu prompt, in script order. */
 export function collectLines(parsed: ReadonlyMap<string, AstResult>): SourceLine[] {
   const out: SourceLine[] = [];
   for (const [file, r] of parsed) {
     let scene = "";
     const visit = (n: CstNode) => {
       if (n.kind === "SceneHeader") scene = childTokens(n, "Identifier")[1]?.text ?? "";
-      const kind = n.kind === "SayStmt" ? "say" : n.kind === "NarrationStmt" ? "narration" : n.kind === "OptionHeader" ? "option" : null;
+      const kind = n.kind === "SayStmt" ? "say" : n.kind === "NarrationStmt" ? "narration" : n.kind === "OptionHeader" ? "option" : n.kind === "MenuHeader" ? "prompt" : null;
       if (kind) {
         const tag = childTokens(n, "LineTag")[0];
         const lit = childNodes(n, "Literal")[0];

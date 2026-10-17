@@ -2,7 +2,9 @@
  * Conformance suite, compile half (plan §16.2). Each folder in cases/ is a
  * small project. It must either compile to exactly `expected.disasm`, or
  * report exactly `expected.diagnostics` (one `CODE file:line:col` per line).
- * Phase 2 adds the C runtime's playtest transcripts to the same cases.
+ * Compile cases also commit `expected.hwb`, the exact bytes; the C runtime's
+ * conformance test (runtime/tests/test_conformance.c) plays those bytes and
+ * compares its transcript with `expected.transcript` (the execution half).
  *
  * Regenerate expected files (then review the diff!) with:
  *   UPDATE_CONFORMANCE=1 corepack pnpm vitest run tests/conformance
@@ -33,6 +35,7 @@ function load(dir: string): ProjectInput {
   const input: ProjectInput = {
     characters: files(join(dir, "characters"), "characters/", ".md").map(read),
     scripts: files(join(dir, "script"), "script/", ".hws").map(read),
+    locales: files(join(dir, "locales"), "locales/", ".json").map(read),
   };
   if (existsSync(join(dir, "himawari.json"))) input.manifest = read("himawari.json");
   return input;
@@ -77,6 +80,10 @@ describe("conformance (compile half)", () => {
       const actual = disassemble(module);
       if (UPDATE) writeFileSync(disasmFile, actual);
       expect(actual).toBe(readFileSync(disasmFile, "utf8"));
+      const hwbFile = join(dir, "expected.hwb");
+      const bytes = writeHwb(module);
+      if (UPDATE) writeFileSync(hwbFile, bytes);
+      expect(Buffer.from(bytes).equals(readFileSync(hwbFile))).toBe(true);
     });
   }
 });
