@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pastelsalt.github.io/himawari/spec/manifest/1.0.json",
+  "title": "Himawari project manifest (himawari.json)",
+  "description": "Draft 1.0.0-draft. Plan §5.5. Cross-field rules that JSON Schema cannot express (e.g. sourceLanguage must be listed in languages, entry must name an existing scene) are checked by @himawari/core's validator.",
+  "type": "object",
+  "required": ["name", "id", "version", "engine", "sourceLanguage", "languages", "entry"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "name": {
+      "description": "Display name of the game.",
+      "type": "string",
+      "minLength": 1
+    },
+    "id": {
+      "description": "Reverse-DNS identifier. Used for the save folder (SDL_GetPrefPath).",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$"
+    },
+    "version": {
+      "description": "Game version (SemVer).",
+      "$ref": "#/$defs/semver"
+    },
+    "engine": {
+      "description": "Compatible engine version range, e.g. \"^1.0.0\".",
+      "type": "string",
+      "minLength": 1
+    },
+    "resolution": {
+      "description": "Virtual canvas size in pixels. Templates use 16:9 (D16).",
+      "type": "array",
+      "prefixItems": [
+        { "type": "integer", "minimum": 320, "maximum": 7680 },
+        { "type": "integer", "minimum": 180, "maximum": 4320 }
+      ],
+      "items": false,
+      "minItems": 2,
+      "default": [1920, 1080]
+    },
+    "sourceLanguage": { "$ref": "#/$defs/languageTag" },
+    "languages": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/languageTag" },
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "entry": {
+      "description": "Scene the game starts in.",
+      "$ref": "#/$defs/identifier"
+    },
+    "positions": {
+      "description": "Named stage positions as [x, y] fractions of the canvas. Layout only, never used in story logic.",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/identifier" },
+      "additionalProperties": {
+        "type": "array",
+        "prefixItems": [
+          { "type": "number", "minimum": -1, "maximum": 2 },
+          { "type": "number", "minimum": -1, "maximum": 2 }
+        ],
+        "items": false,
+        "minItems": 2
+      }
+    },
+    "variables": {
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/identifier" },
+      "additionalProperties": { "$ref": "#/$defs/variable" }
+    },
+    "fonts": {
+      "description": "Font fallback chains per role, with optional per-language overrides (plan §7).",
+      "type": "object",
+      "propertyNames": { "$ref": "#/$defs/identifier" },
+      "additionalProperties": {
+        "type": "object",
+        "required": ["default"],
+        "properties": {
+          "default": { "$ref": "#/$defs/fontChain" }
+        },
+        "additionalProperties": { "$ref": "#/$defs/fontChain" },
+        "propertyNames": {
+          "anyOf": [{ "const": "default" }, { "$ref": "#/$defs/languageTag" }]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z_][a-z0-9_]*$",
+      "maxLength": 64
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(-[0-9A-Za-z.-]+)?(\\+[0-9A-Za-z.-]+)?$"
+    },
+    "languageTag": {
+      "description": "BCP 47 language tag, e.g. en, ja, zh-Hans, pt-BR.",
+      "type": "string",
+      "pattern": "^[a-z]{2,3}(-[A-Z][a-z]{3})?(-([A-Z]{2}|[0-9]{3}))?$"
+    },
+    "fontChain": {
+      "description": "Font files under assets/fonts/, tried in order for each glyph.",
+      "type": "array",
+      "items": { "type": "string", "pattern": "\\.(otf|ttf|ttc|otc)$" },
+      "minItems": 1
+    },
+    "scope": {
+      "description": "save: stored per save slot. global: shared across all saves (e.g. endings seen).",
+      "enum": ["save", "global"]
+    },
+    "variable": {
+      "type": "object",
+      "required": ["type", "default", "scope"],
+      "oneOf": [
+        {
+          "properties": {
+            "type": { "const": "int" },
+            "default": { "type": "integer", "minimum": -2147483648, "maximum": 2147483647 },
+            "scope": { "$ref": "#/$defs/scope" },
+            "min": { "type": "integer" },
+            "max": { "type": "integer" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "bool" },
+            "default": { "type": "boolean" },
+            "scope": { "$ref": "#/$defs/scope" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "properties": {
+            "type": { "const": "str" },
+            "default": { "type": "string" },
+            "scope": { "$ref": "#/$defs/scope" },
+            "enum": {
+              "description": "If present, the variable is a string enum and only these values are allowed.",
+              "type": "array",
+              "items": { "type": "string" },
+              "minItems": 1,
+              "uniqueItems": true
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    }
+  }
+}

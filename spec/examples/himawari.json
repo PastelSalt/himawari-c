@@ -1,0 +1,27 @@
+{
+  "$schema": "https://pastelsalt.github.io/himawari/spec/manifest/1.0.json",
+  "name": "Sunflower Days",
+  "id": "dev.moesoft.sunflowerdays",
+  "version": "0.1.0",
+  "engine": "^1.0.0",
+  "resolution": [1920, 1080],
+  "sourceLanguage": "en",
+  "languages": ["en", "ja", "zh-Hans"],
+  "entry": "ch1_intro",
+  "positions": { "left": [0.25, 1.0], "center": [0.5, 1.0], "right": [0.75, 1.0] },
+  "variables": {
+    "player_name": { "type": "str", "default": "Aoi", "scope": "save" },
+    "gender_p": { "type": "str", "enum": ["m", "f", "other"], "default": "other", "scope": "save" },
+    "hana_affection": { "type": "int", "default": 0, "scope": "save" },
+    "courage": { "type": "int", "default": 0, "scope": "save" },
+    "heard_rumor": { "type": "bool", "default": false, "scope": "save" },
+    "ending_true_seen": { "type": "bool", "default": false, "scope": "global" }
+  },
+  "fonts": {
+    "dialogue": {
+      "default": ["NotoSans-Regular.otf", "NotoSansJP-Regular.otf"],
+      "ja": ["NotoSansJP-Regular.otf"],
+      "zh-Hans": ["NotoSansSC-Regular.otf"]
+    }
+  }
+}

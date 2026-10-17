@@ -1,0 +1,11 @@
+{
+  "name": "@himawari/studio",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Himawari Studio, the authoring app. Phase 0 holds only the UI message catalogs; the Electron app arrives in Phase 4.",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "check:i18n": "node scripts/check-locales.mjs"
+  }
+}

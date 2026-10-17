@@ -1,0 +1,92 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}"
+    },
+    {
+      "name": "windows",
+      "hidden": true,
+      "inherits": "base",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Windows" },
+      "cacheVariables": { "CMAKE_C_COMPILER": "gcc" }
+    },
+    {
+      "name": "linux",
+      "hidden": true,
+      "inherits": "base",
+      "condition": { "type": "equals", "lhs": "${hostSystemName}", "rhs": "Linux" }
+    },
+    {
+      "name": "win64-debug",
+      "displayName": "Windows debug (MSYS2 UCRT64)",
+      "description": "Everyday build: -O0 -g, console subsystem.",
+      "inherits": "windows",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+    },
+    {
+      "name": "win64-release",
+      "displayName": "Windows release (shipping build)",
+      "description": "-O2 -flto -static -static-libgcc -mwindows -s.",
+      "inherits": "windows",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "HW_RELEASE_STATIC": "ON" }
+    },
+    {
+      "name": "win64-asan",
+      "displayName": "Windows ASan/UBSan (MSYS2 CLANG64)",
+      "description": "Needs the CLANG64 environment. Support is still being verified (RESEARCH.md §15).",
+      "inherits": "windows",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "CMAKE_C_COMPILER": "clang", "HW_SANITIZE": "ON" }
+    },
+    {
+      "name": "linux-debug",
+      "displayName": "Linux debug + sanitizers (WSL2 / CI)",
+      "inherits": "linux",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "HW_SANITIZE": "ON" }
+    },
+    {
+      "name": "linux-preview",
+      "displayName": "Linux preview runtime (internal, never exported)",
+      "inherits": "linux",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+    },
+    {
+      "name": "fuzz",
+      "displayName": "libFuzzer targets (clang)",
+      "inherits": "linux",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "clang",
+        "HW_FUZZ": "ON",
+        "HW_WITH_SDL": "OFF"
+      }
+    },
+    {
+      "name": "win64-cross",
+      "displayName": "Windows cross-build check (CI ubuntu, UCRT MinGW)",
+      "inherits": "linux",
+      "toolchainFile": "${sourceDir}/cmake/toolchains/mingw-w64-x86_64.cmake",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "HW_RELEASE_STATIC": "ON" }
+    }
+  ],
+  "buildPresets": [
+    { "name": "win64-debug", "configurePreset": "win64-debug" },
+    { "name": "win64-release", "configurePreset": "win64-release" },
+    { "name": "win64-asan", "configurePreset": "win64-asan" },
+    { "name": "linux-debug", "configurePreset": "linux-debug" },
+    { "name": "linux-preview", "configurePreset": "linux-preview" },
+    { "name": "fuzz", "configurePreset": "fuzz" },
+    { "name": "win64-cross", "configurePreset": "win64-cross" }
+  ],
+  "testPresets": [
+    { "name": "win64-debug", "configurePreset": "win64-debug", "output": { "outputOnFailure": true } },
+    { "name": "win64-release", "configurePreset": "win64-release", "output": { "outputOnFailure": true } },
+    { "name": "win64-asan", "configurePreset": "win64-asan", "output": { "outputOnFailure": true } },
+    { "name": "linux-debug", "configurePreset": "linux-debug", "output": { "outputOnFailure": true } },
+    { "name": "linux-preview", "configurePreset": "linux-preview", "output": { "outputOnFailure": true } }
+  ]
+}

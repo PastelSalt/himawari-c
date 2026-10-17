@@ -1,0 +1,172 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pastelsalt.github.io/himawari/spec/character/1.0.json",
+  "title": "Himawari character file frontmatter (characters/*.md)",
+  "description": "Draft 1.0.0-draft. Plan §6.3. This schema covers the YAML frontmatter only; the Markdown body below it is the free-form character bible. Cross-file rules (preset values must name real attributes, sprite folders must exist, rules must reference known attributes) are checked by @himawari/core's validator.",
+  "type": "object",
+  "required": ["id", "name"],
+  "additionalProperties": false,
+  "properties": {
+    "id": {
+      "description": "Speaker name used in scripts (`hana \"...\"`). Must match the file name.",
+      "$ref": "#/$defs/identifier"
+    },
+    "name": {
+      "description": "Display name: a plain string, or a map of language tag to name.",
+      "oneOf": [
+        { "type": "string", "minLength": 1 },
+        {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": { "$ref": "https://pastelsalt.github.io/himawari/spec/manifest/1.0.json#/$defs/languageTag" },
+          "additionalProperties": { "type": "string", "minLength": 1 }
+        }
+      ]
+    },
+    "color": {
+      "description": "Name and placeholder color, #rrggbb.",
+      "type": "string",
+      "pattern": "^#[0-9a-fA-F]{6}$"
+    },
+    "voice": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "blip": {
+          "description": "Text blip sound played while unvoiced text reveals, relative to assets/.",
+          "type": "string"
+        }
+      }
+    },
+    "sprite": { "$ref": "#/$defs/sprite" }
+  },
+  "$defs": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z_][a-z0-9_]*$",
+      "maxLength": 64
+    },
+    "sprite": {
+      "type": "object",
+      "required": ["root"],
+      "additionalProperties": false,
+      "properties": {
+        "root": {
+          "description": "Sprite folder relative to assets/, e.g. sprites/hana (plan §6.2).",
+          "type": "string",
+          "minLength": 1
+        },
+        "anchor": {
+          "description": "Anchor as [x, y] fractions of the sprite canvas. [0.5, 1.0] is bottom center.",
+          "type": "array",
+          "prefixItems": [
+            { "type": "number", "minimum": 0, "maximum": 1 },
+            { "type": "number", "minimum": 0, "maximum": 1 }
+          ],
+          "items": false,
+          "minItems": 2,
+          "default": [0.5, 1.0]
+        },
+        "scale": { "type": "number", "exclusiveMinimum": 0, "default": 1.0 },
+        "groups": {
+          "description": "Layer groups, bottom to top in key order. Omitted groups come from folder order with defaults.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/identifier" },
+          "additionalProperties": { "$ref": "#/$defs/group" }
+        },
+        "rules": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/rule" }
+        },
+        "presets": {
+          "description": "Expression presets: preset name to { group: attribute }. Writers type `hana smile`.",
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/identifier" },
+          "additionalProperties": {
+            "type": "object",
+            "minProperties": 1,
+            "propertyNames": { "$ref": "#/$defs/identifier" },
+            "additionalProperties": { "$ref": "#/$defs/identifier" }
+          }
+        },
+        "views": {
+          "type": "object",
+          "propertyNames": { "$ref": "#/$defs/identifier" },
+          "additionalProperties": { "$ref": "#/$defs/view" }
+        }
+      }
+    },
+    "group": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "always": {
+          "description": "Always drawn (e.g. body base). Has no selectable attributes.",
+          "type": "boolean"
+        },
+        "multiple": {
+          "description": "Several attributes may be active at once (e.g. accessories).",
+          "type": "boolean"
+        },
+        "default": {
+          "description": "Default attribute, or a list of defaults when multiple is true.",
+          "oneOf": [
+            { "$ref": "#/$defs/identifier" },
+            { "type": "array", "items": { "$ref": "#/$defs/identifier" }, "uniqueItems": true }
+          ]
+        },
+        "blink": {
+          "description": "Auto-blink using <attr>_half and <attr>_closed frames (plan §6.1).",
+          "type": "boolean"
+        },
+        "lipflap": {
+          "description": "Flap using <attr>_open frames while this character's text or voice plays.",
+          "type": "boolean"
+        }
+      },
+      "if": {
+        "properties": { "always": { "const": true } },
+        "required": ["always"]
+      },
+      "then": {
+        "properties": { "default": false, "multiple": false }
+      }
+    },
+    "rule": {
+      "description": "Conditional visibility: exactly one of hide or show, plus when. `when` is a space-separated list of attributes or presets that must all be active.",
+      "type": "object",
+      "required": ["when"],
+      "minProperties": 2,
+      "maxProperties": 2,
+      "additionalProperties": false,
+      "properties": {
+        "hide": { "$ref": "#/$defs/identifier" },
+        "show": { "$ref": "#/$defs/identifier" },
+        "when": { "type": "string", "pattern": "^[a-z_][a-z0-9_]*( [a-z_][a-z0-9_]*)*$" }
+      }
+    },
+    "view": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "crop": {
+          "description": "Crop rectangle in sprite-canvas pixels: [x, y, width, height].",
+          "type": "array",
+          "prefixItems": [
+            { "type": "integer", "minimum": 0 },
+            { "type": "integer", "minimum": 0 },
+            { "type": "integer", "minimum": 1 },
+            { "type": "integer", "minimum": 1 }
+          ],
+          "items": false,
+          "minItems": 4
+        },
+        "tint": {
+          "description": "Multiply color, #rrggbb.",
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "name": "himawari",
+  "private": true,
+  "type": "module",
+  "description": "AI-assisted open-source visual novel engine",
+  "license": "MIT",
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b && tsc -p tests",
+    "test": "vitest run",
+    "lint": "eslint .",
+    "check:i18n": "node packages/studio/scripts/check-locales.mjs",
+    "check": "tsc -b && tsc -p tests && eslint . && vitest run && node packages/studio/scripts/check-locales.mjs"
+  },
+  "devDependencies": {
+    "@formatjs/icu-messageformat-parser": "3.5.21",
+    "@types/node": "26.6.5",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "eslint": "10.12.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.71.2",
+    "vitest": "5.0.5",
+    "yaml": "2.9.1"
+  }
+}

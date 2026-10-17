@@ -1,0 +1,19 @@
+* text=auto eol=lf
+
+# Binary assets
+*.png  binary
+*.jpg  binary
+*.webp binary
+*.ogg  binary
+*.wav  binary
+*.otf  binary
+*.ttf  binary
+*.ttc  binary
+*.ico  binary
+*.hwb  binary
+*.hwp  binary
+*.hwsav binary
+
+# Windows-only scripts keep CRLF
+*.bat eol=crlf
+*.cmd eol=crlf

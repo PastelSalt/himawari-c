@@ -1,0 +1,135 @@
+# CI skeleton (plan §14.6). Phase 0 covers: ts, i18n, runtime-win, runtime-linux, fuzz.
+# Later phases add: runtime-win-cross, proton-smoke, e2e, ux-budget, release.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ts:
+    name: TypeScript (typecheck, lint, test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm lint
+      - run: pnpm test
+
+  i18n:
+    name: Studio UI strings (EN/JA in sync)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check:i18n
+
+  runtime-win:
+    name: Runtime, Windows (shipping build, MSYS2 UCRT64)
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+        working-directory: runtime
+    steps:
+      - uses: actions/checkout@v5
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            mingw-w64-ucrt-x86_64-toolchain
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+      - name: Configure and build (win64-release)
+        run: |
+          cmake --preset win64-release
+          cmake --build --preset win64-release
+      - name: Unit tests
+        run: ctest --preset win64-release
+      - name: Check the .exe imports no non-system DLLs
+        run: |
+          objdump -p build/win64-release/spike_a.exe | grep "DLL Name" | tee imports.txt
+          if grep -Eiv "DLL Name: (kernel32|user32|gdi32|winmm|imm32|ole32|oleaut32|version|uuid|advapi32|setupapi|shell32|dinput8|cfgmgr32|hid|api-ms-win-[a-z0-9-]+)\.dll" imports.txt; then
+            echo "::error::spike_a.exe imports a non-system DLL"; exit 1
+          fi
+      - name: Spike A smoke test (window, audio on the dummy driver, JP text)
+        env:
+          SDL_AUDIO_DRIVER: dummy
+        run: ./build/win64-release/spike_a.exe --frames 60
+      - name: Spike B smoke test (GPU rule wipe, or the crossfade fallback on a GPU-less runner)
+        run: ./build/win64-release/spike_b.exe --frames 60
+      - name: Spike C kinsoku check on real font metrics (needs Yu Gothic on the runner)
+        run: |
+          if [ -f /c/Windows/Fonts/YuGothM.ttc ]; then
+            for w in 600 900 1200 1600; do ./build/win64-release/spike_c_ft.exe --check-only --width $w; done
+          else
+            echo "::notice::Yu Gothic not installed on this runner; skipped (test_layout still ran under ctest)"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: spikes-windows-x64
+          path: |
+            runtime/build/win64-release/spike_a.exe
+            runtime/build/win64-release/spike_b.exe
+            runtime/build/win64-release/spike_c_ft.exe
+            runtime/build/win64-release/spike_c_ttf.exe
+
+  runtime-linux:
+    name: Runtime, Linux preview build (sanitizers)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: runtime
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install SDL build dependencies (SDL docs/README-linux.md)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake ninja-build pkg-config \
+            libasound2-dev libpulse-dev libpipewire-0.3-dev libx11-dev libxext-dev \
+            libxrandr-dev libxcursor-dev libxfixes-dev libxi-dev libxss-dev libxtst-dev \
+            libxkbcommon-dev libdrm-dev libgbm-dev libgl1-mesa-dev libgles2-mesa-dev \
+            libegl1-mesa-dev libdbus-1-dev libibus-1.0-dev libudev-dev libwayland-dev \
+            wayland-protocols libdecor-0-dev
+      - name: Configure and build (linux-debug, ASan + UBSan)
+        run: |
+          cmake --preset linux-debug
+          cmake --build --preset linux-debug
+      - name: Unit tests
+        run: ctest --preset linux-debug
+      - name: Build the internal preview runtime (linux-preview)
+        run: |
+          cmake --preset linux-preview
+          cmake --build --preset linux-preview
+
+  fuzz:
+    name: Fuzz loaders (60 s per target)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: runtime
+    steps:
+      - uses: actions/checkout@v5
+      - run: sudo apt-get update && sudo apt-get install -y clang cmake ninja-build
+      - run: |
+          cmake --preset fuzz
+          cmake --build --preset fuzz
+      - run: ./build/fuzz/fuzz_utf8 -max_total_time=60

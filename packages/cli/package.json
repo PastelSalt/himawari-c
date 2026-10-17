@@ -1,0 +1,17 @@
+{
+  "name": "@himawari/cli",
+  "version": "0.0.0",
+  "description": "hwc: the Himawari command-line compiler and project tool",
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "hwc": "./dist/main.js"
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@himawari/core": "workspace:*"
+  }
+}
