@@ -1164,10 +1164,10 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 - ✅ Size work: SDL subsystems and FreeType modules trimmed, `-Os`: **2.38 MB** release `.exe` (budget 4 MB).
 - ✅ **Exit:** the tutorial plays in EN and JA on Windows; headless reaches every ending; the `.hwb` loader and VM survived 10 minutes of libFuzzer (2.05 M inputs) and save loading 10 minutes (11.3 M inputs) after one fixed bug. Not yet: JPG/WebP images, side portraits, themes from `theme.json`, `.hwp` packs, gamepad remapping.
 
-### Phase 3: MCP v1 and CLI polish (⏱ 2)
-- Shared `packages/tools` registry. All tools on spec 2026-07-28, `llm-reference`, **`agent-guide.md` v1**, prompts, `render_line`, tasks extension.
-- `AGENTS.md` + `CLAUDE.md` in templates. Setup docs for the Claude desktop app and Claude Code (Mode A).
-- 🎯 **M1, vertical slice (≈ week 14):** *starting from a premise and two character bibles with layered sprites, an AI agent writes a 3-route chapter via MCP. It validates, reaches 100% playtest ending coverage, gets translated to a second language, and plays as a Windows `.exe`.*
+### Phase 3: MCP v1 and CLI polish (⏱ 2) ✅ done 2026-10-17
+- ✅ Shared `packages/tools` registry (22 tools). All tools on spec 2026-07-28 (TypeScript SDK v2, GA), `llm-reference`, **`agent-guide.md` v1**, resources, prompts, `render_line`. ⏸ Tasks extension: SDK v2.3.1 has no server helper for it, so long calls use the synchronous fallback (playtests take milliseconds today).
+- ✅ `AGENTS.md` + `CLAUDE.md` in templates. Setup docs for the Claude desktop app and Claude Code (Mode A): `docs/ai-setup.md`, `hwc ai setup`. CLI: `hwc run`, `playtest`, `graph`, `report ai-content`, `build --release` packaging.
+- ✅ 🎯 **M1, vertical slice (≈ week 14):** *starting from a premise and two character bibles with layered sprites, an AI agent writes a 3-route chapter via MCP. It validates, reaches 100% playtest ending coverage, gets translated to a second language, and plays as a Windows `.exe`.* Done: `examples/festival-eve/` (3 of 3 endings, 45 lines translated into Japanese, `Festival Eve.exe`).
 
 ### Phase 4: Studio MVP (⏱ 9)
 - Shell and **first-run flow (§2.1)**, Explorer, **Screenplay view + Script view** (CodeMirror 6), live preview with **play-as-you-write replay** and two-way line sync.

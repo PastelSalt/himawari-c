@@ -31,7 +31,8 @@ export { type EditOp, type EditOptions, type EditResult, addLineIds, applyEdits 
 export { DIAGNOSTICS, type Fix, SEMANTIC_DIAGNOSTICS } from "./syntax/diagnostics.js";
 export { type Ref } from "./syntax/ast.js";
 export { type FileReport, type ProjectCheck, type ProjectInput, type SourceFile, checkProject } from "./project/check.js";
-export { type Character, characterWords, readCharacter } from "./project/character.js";
+export { type Character, type SpriteDef, type SpriteGroup, characterWords, readCharacter } from "./project/character.js";
+export { type GraphEdge, type GraphNode, type StoryGraph, exprToString, graphToMermaid, storyGraph } from "./project/graph.js";
 export { DEFAULT_POSITIONS, type Manifest, type VarType, type VariableDecl, readManifest } from "./project/manifest.js";
 export { editDistance, suggest } from "./project/suggest.js";
 export { lineIdToNumber, numberToLineId } from "./ids.js";

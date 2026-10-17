@@ -1,0 +1,19 @@
+scene start:
+    bg shrine_evening with fade(800)
+    "The night before the summer festival. The shrine grounds smell like rain and frying oil."   #line:q409re
+    show hana happy at left with dissolve(300)
+    hana "There you are! The goldfish stall won't build itself!"   #line:ysjq98
+    show ren neutral at right with dissolve(300)
+    ren "And the flute won't practice itself. Allegedly."   #line:xvpgdx
+    me "I only have one evening."   #line:f81ve9
+    menu "Where do I spend it?":   #line:2kmqsy
+        "With Hana, at the goldfish stall.":   #line:retqdg
+            hide ren with fade(300)
+            jump hana_route
+        "With Ren, on the shrine steps.":   #line:ksn4f9
+            hide hana with fade(300)
+            jump ren_route
+        "I'll help both of them.":   #line:tsrtdg
+            hide hana
+            hide ren
+            jump both_route

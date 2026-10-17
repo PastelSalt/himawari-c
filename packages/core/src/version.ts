@@ -10,6 +10,8 @@ export const SPEC_VERSIONS = {
   language: "0.2.0-draft",
   manifest: "1.0.0-draft",
   character: "1.0.0-draft",
+  bytecode: "1.0.0",
+  ast: "1.0.0",
 } as const;
 
 export type SpecName = keyof typeof SPEC_VERSIONS;

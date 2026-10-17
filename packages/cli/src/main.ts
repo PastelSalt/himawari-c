@@ -16,12 +16,13 @@ import {
   renderDiagnostic,
   writeHwb,
 } from "@himawari/core";
+import { CommandError, aiSetup, graph, packageRelease, playtest, report, run } from "./commands.js";
 import { TEMPLATES, type TemplateName, initProject } from "./init.js";
 import { L10nUsageError, l10n } from "./l10n.js";
 import { findProjectRoot, loadProject } from "./project.js";
 
-// Commands from plan §9.2. `check` and `fmt` work; the rest land later in Phase 1+.
-const PLANNED = ["run", "playtest", "sprites", "graph", "report", "migrate"]; // l10n: sync/export/import done
+// Commands from plan §9.2 that aren't built yet.
+const PLANNED = ["sprites", "migrate"];
 
 const HELP = `hwc ${CORE_VERSION}
 
@@ -40,7 +41,17 @@ Commands:
   l10n import <file> --lang ja [--ai]
                          Bring translations back (placeholders are checked)
   build [--release]      Compile the project to build/game.hwb
-                         (--release: without debug info)
+                         (--release: without debug info, and package a playable
+                         build/windows/<Game>/ folder with the runtime)
+  run [--warp scene|file:line|#lineid] [--lang xx]
+                         Play the project in the runtime (dev mode: F3, F5)
+  playtest [--choices "0 1"] [--seed N] [--lang xx] [--out report.json]
+                         Play every path headlessly (or one, with --choices)
+  graph [--format mermaid|json]
+                         The story graph (scenes, jumps, calls, choices)
+  report ai-content      A summary of AI-written text, for store disclosure
+  ai setup [--write]     Connect Claude Code or the Claude desktop app to this
+                         project through himawari-mcp (--write: create .mcp.json)
   disasm <file.hwb>      Validate a .hwb file and print its instructions
   --version              Show versions of hwc and the specs
 
@@ -200,6 +211,10 @@ function build(args: readonly string[]): number {
   console.log(
     `✓ ${display(out)}: ${bytes.length} bytes, ${m.scenes.length} scene(s), ${m.lines.length} line(s)${release ? "" : ", with debug info"}`,
   );
+  if (release) {
+    const packaged = packageRelease(root);
+    if (packaged) console.log(packaged);
+  }
   return 0;
 }
 
@@ -246,6 +261,20 @@ function main(argv: readonly string[]): number {
       }
     }
     if (command === "disasm") return disasm(rest);
+    if (command === "run" || command === "playtest" || command === "graph" || command === "report" || command === "ai") {
+      const root = findProjectRoot(".");
+      if (!root) throw new UsageError(`no himawari.json here or above; run hwc ${command} inside a project`);
+      try {
+        if (command === "run") return run(root, rest);
+        if (command === "playtest") return playtest(root, rest);
+        if (command === "graph") return graph(root, rest);
+        if (command === "ai") return aiSetup(root, rest);
+        return report(root, rest);
+      } catch (e) {
+        if (e instanceof CommandError) throw new UsageError(e.message);
+        throw e;
+      }
+    }
     if (PLANNED.includes(command)) {
       console.error(`hwc ${command}: not implemented yet (see DETAILED_PLAN.md §18).`);
       return 2;

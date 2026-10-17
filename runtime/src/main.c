@@ -25,7 +25,8 @@ static const char *USAGE =
     "  himawari [game.hwb] [--lang xx]       play (default: game.hwb beside himawari.exe)\n"
     "  himawari --project DIR [--dev]        play DIR/build/game.hwb, assets from DIR/assets\n"
     "           [--no-gpu]                   use the default renderer (rule wipes become dissolves)\n"
-    "           [--warp scene | file:line]   start at that line, with a state reconstructed along a real path\n"
+    "           [--warp scene | file:line | #lineid]  start at that line, with a state reconstructed along a real path\n"
+    "           [--text-speed N]             characters per second for this run (1000 = instant)\n"
     "  himawari --headless [game.hwb | --project DIR] --playtest [max_steps=N] [seed=N] [lang=xx] [--out report.json]\n"
     "  himawari --headless [game.hwb | --project DIR] --transcript \"0 1\" [seed=N] [lang=xx] [--out file.txt]\n"
     "  himawari --version\n";

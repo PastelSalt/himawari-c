@@ -1,0 +1,458 @@
+{
+  "version": 1,
+  "lines": {
+    "1d2txq": {
+      "provenance": "ai",
+      "hash": "785a1d1bab7dbbd0",
+      "at": "2026-10-17T12:30:42.790Z"
+    },
+    "1dnxmq": {
+      "provenance": "ai",
+      "hash": "2eba9e31a8e14374",
+      "at": "2026-10-17T12:30:42.790Z"
+    },
+    "2kmqsy": {
+      "provenance": "ai",
+      "hash": "dced522bde4507b2",
+      "at": "2026-10-17T12:30:42.844Z"
+    },
+    "2tn7nr": {
+      "provenance": "ai",
+      "hash": "c83ca1019edeb09d",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "35f939": {
+      "provenance": "ai",
+      "hash": "be31b80a00a5e077",
+      "at": "2026-10-17T12:30:42.790Z"
+    },
+    "40dmp4": {
+      "provenance": "ai",
+      "hash": "3361d00e280bd7d8",
+      "at": "2026-10-17T12:30:42.790Z"
+    },
+    "55psjy": {
+      "provenance": "ai",
+      "hash": "db268872d508ba46",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "5aenqx": {
+      "provenance": "ai",
+      "hash": "a4fb7124c602ebc6",
+      "at": "2026-10-17T12:30:42.790Z"
+    },
+    "627gb0": {
+      "provenance": "ai",
+      "hash": "37b54db476cf28ea",
+      "at": "2026-10-17T12:30:42.790Z"
+    },
+    "6nr9jf": {
+      "provenance": "ai",
+      "hash": "0de6fa7dd78733d8",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "6xwa14": {
+      "provenance": "ai",
+      "hash": "2bae05527e47b006",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "78a6dt": {
+      "provenance": "ai",
+      "hash": "bfe948b9cf4db6a3",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "7zg525": {
+      "provenance": "ai",
+      "hash": "83d4a9b185f07fa8",
+      "at": "2026-10-17T12:30:42.790Z"
+    },
+    "8tbpgf": {
+      "provenance": "ai",
+      "hash": "03f9993bf752a366",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "9bbm6t": {
+      "provenance": "ai",
+      "hash": "fd0888afb485fba6",
+      "at": "2026-10-17T12:30:42.790Z"
+    },
+    "9f4914": {
+      "provenance": "ai",
+      "hash": "4500ba64a2bfbf3e",
+      "at": "2026-10-17T12:30:42.790Z"
+    },
+    "9ppbc8": {
+      "provenance": "ai",
+      "hash": "a82fd70bdfbbcfef",
+      "at": "2026-10-17T12:30:42.790Z"
+    },
+    "9vpezn": {
+      "provenance": "ai",
+      "hash": "244cdc01da18ffea",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "c2ty91": {
+      "provenance": "ai",
+      "hash": "bf6ccf30d04f962c",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "cjja35": {
+      "provenance": "ai",
+      "hash": "8b130e63909c994f",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "dpvswy": {
+      "provenance": "ai",
+      "hash": "c5b20f3610a50d97",
+      "at": "2026-10-17T12:30:42.790Z"
+    },
+    "e22xtw": {
+      "provenance": "ai",
+      "hash": "899f7abad7af16d8",
+      "at": "2026-10-17T12:30:42.790Z"
+    },
+    "egbsx2": {
+      "provenance": "ai",
+      "hash": "dd6facdc65b63062",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "f81ve9": {
+      "provenance": "ai",
+      "hash": "73d63fe19527a863",
+      "at": "2026-10-17T12:30:42.844Z"
+    },
+    "hbfz3t": {
+      "provenance": "ai",
+      "hash": "96fd5c311136f0e0",
+      "at": "2026-10-17T12:30:42.790Z"
+    },
+    "janw5p": {
+      "provenance": "ai",
+      "hash": "545ea0807ca00a69",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "khf2gn": {
+      "provenance": "ai",
+      "hash": "6ecdd26d312d3f29",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "ksn4f9": {
+      "provenance": "ai",
+      "hash": "1878a00402082db7",
+      "at": "2026-10-17T12:30:42.844Z"
+    },
+    "m9378m": {
+      "provenance": "ai",
+      "hash": "4da43e68a66cfe7b",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "me68qv": {
+      "provenance": "ai",
+      "hash": "24b7a838d54da43d",
+      "at": "2026-10-17T12:30:42.790Z"
+    },
+    "q409re": {
+      "provenance": "ai",
+      "hash": "958d74ab4919951c",
+      "at": "2026-10-17T12:30:42.844Z"
+    },
+    "q4hn05": {
+      "provenance": "ai",
+      "hash": "bea98cdfec4f3989",
+      "at": "2026-10-17T12:30:42.790Z"
+    },
+    "qj0hkf": {
+      "provenance": "ai",
+      "hash": "dee4a89f9976f19a",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "qn1x42": {
+      "provenance": "ai",
+      "hash": "6643b1f337a9828f",
+      "at": "2026-10-17T12:30:42.790Z"
+    },
+    "retqdg": {
+      "provenance": "ai",
+      "hash": "a973e48344ee491c",
+      "at": "2026-10-17T12:30:42.844Z"
+    },
+    "tsrtdg": {
+      "provenance": "ai",
+      "hash": "fc42dcdc3fbcd663",
+      "at": "2026-10-17T12:30:42.844Z"
+    },
+    "vzsx02": {
+      "provenance": "ai",
+      "hash": "2d5ff18ee94b86c5",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "w8c880": {
+      "provenance": "ai",
+      "hash": "149a410bdfe0f085",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "wxwsj4": {
+      "provenance": "ai",
+      "hash": "94bd8a5da19b1208",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "xa5w1a": {
+      "provenance": "ai",
+      "hash": "dff780e07d7581a1",
+      "at": "2026-10-17T12:30:42.790Z"
+    },
+    "xvpgdx": {
+      "provenance": "ai",
+      "hash": "6e2c089ea3f74a35",
+      "at": "2026-10-17T12:30:42.844Z"
+    },
+    "ynawk9": {
+      "provenance": "ai",
+      "hash": "6f8d303495c80b24",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "ysjq98": {
+      "provenance": "ai",
+      "hash": "743ea2f53ca6a1e8",
+      "at": "2026-10-17T12:30:42.844Z"
+    },
+    "ywncj3": {
+      "provenance": "ai",
+      "hash": "9a61fc70cdec19d7",
+      "at": "2026-10-17T12:30:42.812Z"
+    },
+    "yxv4b1": {
+      "provenance": "ai",
+      "hash": "bd32f13c2d93377d",
+      "at": "2026-10-17T12:30:42.812Z"
+    }
+  },
+  "translations": {
+    "ja:1d2txq": {
+      "provenance": "ai",
+      "hash": "590539eb02ba0884",
+      "at": "2026-10-17T12:31:25.579Z"
+    },
+    "ja:1dnxmq": {
+      "provenance": "ai",
+      "hash": "7c3cbdbbf511112a",
+      "at": "2026-10-17T12:31:25.520Z"
+    },
+    "ja:2kmqsy": {
+      "provenance": "ai",
+      "hash": "9d8bb2b95551d441",
+      "at": "2026-10-17T12:31:25.935Z"
+    },
+    "ja:2tn7nr": {
+      "provenance": "ai",
+      "hash": "8b007da45639ab8c",
+      "at": "2026-10-17T12:31:25.646Z"
+    },
+    "ja:35f939": {
+      "provenance": "ai",
+      "hash": "ac0c096cc6dbeefa",
+      "at": "2026-10-17T12:31:25.606Z"
+    },
+    "ja:40dmp4": {
+      "provenance": "ai",
+      "hash": "a588c6e74add9ed0",
+      "at": "2026-10-17T12:31:25.592Z"
+    },
+    "ja:55psjy": {
+      "provenance": "ai",
+      "hash": "57cadbec2d22a64f",
+      "at": "2026-10-17T12:31:25.713Z"
+    },
+    "ja:5aenqx": {
+      "provenance": "ai",
+      "hash": "44dbe99dd423d90c",
+      "at": "2026-10-17T12:31:25.442Z"
+    },
+    "ja:627gb0": {
+      "provenance": "ai",
+      "hash": "0594f5621a170813",
+      "at": "2026-10-17T12:31:25.426Z"
+    },
+    "ja:6nr9jf": {
+      "provenance": "ai",
+      "hash": "48e20417b5ac54e3",
+      "at": "2026-10-17T12:31:25.620Z"
+    },
+    "ja:6xwa14": {
+      "provenance": "ai",
+      "hash": "ca0221ceb27f7aaf",
+      "at": "2026-10-17T12:31:25.766Z"
+    },
+    "ja:78a6dt": {
+      "provenance": "ai",
+      "hash": "50c175c95304f822",
+      "at": "2026-10-17T12:31:25.726Z"
+    },
+    "ja:7zg525": {
+      "provenance": "ai",
+      "hash": "ac54ec4fe52cceb7",
+      "at": "2026-10-17T12:31:25.392Z"
+    },
+    "ja:8tbpgf": {
+      "provenance": "ai",
+      "hash": "2c0e2d75394d0b54",
+      "at": "2026-10-17T12:31:25.753Z"
+    },
+    "ja:9bbm6t": {
+      "provenance": "ai",
+      "hash": "e0fb9b938de2120e",
+      "at": "2026-10-17T12:31:25.409Z"
+    },
+    "ja:9f4914": {
+      "provenance": "ai",
+      "hash": "af93d2462aae3bc2",
+      "at": "2026-10-17T12:31:25.374Z"
+    },
+    "ja:9ppbc8": {
+      "provenance": "ai",
+      "hash": "3e68f9154258d673",
+      "at": "2026-10-17T12:31:25.564Z"
+    },
+    "ja:9vpezn": {
+      "provenance": "ai",
+      "hash": "286c9c341cb22428",
+      "at": "2026-10-17T12:31:25.673Z"
+    },
+    "ja:c2ty91": {
+      "provenance": "ai",
+      "hash": "76165549f6d359cd",
+      "at": "2026-10-17T12:31:25.804Z"
+    },
+    "ja:cjja35": {
+      "provenance": "ai",
+      "hash": "656f3d6c1ae7113f",
+      "at": "2026-10-17T12:31:25.817Z"
+    },
+    "ja:dpvswy": {
+      "provenance": "ai",
+      "hash": "776ab26b9bc4eede",
+      "at": "2026-10-17T12:31:25.505Z"
+    },
+    "ja:e22xtw": {
+      "provenance": "ai",
+      "hash": "32a6edcb94d4ec58",
+      "at": "2026-10-17T12:31:25.474Z"
+    },
+    "ja:egbsx2": {
+      "provenance": "ai",
+      "hash": "194096b4ad0616be",
+      "at": "2026-10-17T12:31:25.700Z"
+    },
+    "ja:f81ve9": {
+      "provenance": "ai",
+      "hash": "73401e3b6f2e75ee",
+      "at": "2026-10-17T12:31:25.923Z"
+    },
+    "ja:hbfz3t": {
+      "provenance": "ai",
+      "hash": "3654917e46019e99",
+      "at": "2026-10-17T12:31:25.489Z"
+    },
+    "ja:janw5p": {
+      "provenance": "ai",
+      "hash": "a370e72a7dc60b0c",
+      "at": "2026-10-17T12:31:25.844Z"
+    },
+    "ja:khf2gn": {
+      "provenance": "ai",
+      "hash": "c531e90d95880fba",
+      "at": "2026-10-17T12:31:25.870Z"
+    },
+    "ja:ksn4f9": {
+      "provenance": "ai",
+      "hash": "f3fadd42b1401b9e",
+      "at": "2026-10-17T12:31:25.961Z"
+    },
+    "ja:m9378m": {
+      "provenance": "ai",
+      "hash": "9e23a86dcafddace",
+      "at": "2026-10-17T12:31:25.831Z"
+    },
+    "ja:me68qv": {
+      "provenance": "ai",
+      "hash": "17a8a4793b30cca0",
+      "at": "2026-10-17T12:31:25.550Z"
+    },
+    "ja:q409re": {
+      "provenance": "ai",
+      "hash": "c9a34facb7e48e36",
+      "at": "2026-10-17T12:31:25.883Z"
+    },
+    "ja:q4hn05": {
+      "provenance": "ai",
+      "hash": "10bf03df0e4a7bea",
+      "at": "2026-10-17T12:31:25.535Z"
+    },
+    "ja:qj0hkf": {
+      "provenance": "ai",
+      "hash": "117bfed2f00d7a49",
+      "at": "2026-10-17T12:31:25.633Z"
+    },
+    "ja:qn1x42": {
+      "provenance": "ai",
+      "hash": "b240a411d4abbbc9",
+      "at": "2026-10-17T12:31:25.348Z"
+    },
+    "ja:retqdg": {
+      "provenance": "ai",
+      "hash": "728d314180cecfda",
+      "at": "2026-10-17T12:31:25.948Z"
+    },
+    "ja:tsrtdg": {
+      "provenance": "ai",
+      "hash": "7c87d8c179b2bf4e",
+      "at": "2026-10-17T12:31:25.974Z"
+    },
+    "ja:vzsx02": {
+      "provenance": "ai",
+      "hash": "7c010f842c9f8643",
+      "at": "2026-10-17T12:31:25.791Z"
+    },
+    "ja:w8c880": {
+      "provenance": "ai",
+      "hash": "09ccebff4619a060",
+      "at": "2026-10-17T12:31:25.740Z"
+    },
+    "ja:wxwsj4": {
+      "provenance": "ai",
+      "hash": "6640529316522046",
+      "at": "2026-10-17T12:31:25.686Z"
+    },
+    "ja:xa5w1a": {
+      "provenance": "ai",
+      "hash": "eb41852fc20e2502",
+      "at": "2026-10-17T12:31:25.458Z"
+    },
+    "ja:xvpgdx": {
+      "provenance": "ai",
+      "hash": "8e766c1efa41b8ae",
+      "at": "2026-10-17T12:31:25.909Z"
+    },
+    "ja:ynawk9": {
+      "provenance": "ai",
+      "hash": "038608f188f166aa",
+      "at": "2026-10-17T12:31:25.779Z"
+    },
+    "ja:ysjq98": {
+      "provenance": "ai",
+      "hash": "7042b61ce449135c",
+      "at": "2026-10-17T12:31:25.895Z"
+    },
+    "ja:ywncj3": {
+      "provenance": "ai",
+      "hash": "5e7259404261b95d",
+      "at": "2026-10-17T12:31:25.660Z"
+    },
+    "ja:yxv4b1": {
+      "provenance": "ai",
+      "hash": "c24cdbf865892ee1",
+      "at": "2026-10-17T12:31:25.857Z"
+    }
+  },
+  "characters": {}
+}

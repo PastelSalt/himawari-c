@@ -1,0 +1,39 @@
+scene goldfish_ending:
+    bg festival_morning with fade(800)
+    show hana happy at center with dissolve(400)
+    "Festival morning. A line of kids is already waiting at the goldfish stall."   #line:qn1x42
+    if lantern_stall:
+        hana "The paper lanterns were your idea. Look, everyone stops to see them."   #line:9f4914
+    else:
+        hana "I kept it simple, like you said. Simple works!"   #line:7zg525
+    hana "Thank you for staying last night. I… I didn't want to do it alone."   #line:9bbm6t
+    "She hands me the first scoop of the day."   #line:627gb0
+    $ endings_seen += 1
+    end
+
+scene flute_ending:
+    bg festival_morning with fade(800)
+    "The opening ceremony. The whole town is quiet."   #line:5aenqx
+    show ren neutral at center with dissolve(400)
+    "Ren lifts the shinobue. For a second, his hands don't move."   #line:xa5w1a
+    if ren_played_for_me:
+        "Then he finds me in the crowd, and plays the song from last night."   #line:e22xtw
+    else:
+        "Then he closes his eyes and plays anyway."   #line:hbfz3t
+    ren happy "Told you. No big deal."   #line:dpvswy
+    "His hands are still shaking. I don't say anything."   #line:1dnxmq
+    $ endings_seen += 1
+    end
+
+scene lanterns_ending:
+    bg shrine_evening with fade(800)
+    "I never managed to be in two places at once."   #line:q4hn05
+    show hana neutral at left with dissolve(300)
+    show ren neutral at right with dissolve(300)
+    hana "The stall is half finished."   #line:me68qv
+    ren "The flute is half practiced."   #line:9ppbc8
+    hana happy "Then we'll do half of everything together."   #line:1d2txq
+    "The three of us light the lanterns along the path, one by one."   #line:40dmp4
+    ren happy "Not a bad festival eve."   #line:35f939
+    $ endings_seen += 1
+    end

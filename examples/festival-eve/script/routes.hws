@@ -1,0 +1,34 @@
+scene hana_route:
+    show hana neutral at center with dissolve(300)
+    hana "Okay! Tank, nets, prizes… and the sign."   #line:6nr9jf
+    hana sad "What if nobody comes? Last year's stall was…"   #line:qj0hkf
+    menu "How do I help?":   #line:2tn7nr
+        "Hang paper lanterns so people notice it.":   #line:ywncj3
+            $ lantern_stall = true
+            hana happy "Lanterns! That's perfect."   #line:9vpezn
+        "Tell her it's already good as it is.":   #line:wxwsj4
+            hana "You think so? Then… I'll trust it."   #line:egbsx2
+    "We work until the shrine bell rings ten."   #line:55psjy
+    jump goldfish_ending
+
+scene ren_route:
+    show ren neutral at center with dissolve(300)
+    ren "If you're here to hear me practice, I charge admission."   #line:78a6dt
+    "He turns the flute over in his hands and doesn't play."   #line:w8c880
+    menu "What do I say?":   #line:8tbpgf
+        "Ask him to play something, just for me.":   #line:6xwa14
+            $ ren_played_for_me = true
+            ren "Just one song. Don't clap."   #line:ynawk9
+            "It's soft and a little uneven. It's beautiful."   #line:vzsx02
+        "Sit next to him and say nothing.":   #line:c2ty91
+            "We watch the lanterns go up. After a while, he starts to play."   #line:cjja35
+    ren happy "Huh. My hands remembered."   #line:m9378m
+    jump flute_ending
+
+scene both_route:
+    "I run to the stall, then to the steps, then back to the stall."   #line:janw5p
+    show hana sad at left with dissolve(300)
+    hana "You don't have to split yourself in half…"   #line:yxv4b1
+    show ren neutral at right with dissolve(300)
+    ren "Speaking as half of the problem, she's right."   #line:khf2gn
+    jump lanterns_ending

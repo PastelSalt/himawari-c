@@ -17,7 +17,8 @@
 | **Studio** | Windows, UI in English (default) + Japanese |
 | **AI role** | Development assistant only. **No media generation** |
 | **Phase** | **Phase 1 done** (session 9): sanitizers; lexer, CST parser, AST + `ast.schema.json`, formatter, validator, edit API, bytecode spec + compiler, conformance (compile half), localization, templates + tutorial, `hwc check/fmt/build/disasm/init/l10n`. Next: Phase 2 |
-| **Phase 2** | **Done** (session 10): `himawari.exe` (loader, VM, saves, rollback, headless playtests, windowed player with layered sprites, rule wipes, EN/JA), bytecode 1.0 frozen, 2.38 MB release. Next: **Phase 3, MCP v1 and CLI polish** (waiting on your go-ahead) |
+| **Phase 2** | **Done** (session 10): `himawari.exe` (loader, VM, saves, rollback, headless playtests, windowed player with layered sprites, rule wipes, EN/JA), bytecode 1.0 frozen, 2.38 MB release |
+| **Phase 3** | **Done** (session 11): `@himawari/tools` (22 tools) + `himawari-mcp` (spec 2026-07-28, SDK v2), agent guide, `hwc run/playtest/graph/report/ai setup`, `build --release` packaging; **M1 reached** (`examples/festival-eve`). Next: **Phase 4, Studio MVP** (waiting on your go-ahead) |
 | **Owner** | Moesoft (GitHub: `PastelSalt`) |
 | **Repo** | **https://github.com/PastelSalt/himawari-c** (public) |
 
@@ -440,7 +441,34 @@ You then asked to commit and push: `0419238`.
   - Bytecode **1.0 is frozen** (`spec/bytecode.md`); later additions bump the minor version.
   - Not done in Phase 2 (none were in its list): JPG/WebP images (PNG/BMP only), side portraits and tinted views, `theme.json` themes (UI strings live in `hw_ui_text.c` for now), `.hwp` packs, gamepad remapping, measured cold-start/frame/memory budgets, Windows manifest via `windres` and crash minidumps (plan §8.13), backlog voice replay, save thumbnails.
   - Checks at the end: `corepack pnpm check` 219 tests; runtime ctest 8/8 (debug, release, ASan); spikes A and B OK on the trimmed SDL.
-  - **Nothing from session 10 is committed yet** (everything after `df0c634`).
+  - 📦 **Committed and pushed** at your request: `55a0744` "Phase 2: runtime MVP (himawari.exe)".
+
+## Session 11: 2026-10-17 · Phase 3: MCP v1 and CLI polish
+**You asked:** continue with Phase 3 and keep logging after every milestone. This entry is updated after each one.
+
+**Work order (plan §18 Phase 3):** shared tool registry → himawari-mcp on spec 2026-07-28 → agent guide and llm-reference → resources and prompts → CLI polish (`hwc run`, `playtest`, `graph`, `report`, `build --release` packaging) → setup docs for Mode A → the M1 vertical slice.
+
+- ✅ **Milestone 11a: the tool registry and the MCP server.**
+  - **SDK check (plan §10.1 asked to verify at Phase 3):** TypeScript SDK **v2 is GA** (`@modelcontextprotocol/server` 2.3.1, "the stable release line, implementing the 2026-07-28 spec"), so himawari-mcp builds on v2 directly; no v1 adapter. Instructions go in the server's `instructions` option (the open question in plan §10.8); MRTR confirmations use the SDK's `inputRequired` / `acceptedContent`.
+  - **`packages/tools` (`@himawari/tools`):** every tool defined once (Zod input, output schema, annotations, handler), in a fixed order (plan §10.1). **22 tools**: reads `project_info`, `list_scenes`, `read_scene` (hws or AST, with a `revision`), `search_dialogue` (with translations), `get_story_graph` (JSON or Mermaid), `list_characters`, `get_character` (frontmatter + bible + valid words), `list_variables` (reads/writes, unused), `list_assets` (missing = placeholders, unused), `validate`, `analyze`; writes `create_scene`, `update_scene`, `patch_scene` (the Core edit API, line-ID anchored), `upsert_character`, `set_preset`, `declare_variable`, `rename` (scene/character/variable, from the refs index), `set_translation` (parity-checked, lands `needs-review`); execs `playtest` (all paths or a transcript), `render_line` (a PNG from the real runtime via `--warp '#lineid' --text-speed 1000 --screenshot`), `build` (gated by `--allow-build`).
+  - **Rules from plan §10.2, enforced in code:** the sandbox refuses paths outside the project; every write is validated against the **whole project** before touching disk and refused if it adds errors (the diagnostics come back so the model can fix them in one round); `dry_run` everywhere; `base_revision` optimistic concurrency on scene writes; patch anchors must belong to the scene; atomic writes; the runtime only with fixed arguments and no shell; **provenance** in `.himawari/provenance.json` (lines, translations, bibles; `ai`, or `ai-edited` when an AI rewrites a human line or a human changes an AI line, detected by text hash).
+  - **Core additions:** a story-graph analyzer (`storyGraph`, `graphToMermaid`, `exprToString`: edges labeled with the menu choice and conditions on the way, reachability, endings); `SPEC_VERSIONS` now lists bytecode and AST.
+  - **Runtime additions:** `--warp '#k3f9a1'` (a line ID; an option warps to its menu) and `--text-speed N` (a per-run override that's never saved).
+  - **`packages/mcp` (`himawari-mcp`):** stdio server (`--project`, `--runtime`, `--allow-build`; logs to stderr), the agent guide as server instructions, **resources** `himawari://project/manifest`, `…/project/agents-md`, `…/agent-guide`, `…/spec/llm-reference`, `…/graph`, `…/scene/{id}`, `…/character/{id}`, and **prompts** `write_scene`, `continuity_check`, `branch_planner`, `translate_scene`, `sprite_direction`.
+  - **`spec/agent-guide.md` v1** (layer 1: scope with no media generation, read before writing, line-ID edits, validate and dry-run, playtest after branching, translation markup, provenance, one-line explanations) and **`spec/llm-reference.md`** (the language on two pages, with the real diagnostic codes, checked against Core).
+  - **Tests:** an end-to-end suite starts the real stdio server on a temp copy of a project and drives it with the official v2 client (tool list and order, instructions, read tools, `patch_scene` with revisions and provenance, refused writes and dry runs, variables, characters, presets, translations with a parity refusal, a rename across 5 files that triggers a real **MRTR elicitation round trip**, the sandbox, resources, prompts, `build` gating): 10 tests. Exec tools against the real runtime (all-paths playtest, transcript, a rendered PNG, a packaged `build/windows/<Game>/`): 4 tests, skipped when no runtime is built. `corepack pnpm check`: 233 tests.
+
+- ✅ **Milestone 11b: CLI polish and Mode A setup** (plan §9.2, §10.7):
+  - **`hwc run [--warp scene|file:line|#lineid] [--lang xx] [--no-gpu]`** compiles to `build/game.hwb` and starts the runtime in dev mode. **`hwc playtest [--choices "0 1"] [--seed N] [--lang xx] [--out report.json]`** plays every path headlessly (or one). **`hwc graph [--format mermaid|json]`**. **`hwc report ai-content [--format json]`**: a store-ready summary of AI-written script lines, translations, and bibles from `.himawari/provenance.json`, re-checked against the current text (human / AI / AI then edited), stating that no media was AI-generated. **`hwc build --release`** now also packages **`build/windows/<Game>/<Game>.exe`** (the runtime, `game.hwb`, `assets/`); the packaged layered example runs standalone (screenshot).
+  - **`hwc ai setup [--write]`** prints the exact `claude mcp add himawari -- …` command and the Claude desktop config entry for this project and machine; `--write` creates the project's `.mcp.json` for Claude Code. The desktop app's own config is never edited.
+  - **`docs/ai-setup.md`**: the Mode A guide (what the AI can and can't do, setup for Claude Code and the desktop app, options, how to work with `AGENTS.md`, the prompts).
+  - The runtime is found via `$HIMAWARI_RUNTIME` or a checkout's `runtime/build/win64-release|debug` (`@himawari/tools` `findRuntime`); hwc now depends on `@himawari/tools`.
+  - Tests: graph (Mermaid and JSON), report counts (human / AI / AI-edited by hash), `ai setup --write`. `corepack pnpm check`: 236 tests.
+
+- ✅ **Milestone 11c: M1, the vertical slice** (`examples/festival-eve/`). **Inputs (by a person):** `PREMISE.md` (three routes, three endings), `AGENTS.md` (tone, rating, style rules), two character bibles with layered sprites (Hana, Ren) and procedurally drawn layers (`make-art.mjs`), Japanese added to `languages`. **The agent (this Claude session) through the real himawari-mcp over stdio, driven by the official client:** read the project and both bibles, declared 3 variables, wrote 7 scenes (opening, 3 routes, 3 endings) with `create_scene` (dry run first), `validate` → 0 errors, `playtest` → **5 paths, 3 of 3 endings, 35/35 lines, 7/7 choices**, translated all **45 lines into Japanese** (`set_translation`, `needs-review`), checked two lines with `render_line` (English and Japanese), and packaged **`build/windows/Festival Eve/Festival Eve.exe`** with `build`. The packaged exe plays standalone in Japanese (screenshot). `hwc report ai-content`: 45/45 script lines and 45 translations AI-written.
+  - **The run found and fixed six real problems:** (1) a pre-existing project error (the not-yet-written entry scene) blocked every write; now only *new* errors block, matched by code, file, and message. (2) `create_scene` took one scene, so scenes that jump to each other could never be added; it now takes a whole chapter. (3) `render_line` reported success with a title-screen screenshot when the warp failed (the release runtime was stale, so it didn't know `#lineid` yet); a failed warp in an unattended run now exits with code 3 and the tool reports the error. (4) Unattended runtime runs (`--frames`, used by `render_line` and smoke tests) wrote the player's `global.dat`; they no longer write player data. (5) `--lang` was saved as the player's language; it's now for that run only, and `render_line` defaults to the source language. (6) Template and root `.gitignore` ignored all of `.himawari/`, but `provenance.json` must be committed (plan §16.4); now only `.himawari/cache/` is ignored. Also: `set_translation` no longer echoes table-wide progress notes on every call.
+  - Regression tests for (1) and (2) in the MCP suite; a bad-line-ID `render_line` is refused.
+- ✅ **Phase 3 complete** (plan §18): the registry, all tools on spec 2026-07-28, `llm-reference`, `agent-guide.md` v1, resources, prompts, `render_line`, setup docs and `hwc ai setup`, CLI polish, **M1**. **Deferred:** the tasks extension (TypeScript SDK v2.3.1 has no server-side helper for `io.modelcontextprotocol/tasks`, and its 2026-era codec strips the old `taskSupport` fields; long calls use the plan's synchronous fallback, and playtests take milliseconds today) and the optional MCP Apps UI (`ui://himawari/story-graph`, `scene-preview`). README updated (it still said Phase 0). `corepack pnpm check`: 241 tests. Not committed yet.
 
 ---
 
@@ -475,6 +503,7 @@ You then asked to commit and push: `0419238`.
 | D25 | Bytecode 1.0 gains `META`, `LOCL` (compiled translations), menu prompt line IDs, stricter loader rules, PCG32 (rfcs/0004), and `SPRT` layered sprites with attribute merge in the VM (rfcs/0005); **1.0 frozen** at the end of Phase 2 | session 10 | ✅ Active |
 | D26 | Shipping runtime size: SDL subsystems a VN doesn't use are off (incl. HIDAPI and Vulkan), FreeType registers TrueType/CFF only, release builds use `-Os` + LTO → 2.38 MB | session 10 | ✅ Active |
 | D27 | Saves store names and line IDs (not indices) and remap across script edits; call frames anchor on "k-th call to X in scene Y" | session 10 | ✅ Active |
+| D28 | himawari-mcp builds on TypeScript SDK **v2** (GA, spec 2026-07-28); tools defined once in `@himawari/tools`; writes refused only for *new* errors; tasks extension deferred (synchronous fallback) | session 11 | ✅ Active |
 
 Also: **D13** (games export for Windows x64 only) stays active; its "internal Linux runtime" clause is superseded by D21.
 
@@ -485,9 +514,9 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 10)
+## Next Steps (after session 11)
 
-1. **You:** decide whether to commit and push the Phase 2 work (everything after `df0c634`). Then check CI on that push: the new player smoke test, the 60 s `.hwb` and save fuzzing, and the release size.
-2. **Phase 3: MCP v1 and CLI polish**, on your go-ahead (plan §18): the shared `packages/tools` registry, `himawari-mcp` on spec 2026-07-28, `llm-reference`, `agent-guide.md` v1, `render_line`, and `hwc run`/`playtest` wrappers around `himawari.exe`.
-3. Runtime follow-ups that can come any time: JPG/WebP, side portraits, `theme.json`, `.hwp` packs, gamepad remapping, the Windows manifest and crash minidumps, and measuring the cold-start, frame, and memory budgets.
-4. A human review of the 30 AI-translated tutorial lines (`examples/tutorial/locales/ja.json`, marked `needs-review`).
+1. **You:** decide whether to commit and push Phase 3 (everything after `55a0744`), then check CI on that push.
+2. **Phase 4: Studio MVP**, on your go-ahead (plan §18): the Electron shell, Screenplay and Script views (CodeMirror 6), live preview, story graph, characters panel and sprite composer, the embedded MCP with a proposals panel (Mode A live sync), and the built-in assistant panel (Mode B).
+3. Follow-ups any time: the MCP tasks extension once the SDK supports it; MCP Apps UI; runtime items from session 10 (JPG/WebP, side portraits, `theme.json`, `.hwp` packs, gamepad remapping, manifest/minidumps, budget measurements).
+4. Human review of AI-written Japanese in `examples/tutorial` (30 lines) and `examples/festival-eve` (45 lines), both marked `needs-review`.

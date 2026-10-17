@@ -624,8 +624,38 @@ void hw_playtest_report_json(const hw_module *m, const hw_playtest_report *r, hw
 
 /* ---- warp (plan §8.11) ---- */
 
+/* Crockford base32 line ID → 30-bit value, or HW_NONE. */
+static uint32_t parse_line_id(const char *s)
+{
+    static const char alphabet[] = "0123456789abcdefghjkmnpqrstvwxyz";
+    if (strlen(s) != 6) return HW_NONE;
+    uint32_t v = 0;
+    for (int i = 0; i < 6; i++) {
+        const char *p = strchr(alphabet, s[i]);
+        if (!p || !s[i]) return HW_NONE;
+        v = (v << 5) | (uint32_t)(p - alphabet);
+    }
+    return v;
+}
+
 uint32_t hw_warp_target(const hw_module *m, const char *where)
 {
+    /* "#k3f9a1": the SAY or MENU showing that line (a menu by its prompt or any option). */
+    if (where[0] == '#') {
+        uint32_t id = parse_line_id(where + 1);
+        if (id == HW_NONE) return HW_NONE;
+        for (uint32_t pc = 0; pc < m->code_count; pc += 1 + hw_argc(m->code[pc])) {
+            const uint32_t *a = &m->code[pc + 1];
+            if (hw_op(m->code[pc]) == HW_OP_SAY && m->lines[a[0]].line_id == id) return pc;
+            if (hw_op(m->code[pc]) == HW_OP_MENU) {
+                if (a[0] != HW_NONE && m->lines[a[0]].line_id == id) return pc;
+                for (uint32_t k = 0; k < a[1]; k++) {
+                    if (m->lines[a[2 + 2 * k]].line_id == id) return pc;
+                }
+            }
+        }
+        return HW_NONE;
+    }
     /* A scene name: its first line or menu. */
     uint32_t scene = hw_module_find_scene(m, where);
     uint32_t from = HW_NONE;

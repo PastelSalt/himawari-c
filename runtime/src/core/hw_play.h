@@ -84,9 +84,10 @@ bool hw_playtest(const hw_module *m, const hw_playtest_options *o, hw_playtest_r
 void hw_playtest_report_free(hw_playtest_report *r);
 
 /*
- * Warp (plan §8.11): the SAY or MENU a place names, either a scene ("ch1_hub",
- * its first line) or "file:line" (the first line at or after it; "ch1.hws:40"
- * matches "script/ch1.hws"). HW_NONE when nothing matches.
+ * Warp (plan §8.11): the SAY or MENU a place names: a scene ("ch1_hub", its
+ * first line), "file:line" (the first line at or after it; "ch1.hws:40"
+ * matches "script/ch1.hws"), or a line ID ("#k3f9a1"; for a menu option, its
+ * menu). HW_NONE when nothing matches.
  */
 uint32_t hw_warp_target(const hw_module *m, const char *where);
 /*

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://pastelsalt.github.io/himawari-c/spec/manifest/1.0.json",
+  "name": "Festival Eve",
+  "id": "dev.example.festival-eve",
+  "version": "0.1.0",
+  "engine": "^1.0.0",
+  "resolution": [
+    1920,
+    1080
+  ],
+  "sourceLanguage": "en",
+  "languages": [
+    "en",
+    "ja"
+  ],
+  "entry": "start",
+  "variables": {
+    "lantern_stall": {
+      "type": "bool",
+      "default": false,
+      "scope": "save"
+    },
+    "ren_played_for_me": {
+      "type": "bool",
+      "default": false,
+      "scope": "save"
+    },
+    "endings_seen": {
+      "type": "int",
+      "default": 0,
+      "scope": "global"
+    }
+  }
+}

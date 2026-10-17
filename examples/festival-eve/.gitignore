@@ -1,0 +1,3 @@
+build/
+# Caches; .himawari/provenance.json (AI provenance, plan §16.4) is meant to be committed
+.himawari/cache/

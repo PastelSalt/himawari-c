@@ -125,6 +125,7 @@ typedef struct game {
     char error[300];
     bool overlay;
     const char *shot; /* save the next frame as PNG */
+    float cps_override; /* --text-speed: this run only, never saved */
 
     /* Auto-blink per stage slot (plan §6.1): when the next blink starts. */
     double blink_at[HW_VM_MAX_STAGE];
@@ -134,6 +135,9 @@ static const SDL_Color WHITE = { 255, 255, 255, 255 };
 static const SDL_Color INK = { 18, 18, 28, 255 };
 static const SDL_Color DIM = { 190, 196, 214, 255 };
 static const SDL_Color ACCENT = { 255, 196, 64, 255 };
+
+/* An unattended run (--frames: smoke tests, render_line) never writes the player's data. */
+static bool unattended = false;
 
 /* ---- small helpers ---- */
 
@@ -199,6 +203,12 @@ static void notify(game *g, const char *msg)
 }
 
 static const char *ui(const game *g, hw_ui_string id) { return hw_ui(g->lang, id); }
+
+/* Global data: settings, read lines, global variables. */
+static void save_global(game *g)
+{
+    if (!unattended) hw_global_save(&g->persist, &g->m, &g->vm, g->read_lines, &g->settings);
+}
 
 static bool point_in(float x, float y, SDL_FRect r) { return x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h; }
 
@@ -554,7 +564,7 @@ static void stage_change(game *g, const hw_event *ev)
 static void end_story(game *g)
 {
     hw_audio_stop_all(g->audio);
-    hw_global_save(&g->persist, &g->m, &g->vm, g->read_lines, &g->settings);
+    save_global(g);
 }
 
 static void handle(game *g, const hw_event *ev)
@@ -731,7 +741,7 @@ static void save_slot(game *g, int slot)
     hw_persist_slot_path(&g->persist, slot, path, sizeof path);
     bool ok = hw_save_write(&g->vm, snap, pcs, n, &info, &out) && hw_persist_write(path, out.data, out.len);
     hw_buf_free(&out);
-    hw_global_save(&g->persist, &g->m, &g->vm, g->read_lines, &g->settings);
+    save_global(g);
     notify(g, ok ? ui(g, UI_SAVED) : SDL_GetError());
 }
 
@@ -792,7 +802,7 @@ static void next_language(game *g)
         if (strcmp(hw_str(m, m->languages[i]), g->lang) == 0) cur = i;
     }
     set_language(g, hw_str(m, m->languages[(cur + 1) % m->language_count]));
-    hw_global_save(&g->persist, &g->m, &g->vm, g->read_lines, &g->settings);
+    save_global(g);
 }
 
 /* The settings' language, else the OS language if the game has it, else the source language. */
@@ -1190,7 +1200,7 @@ static void update(game *g, double dt)
         hw_rich_text *t = &g->text;
         if (g->reveal < (float)t->chars) {
             if (g->now >= g->pause_until) {
-                float cps = hw_rich_cps(t, (uint32_t)g->reveal, g->settings.cps);
+                float cps = hw_rich_cps(t, (uint32_t)g->reveal, g->cps_override >= 1.0f ? g->cps_override : g->settings.cps);
                 g->reveal += (float)dt * (cps >= 1000.0f ? 1e6f : cps);
                 if (g->next_pause < t->pause_count && g->reveal >= (float)t->pauses[g->next_pause].at) {
                     g->reveal = (float)t->pauses[g->next_pause].at;
@@ -1241,7 +1251,7 @@ static void activate(game *g, int id)
         int k = 0;
         for (int i = 0; i < 5; i++) if (speeds[i] <= g->settings.cps) k = i;
         g->settings.cps = speeds[(k + 1) % 5];
-        hw_global_save(&g->persist, &g->m, &g->vm, g->read_lines, &g->settings);
+        save_global(g);
         break;
     }
     case BTN_BACK: g->scr = g->back_to == SCR_SLOTS || g->back_to == SCR_HISTORY ? SCR_PLAY : g->back_to; break;
@@ -1402,7 +1412,6 @@ static void open_fonts(game *g)
 }
 
 /* A startup failure: logged, and shown in a message box unless this is an unattended (--frames) run. */
-static bool unattended = false;
 static int fatal(SDL_Window *win, const char *msg)
 {
     SDL_Log("himawari: %s", msg);
@@ -1492,7 +1501,15 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
     pick_language(g);
 
     for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--lang") == 0 && i + 1 < argc) set_language(g, argv[i + 1]);
+        if (strcmp(argv[i], "--lang") == 0 && i + 1 < argc) {
+            /* For this run only: the player's own choice stays in settings. */
+            char saved[sizeof g->settings.language];
+            memcpy(saved, g->settings.language, sizeof saved);
+            set_language(g, argv[i + 1]);
+            memcpy(g->settings.language, saved, sizeof saved);
+        }
+        /* --text-speed N: characters per second for this run (1000 = instant; render_line uses it). */
+        if (strcmp(argv[i], "--text-speed") == 0 && i + 1 < argc) g->cps_override = strtof(argv[i + 1], NULL);
     }
 
     g->scr = SCR_TITLE;
@@ -1503,6 +1520,7 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
     /* --advance N: click through N times after starting, choosing option --pick K at menus (smoke tests).
      * --screenshot FILE: save the last frame as PNG. */
     long frames = -1, clicks = 0, pick = 0;
+    bool warp_failed = false;
     const char *shot = NULL;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--frames") == 0 && i + 1 < argc) frames = strtol(argv[i + 1], NULL, 10);
@@ -1526,11 +1544,13 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
                 snprintf(msg, sizeof msg, target == HW_NONE ? "warp: no line at %s" : "warp: no path reaches %s", argv[i + 1]);
                 SDL_Log("%s", msg);
                 notify(g, msg);
+                if (unattended) warp_failed = true;
             }
             SDL_free(snap);
         }
     }
     if (g->dev) SDL_Log("dev mode: F3 overlay, F5 reload %s", game_path);
+    if (warp_failed) g->running = false;
 
     while (g->running) {
         double t = (double)SDL_GetTicksNS() / 1e9;
@@ -1553,7 +1573,7 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
         if (frames > 0 && --frames == 0) g->running = false;
     }
 
-    hw_global_save(&g->persist, &g->m, &g->vm, g->read_lines, &g->settings);
+    save_global(g);
     hw_rich_free(&g->text);
     for (uint32_t i = 0; i < HW_VM_MAX_OPTIONS; i++) hw_rich_free(&g->option_text[i]);
     SDL_free(g->option_text);
@@ -1571,5 +1591,5 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
     if (g->gpu) SDL_DestroyGPUDevice(g->gpu);
     SDL_DestroyWindow(g->win);
     SDL_Quit();
-    return 0;
+    return warp_failed ? 3 : 0;
 }

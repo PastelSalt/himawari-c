@@ -8,9 +8,8 @@ runtime/build/
 runtime/third_party/_deps/
 out/
 
-# Himawari project caches (§5.5)
-.himawari/
-!examples/**/.himawari/provenance.json
+# Himawari project caches (§5.5); .himawari/provenance.json is committed (§16.4)
+**/.himawari/cache/
 
 # Editors / OS
 .vscode/*

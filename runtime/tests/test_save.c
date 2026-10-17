@@ -217,6 +217,9 @@ int main(void)
     uint32_t target = hw_warp_target(&m, "talk_rumor");
     CHECK(target != HW_NONE && target == hw_warp_target(&m, "ch1.hws:49"));
     CHECK(hw_warp_target(&m, "script/ch1.hws:48") == target);
+    CHECK(hw_warp_target(&m, "#c7d8e9") == target); /* by line ID */
+    CHECK(hw_warp_target(&m, "#w1x2y3") != HW_NONE && hw_op(m.code[hw_warp_target(&m, "#w1x2y3")]) == HW_OP_MENU); /* an option's menu */
+    CHECK(hw_warp_target(&m, "#zzzzzz") == HW_NONE && hw_warp_target(&m, "#bad") == HW_NONE);
     CHECK(hw_warp_target(&m, "nowhere.hws:3") == HW_NONE && hw_warp_target(&m, "no_scene") == HW_NONE);
     uint8_t *warp_snap = malloc(hw_vm_snapshot_size(&c));
     CHECK(warp_snap && hw_warp(&m, target, 1, 0, warp_snap));

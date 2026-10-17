@@ -2,7 +2,7 @@
 
 Himawari is an open-source, AI-assisted **visual novel engine** for other developers. It is made by Moesoft (GitHub: `PastelSalt`). Repo: **https://github.com/PastelSalt/himawari-c** (public).
 
-**Status:** **Phase 2 done** (2026-10-17): the C runtime `himawari.exe` (`runtime/src/core/`: loader, VM, saves, rollback, playtests, warp; `runtime/src/app/`: windowed player, text, assets, audio, rule wipes, UI) plays the tutorial in EN and JA, headless playtests reach every ending, and the loader and save fuzzers ran clean for 10 minutes each. Bytecode 1.0 is frozen (rfcs/0004, rfcs/0005). Next: Phase 3 (MCP v1 and CLI polish) on the owner's go-ahead. See the latest LOG.md session. Read these before doing anything substantial:
+**Status:** **Phase 3 done** (2026-10-17): `@himawari/tools` (22 AI tools, defined once) and `himawari-mcp` (MCP spec 2026-07-28, SDK v2, stdio) with the agent guide, resources, and prompts; `hwc run/playtest/graph/report/ai setup`, `build --release` packaging; M1 reached with `examples/festival-eve/`. Phase 2 (the C runtime `himawari.exe`) and bytecode 1.0 (frozen) are done too. Next: Phase 4 (Studio MVP) on the owner's go-ahead. See the latest LOG.md session. Read these before doing anything substantial:
 - [DETAILED_PLAN.md](DETAILED_PLAN.md): the plan (v0.5). Section numbers are referenced everywhere.
 - [LOG.md](LOG.md): decision history, the decision register (D01–D24), and next steps.
 - [RESEARCH.md](RESEARCH.md): evidence behind decisions (🔬§N in the plan = RESEARCH.md §N).
@@ -12,8 +12,8 @@ Himawari is an open-source, AI-assisted **visual novel engine** for other develo
 | Package | Tech | License |
 |---|---|---|
 | `@himawari/core` (parser, validator, compiler) | TypeScript | MIT |
-| `packages/tools` (shared AI tool registry) | TypeScript + Zod | MIT |
-| `himawari-mcp` | TypeScript, MCP spec 2026-07-28 | MIT |
+| `@himawari/tools` (`packages/tools`, the AI tool registry) | TypeScript + Zod 4 | MIT |
+| `himawari-mcp` (`packages/mcp`) | TypeScript, MCP spec 2026-07-28, SDK v2 | MIT |
 | Himawari Studio | Electron + React + CodeMirror 6 | MIT |
 | Himawari-C runtime | C11, SDL 3.4, SDL3_mixer, FreeType (direct), libunibreak | zlib |
 
@@ -37,6 +37,7 @@ Himawari is an open-source, AI-assisted **visual novel engine** for other develo
 - CLI (after `corepack pnpm exec tsc -b`): `node packages/cli/dist/main.js check|fmt [--check]|build [--release]|disasm <file.hwb>|init <folder> [--template adv|blank]|l10n sync|export --lang ja|import <file> --lang ja`. Templates and examples must check clean and compile (`tests/projects.test.ts`).
 - Conformance: `corepack pnpm vitest run tests/conformance`; regenerate expected files with `UPDATE_CONFORMANCE=1` and review the diff.
 - Runtime: from `runtime/`: `cmake --preset win64-debug`, `cmake --build --preset win64-debug`, `ctest --preset win64-debug`. Regenerate C conformance transcripts with `UPDATE_CONFORMANCE=1 ./build/win64-debug/test_conformance.exe` (TS writes `expected.hwb` first).
+- MCP: `node packages/mcp/dist/main.js --project <dir> [--allow-build]`; `hwc ai setup` prints client configs. Tests start the real server (`packages/mcp/src/server.test.ts`); exec-tool tests skip without a built runtime.
 - Player: `himawari --project <dir>` (dev: F3 overlay, F5 reload, `--warp scene|file:line`, `--no-gpu`), `himawari --headless --project <dir> --playtest [lang=ja]`, smoke tests with `--start --frames N --advance N --pick K --screenshot out.png`.
 - If a build "does nothing" after edits, outputs may be future-dated (the PC clock/timezone changed): delete our future-dated objects/exes, or `packages/*/dist` + `*.tsbuildinfo` for TS.
 - Git for Windows is at `C:\Program Files\Git\cmd` (may not be on `PATH` in older shells).
