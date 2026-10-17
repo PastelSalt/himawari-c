@@ -268,9 +268,12 @@ type T = VarType | "unknown";
 
 function checkTypesAndFlow(r: AstResult, source: string, ctx: Ctx, out: Diagnostic[]): void {
   const vars = ctx.manifest?.variables;
+  /** The rest of the line from `offset`, skipping its indentation so carets point at the statement. */
   const lineAt = (offset: number): Span => {
-    const nl = source.indexOf("\n", offset);
-    return { start: offset, end: nl < 0 ? source.length : nl };
+    let start = offset;
+    while (source[start] === " " || source[start] === "\t") start++;
+    const nl = source.indexOf("\n", start);
+    return { start, end: nl < 0 ? source.length : nl };
   };
   const typeError = (span: Span, problem: string) => out.push(diagnostic("HW0211", span, { problem }));
 

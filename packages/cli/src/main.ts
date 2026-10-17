@@ -1,20 +1,25 @@
 #!/usr/bin/env node
-import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
 import {
   CORE_VERSION,
   type Diagnostic,
   SPEC_VERSIONS,
+  HwbError,
   checkProject,
+  compile,
+  disassemble,
   format,
   lex,
   parseAst,
+  readHwb,
   renderDiagnostic,
+  writeHwb,
 } from "@himawari/core";
 import { findProjectRoot, loadProject } from "./project.js";
 
 // Commands from plan §9.2. `check` and `fmt` work; the rest land later in Phase 1+.
-const PLANNED = ["init", "build", "run", "playtest", "l10n", "sprites", "graph", "report", "migrate", "disasm"];
+const PLANNED = ["init", "run", "playtest", "l10n", "sprites", "graph", "report", "migrate"];
 
 const HELP = `hwc ${CORE_VERSION}
 
@@ -25,6 +30,9 @@ Commands:
                          assets); exit 1 on errors
   fmt [--check] [paths]  Format files in place and add missing #line: IDs
                          (--check: only report files that need formatting)
+  build [--release]      Compile the project to build/game.hwb
+                         (--release: without debug info)
+  disasm <file.hwb>      Validate a .hwb file and print its instructions
   --version              Show versions of hwc and the specs
 
 Paths default to ./script if it exists, otherwise the current folder.
@@ -132,6 +140,51 @@ function fmt(args: readonly string[]): number {
   return refused > 0 || (checkOnly && changed > 0) ? 1 : 0;
 }
 
+function build(args: readonly string[]): number {
+  const release = args.includes("--release");
+  const root = findProjectRoot(".");
+  if (!root) throw new UsageError("no himawari.json here or above; run hwc build inside a project");
+  const result = compile(checkProject(loadProject(root)), { debug: !release });
+  if (!result.module) {
+    for (const e of result.errors) {
+      if (e.diagnostic) {
+        const source = readFileSync(join(root, e.file), "utf8");
+        console.log(renderDiagnostic(e.diagnostic, e.file, source) + "\n");
+      } else {
+        console.log(`error: ${e.file}: ${e.message}\n`);
+      }
+    }
+    console.log(`✗ build failed: ${result.errors.length} error(s)`);
+    return 1;
+  }
+  const bytes = writeHwb(result.module);
+  const outDir = join(root, "build");
+  mkdirSync(outDir, { recursive: true });
+  const out = join(outDir, "game.hwb");
+  writeFileSync(out, bytes);
+  const m = result.module;
+  console.log(
+    `✓ ${display(out)}: ${bytes.length} bytes, ${m.scenes.length} scene(s), ${m.lines.length} line(s)${release ? "" : ", with debug info"}`,
+  );
+  return 0;
+}
+
+function disasm(args: readonly string[]): number {
+  const [file] = args;
+  if (!file) throw new UsageError("usage: hwc disasm <file.hwb>");
+  if (!existsSync(file)) throw new UsageError(`no such file: ${file}`);
+  try {
+    process.stdout.write(disassemble(readHwb(readFileSync(file))));
+    return 0;
+  } catch (e) {
+    if (e instanceof HwbError) {
+      console.error(`hwc disasm: ${file} isn't a valid .hwb file: ${e.message}`);
+      return 1;
+    }
+    throw e;
+  }
+}
+
 function main(argv: readonly string[]): number {
   const [command, ...rest] = argv;
   try {
@@ -146,6 +199,8 @@ function main(argv: readonly string[]): number {
     }
     if (command === "check") return check(rest);
     if (command === "fmt") return fmt(rest);
+    if (command === "build") return build(rest);
+    if (command === "disasm") return disasm(rest);
     if (PLANNED.includes(command)) {
       console.error(`hwc ${command}: not implemented yet (see DETAILED_PLAN.md §18).`);
       return 2;

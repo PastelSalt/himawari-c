@@ -1,0 +1,11 @@
+scene start:
+    "Plain text."   #line:000001
+    "Hello, [name]. Score: [score]."   #line:000002
+    "{b}Bold{/b}, {i}italic{/i}, {color=#ff8800}orange{/color}, {size=48}big{/size}."   #line:000003
+    "Wait{w=500} for it{nw}"   #line:000004
+    "{speed=20}Slow {shake}shaky{/shake} text.{/speed}"   #line:000005
+    "{select gender_p: m="He" f="She" other="They"} waved."   #line:000006
+    "{rb=かんじ}漢字{/rb}の{rb=よ}読{/rb}み方。"   #line:000007
+    "Escapes: \"quoted\", \[not a var\], \{not a tag}."   #line:000008
+    "{alt=A sunflower}🌻"   #line:000009
+    end

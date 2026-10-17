@@ -1,0 +1,97 @@
+(* Himawari Script (.hws) grammar, language spec 0.2.0-draft.
+   License: CC-BY-4.0. Normative behaviour is defined by @himawari/core
+   (packages/core/src/syntax/parser.ts); this file documents it.
+
+   Notation: ISO/IEC 14977 EBNF. { x } = zero or more, [ x ] = optional,
+   x | y = choice, "..." = terminal.
+
+   Layout:
+   - Every statement is exactly one line. There is no line continuation.
+   - A line ending in ":" opens a block: the following lines indented deeper
+     (by a multiple of 4 spaces) form its body. INDENT / DEDENT below stand
+     for that change in indentation. Tabs in indentation are an error.
+   - Blank lines and comment-only lines may appear anywhere and do not affect
+     blocks.
+   - Whitespace between tokens is free (one space is canonical, see hwc fmt). *)
+
+file            = { top_item } ;
+top_item        = scene | define ;
+
+scene           = "scene" , name , ":" , NEWLINE , block ;
+define          = "define" , { any_token } , ":" , NEWLINE , block ;   (* macro signature: Phase 5 *)
+
+block           = INDENT , statement , { statement } , DEDENT ;
+
+statement       = say | narration | show | hide | move | bg | cg | audio | stop
+                | wait | effect | assign | jump | call | return | end | if | menu ;
+
+(* ---- dialogue ---- *)
+say             = speaker , { attr } , string , line_end ;
+narration       = string , line_end ;
+speaker         = name ;                                      (* not a keyword; "me" is the player *)
+attr            = name | "-" , name ;
+
+(* ---- stage ---- *)
+show            = "show" , name , { attr } , [ at ] , [ with ] , NEWLINE ;  (* attrs stop at "at"/"with" *)
+hide            = "hide" , name , [ with ] , NEWLINE ;
+move            = "move" , name , at , [ with ] , NEWLINE ;
+bg              = "bg" , name , [ with ] , NEWLINE ;
+cg              = "cg" , name , [ with ] , NEWLINE ;
+at              = "at" , name ;
+with            = "with" , name , [ args ] ;                  (* fade, dissolve, slide_*, wipe, rule *)
+args            = "(" , [ arg , { "," , arg } ] , ")" ;
+arg             = integer | name | string ;
+
+(* ---- audio and timing ---- *)
+audio           = ( "music" | "ambient" | "sfx" | "voice" ) , name , [ fade ] , NEWLINE ;
+stop            = "stop" , ( "music" | "ambient" | "voice" ) , [ fade ] , NEWLINE ;
+fade            = "fade" , args ;
+wait            = "wait" , args , NEWLINE ;                   (* wait(ms) *)
+effect          = ( "shake" | "flash" ) , [ args ] , NEWLINE ;
+
+(* ---- state and flow ---- *)
+assign          = "$" , name , ( "=" | "+=" | "-=" | "*=" ) , expr , NEWLINE ;
+jump            = "jump" , name , NEWLINE ;
+call            = "call" , name , NEWLINE ;
+return          = "return" , NEWLINE ;
+end             = "end" , NEWLINE ;
+
+if              = "if" , expr , ":" , NEWLINE , block ,
+                  { "elif" , expr , ":" , NEWLINE , block } ,
+                  [ "else" , ":" , NEWLINE , block ] ;
+
+menu            = "menu" , [ string ] , ":" , NEWLINE , INDENT , option , { option } , DEDENT ;
+option          = [ "once" ] , string , [ "if" , expr ] , ":" , line_end , block ;
+
+(* ---- expressions (lowest to highest precedence) ---- *)
+expr            = or_expr ;
+or_expr         = and_expr , { "or" , and_expr } ;
+and_expr        = not_expr , { "and" , not_expr } ;
+not_expr        = "not" , not_expr | comparison ;
+comparison      = additive , { ( "==" | "!=" | "<" | "<=" | ">" | ">=" ) , additive } ;
+additive        = term , { ( "+" | "-" ) , term } ;
+term            = unary , { ( "*" | "/" | "%" ) , unary } ;
+unary           = "-" , unary | primary ;
+primary         = integer | string | "true" | "false" | name | call_expr | "(" , expr , ")" ;
+call_expr       = name , args ;                               (* only rand(n) is defined *)
+
+(* ---- lines and tokens ---- *)
+line_end        = [ line_tag ] , [ comment ] , NEWLINE ;
+line_tag        = "#line:" , 6 * id_char ;                    (* tool-managed; see language.md §3 *)
+comment         = "#" , { any_char_but_newline } ;
+
+name            = ( letter | "_" ) , { letter | digit | "_" } ;  (* not a keyword; lowercase by convention *)
+integer         = digit , { digit } ;
+string          = '"' , { string_char | escape | tag } , '"' ;
+escape          = "\" , ( '"' | "\" | "n" | "[" | "{" ) ;
+tag             = "{" , { any_char_but_newline_or_close_brace } , "}" ;  (* quotes inside a tag don't end the string *)
+id_char         = digit | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "j" | "k" | "m" | "n"
+                | "p" | "q" | "r" | "s" | "t" | "v" | "w" | "x" | "y" | "z" ;   (* Crockford base32 *)
+
+(* Keywords (reserved, never names):
+   scene define jump call return end if elif else menu once show hide move bg cg
+   music sfx ambient voice stop wait shake flash with at and or not true false
+
+   Text inside strings (interpolation [var], tags {b}…{/b}, {w=ms}, ruby
+   {rb=reading}…{/rb}, {select var: key="…" other="…"}) is specified in
+   language.md §2.2 and parsed by packages/core/src/syntax/text.ts. *)

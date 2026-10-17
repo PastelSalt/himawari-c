@@ -16,7 +16,7 @@
 | **Game output** | Windows x64 only |
 | **Studio** | Windows, UI in English (default) + Japanese |
 | **AI role** | Development assistant only. **No media generation** |
-| **Phase** | **Phase 1 in progress** (as of session 9): sanitizers verified; lexer, CST parser, AST, formatter, semantic validator, edit API, `hwc check`/`fmt` done. Next: spec docs, bytecode + compiler |
+| **Phase** | **Phase 1 nearly done** (as of session 9): sanitizers; lexer, CST parser, AST, formatter, validator, edit API, bytecode spec + compiler, conformance, `hwc check/fmt/build/disasm`. Left: tutorial + starter project, `hwc l10n`, `ast.schema.json` |
 | **Owner** | Moesoft (GitHub: `PastelSalt`) |
 | **Repo** | **https://github.com/PastelSalt/himawari-c** (public) |
 
@@ -323,15 +323,36 @@ You then asked to commit and push: `0419238`.
   - `addLineIds(source, span, …)`: tags only the inserted lines (dialogue, narration, options), putting the tag before any comment. Existing lines are never re-tagged.
   - Batches are atomic: if any op fails (unknown ID, wrong line kind, bad name) or the result has more syntax errors than the input (e.g. emptying a menu, a broken snippet, an unescaped quote), nothing is applied and the original text is returned with a reason.
   - Tests (`edit.test.ts`, 19): exact output for every op, rejections, an atomic-batch failure, and a **property test of 400 random batches** (184 accepted, 216 rejected): accepted batches never have syntax errors, IDs stay unique, every dialogue/narration/option line keeps exactly one ID; rejected batches return the input unchanged.
-- **Checks:** `pnpm check` **154 tests** ✅. Not committed yet (milestone 7 is new since `850419d`).
+- **Checks:** `pnpm check` **154 tests** ✅.
+- 📦 **Committed and pushed** at your request: `24de0a5` "Phase 1: structured edit API anchored on line IDs". You then said "continue with the next phase"; Phase 1 isn't finished (the runtime needs bytecode to run anything), so work continued with the rest of Phase 1.
+- ✅ **Milestone 8a: spec documents.**
+  - `spec/grammar.ebnf`: the grammar the parser implements (layout rules, statements, option/menu structure, expression precedence, line tags, strings with tags, keyword list).
+  - `spec/bytecode.md` v1.0: header (magic `HWB\x01`, major/minor, flags, size, CRC-32), section table, sections `STRS` `VARS` `CHAR` `SCNE` `LINE` `TEXT` `CODE` `DBUG` (reserved: `ASST`, `LOCx`, `XTNS`); **rich-text programs** (`RUN`/`VAR`/`OPEN`/`CLOSE`/`MARK`/`SELECT`), so the runtime never parses markup; the ISA (story ops SAY…END, MENU with condition values and `once`, expression ops PUSH…RAND); loader rules (validate once, then no bounds checks); compilation notes.
+  - **Design change from plan §5.4:** instructions are word-aligned and variable-length (`opcode | argc << 8`, then `argc` words) instead of fixed-width, because `show` carries a variable number of attributes and `argc` makes bounds checks trivial. Recorded in the spec.
+- ✅ **Milestone 8b: compiler + reader + disassembler** (`packages/core/src/bytecode/`):
+  - `format.ts` (opcodes, text ops, module types, argc rules), `crc32.ts`, `writer.ts` (module → bytes, CRC over the whole file), `reader.ts` (bytes → module, applying every loader rule from spec §3: magic/version/size/CRC, section bounds and alignment, string/var/line/text/scene index ranges, UTF-8, text programs, argc per opcode, jump/menu/scene targets on op words; the reference for the Phase 2 C loader), `compiler.ts` (refuses projects with errors or without `himawari.json`; interns strings; scenes in name order; `if` → JZ/JMP chains; menus → conditions, MENU, JMP gather, option bodies; rich-text programs; DBUG pc → file:line), `disasm.ts`.
+  - Also: `lineIdToNumber`/`numberToLineId` in `ids.ts`; characters now keep their `color`.
+  - ✅ Tests (`compiler.test.ts`, 20): scene/var/char/line tables, rich text (tags, `[var]`, select, ruby), disassembly, END on fall-off, refusal on errors or no manifest; binary header, **round-trip read(write(m)) = m**, **deterministic bytes**, no-debug builds; the reader rejects bad magic, newer major, wrong size, a jump into the middle of an instruction, unknown opcodes, out-of-range string indices (each with a fixed CRC so only the structural check can catch it), checksum damage, and truncation.
+  - Read the full disassembly of an if/elif/else + menu sample by hand: control flow is correct. Removed two redundant jumps (last `if` clause, last menu option).
+  - **Decision: no TypeScript VM.** Plan §19's mitigation for compiler/VM drift is "one VM": only the C runtime executes bytecode. Phase 1 conformance covers the compile half (golden disassembly); execution transcripts come with the C VM in Phase 2.
+- ✅ **Milestone 8c: conformance suite (compile half) + `hwc build` / `hwc disasm`.**
+  - `tests/conformance/`: each case is a small project with `expected.disasm` (must compile to exactly this, with **no** diagnostics) or `expected.diagnostics` (exact codes and positions). Cases: `basic` (the plan §5.1 example completed into 6 scenes), `text` (every markup form, escapes, select, ruby, emoji), `errors` (9 deliberate mistakes, one diagnostic each). Regenerate with `UPDATE_CONFORMANCE=1` and review the diff.
+  - **False positive found and fixed:** a scene ending in a menu with an always-available option that jumps/ends was warned as a dead end (HW0320). `endsFlow` now treats a menu as ending the flow when every option ends it and at least one option is unconditional and not `once`. The compiler, separately, always appends `END` unless the scene literally ends in jump/return/end, so a menu's gather point always lands inside the scene.
+  - Type-error carets (HW0211) now point at the statement, not its indentation.
+  - `hwc build [--release]` → `build/game.hwb` (2612 bytes with debug info, 2248 without, for the basic case); refuses with friendly diagnostics on errors. `hwc disasm <file.hwb>` validates and lists.
+  - **Bug found by running the CLI on a real file, fixed:** `readHwb` used `bytes.slice()`, which for a Node `Buffer` is a view into a shared pool, so the CRC check zeroed the wrong memory and rejected every file read from disk (the in-memory tests couldn't see it). Now it makes a real copy; a regression test feeds it a non-zero-offset view and checks the surrounding memory is untouched.
+- **Checks:** `pnpm check` **179 tests** ✅. Not committed yet (milestone 8 is new since `24de0a5`).
 
 **Remaining Phase 1 work (plan §18), in order:**
 1. ~~Project model + semantic validator~~ ✅ done (milestone 6). Known gaps to revisit: manifest/character diagnostics have no line positions yet (they point at line 1); `if`/`elif` type errors point at the `if` line; a test asserting the TS manifest reader and `spec/manifest.schema.json` agree on shared fixtures.
 2. ~~Structured edit API~~ ✅ done (milestone 7). `add_menu_option` is `insert_after` on an option's line ID. Later: rename refactors across files (scenes, characters, variables) using the `refs` index.
-3. **Spec documents:** `spec/grammar.ebnf` (from the parser), `spec/ast.schema.json` (from `ast.ts` types), resolve the open questions in `spec/language.md` §5.
-4. **Bytecode:** `spec/bytecode.md` v1 (header, sections, ISA from plan §5.4), compiler in Core, `hwc build` (writes `.hwb`) and `hwc disasm`; conformance harness (compile half) in `tests/conformance/`.
-5. `hwc l10n` (string tables, CSV/XLIFF) can follow, or move to Phase 2 if time is short.
-6. Phase 1 exit: tutorial and starter projects compile; broken inputs give friendly multi-error diagnostics with fixes; CST round-trip property tests pass (✅ already).
+3. Spec documents: ✅ `grammar.ebnf`, ✅ `bytecode.md`. Still open: `spec/ast.schema.json` (from the `ast.ts` types) and resolving the open questions in `spec/language.md` §5.
+4. ~~Bytecode, compiler, `hwc build`/`disasm`, conformance (compile half)~~ ✅ done (milestone 8).
+5. **Still to do for the Phase 1 exit (plan §18):**
+   - **Tutorial and starter projects** that compile: `examples/tutorial/` (EN, plain, no mascot, D16) and the `adv` template for `hwc init` (16:9, `AGENTS.md` + `CLAUDE.md`, procedural placeholders only).
+   - `hwc l10n` (string tables keyed by line ID, CSV/XLIFF export/import, placeholder checks), or move it to Phase 2 if time is short.
+   - `spec/ast.schema.json`.
+   - Already met: broken inputs give friendly multi-error diagnostics with fixes; CST round-trip property tests pass.
 
 ---
 
@@ -376,5 +397,5 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 ## Next Steps (after session 9)
 
 1. ~~CI: confirm `ts` and `i18n` pass~~ ✅ confirmed in session 9.
-2. **Phase 1 continues** with the "Remaining Phase 1 work" list at the end of session 9 (spec docs → bytecode + compiler).
-3. **You:** milestone 7 (edit API) is not committed yet; `850419d` has everything before it.
+2. **Phase 1 finishes** with item 5 of the "Remaining Phase 1 work" list at the end of session 9 (tutorial + starter project, `hwc l10n`, `ast.schema.json`). Then **Phase 2: the runtime MVP** (C VM + loader following `spec/bytecode.md` and `reader.ts`, renderer, text, audio, `--headless` playtests that complete the conformance suite).
+3. **You:** milestone 8 (bytecode, compiler, conformance, `hwc build`/`disasm`) is not committed yet; `24de0a5` has everything before it.

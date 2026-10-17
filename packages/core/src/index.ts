@@ -34,6 +34,12 @@ export { type FileReport, type ProjectCheck, type ProjectInput, type SourceFile,
 export { type Character, characterWords, readCharacter } from "./project/character.js";
 export { DEFAULT_POSITIONS, type Manifest, type VarType, type VariableDecl, readManifest } from "./project/manifest.js";
 export { editDistance, suggest } from "./project/suggest.js";
+export { lineIdToNumber, numberToLineId } from "./ids.js";
+export { type CompileResult, compile } from "./bytecode/compiler.js";
+export { writeHwb } from "./bytecode/writer.js";
+export { HwbError, readHwb } from "./bytecode/reader.js";
+export { disassemble, textPreview } from "./bytecode/disasm.js";
+export { HWB_MAJOR, HWB_MINOR, type HwbModule, Op, TextOp } from "./bytecode/format.js";
 export {
   AST_VERSION,
   type Ast,

@@ -1,0 +1,20 @@
+; Himawari bytecode 1.0
+; 51 strings, 3 variables, 0 characters, 1 scenes, 9 lines, 19 code words
+; entry: start
+
+var 0: gender_p str enum(m, f, other) = "other" (save)
+var 1: name str = "Aoi" (save)
+var 2: score int = 3 (save)
+
+
+scene start:  ; script/text.hws
+  0000  SAY      "Plain text." #000001   ; script/text.hws:2
+  0002  SAY      "Hello, [name]. Score: [score]." #000002   ; script/text.hws:3
+  0004  SAY      "{b}Bold{/}, {i}italic{/}, {color=#ff8800}orange{/}, {size=48}big{/}." #000003   ; script/text.hws:4
+  0006  SAY      "Wait{w=500} for it{nw}" #000004   ; script/text.hws:5
+  0008  SAY      "{speed=20}Slow {shake}shaky{/} text.{/}" #000005   ; script/text.hws:6
+  0010  SAY      "{select gender_p} waved." #000006   ; script/text.hws:7
+  0012  SAY      "{rb=かんじ}漢字{/}の{rb=よ}読{/}み方。" #000007   ; script/text.hws:8
+  0014  SAY      "Escapes: \"quoted\", [not a var], {not a tag}." #000008   ; script/text.hws:9
+  0016  SAY      "{alt=A sunflower}🌻" #000009   ; script/text.hws:10
+  0018  END   ; script/text.hws:11

@@ -1,0 +1,14 @@
+{
+  "name": "Conformance: text",
+  "id": "dev.moesoft.conformance.text",
+  "version": "0.1.0",
+  "engine": "^1.0.0",
+  "entry": "start",
+  "sourceLanguage": "en",
+  "languages": ["en", "ja"],
+  "variables": {
+    "name": { "type": "str", "default": "Aoi", "scope": "save" },
+    "gender_p": { "type": "str", "enum": ["m", "f", "other"], "default": "other", "scope": "save" },
+    "score": { "type": "int", "default": 3, "scope": "save" }
+  }
+}

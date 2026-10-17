@@ -436,6 +436,11 @@ export function endsFlow(body: Stmt[]): boolean {
     const hasElse = last.clauses.some((c) => c.cond === null);
     return hasElse && last.clauses.every((c) => endsFlow(c.body));
   }
+  if (last.kind === "Menu") {
+    // The menu can be skipped (and play falls through) unless some option is always shown.
+    const alwaysShown = last.options.some((o) => o.cond === null && !o.once);
+    return alwaysShown && last.options.every((o) => endsFlow(o.body));
+  }
   return false;
 }
 

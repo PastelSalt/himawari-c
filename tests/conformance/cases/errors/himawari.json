@@ -1,0 +1,13 @@
+{
+  "name": "Conformance: errors",
+  "id": "dev.moesoft.conformance.errors",
+  "version": "0.1.0",
+  "engine": "^1.0.0",
+  "entry": "start",
+  "sourceLanguage": "en",
+  "languages": ["en"],
+  "variables": {
+    "score": { "type": "int", "default": 0, "scope": "save" },
+    "met": { "type": "bool", "default": false, "scope": "save" }
+  }
+}

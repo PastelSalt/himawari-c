@@ -40,6 +40,18 @@ function encode(n: number): string {
   return out;
 }
 
+/** The 30-bit number of a line ID (first character most significant), as stored in .hwb files. */
+export function lineIdToNumber(id: string): number {
+  let n = 0;
+  for (const c of id) n = n * 32 + LINE_ID_ALPHABET.indexOf(c);
+  return n;
+}
+
+/** Inverse of `lineIdToNumber`. */
+export function numberToLineId(n: number): string {
+  return encode(n);
+}
+
 /**
  * Generates a line ID that is not in `taken`. Collisions are retried; the
  * space is ~1.07 billion IDs, so a project would need hundreds of millions

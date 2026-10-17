@@ -11,6 +11,8 @@ export interface Character {
   file: string;
   /** Display name in the source language (or the id). */
   displayName: string;
+  /** `#rrggbb` from the frontmatter, if set. */
+  color: string | null;
   /** True when the file declares a layered sprite (`sprite:`). */
   hasSprite: boolean;
   /** Sprite folder relative to assets/, e.g. sprites/hana. */
@@ -101,7 +103,11 @@ export function readCharacter(
   }
 
   return {
-    character: { id, file, displayName, hasSprite: hasSprite || groups.size > 0, spriteRoot, presets, groups },
+    character: {
+      id, file, displayName,
+      color: typeof f["color"] === "string" && /^#[0-9a-fA-F]{6}$/.test(f["color"]) ? f["color"] : null,
+      hasSprite: hasSprite || groups.size > 0, spriteRoot, presets, groups,
+    },
     diagnostics,
   };
 }

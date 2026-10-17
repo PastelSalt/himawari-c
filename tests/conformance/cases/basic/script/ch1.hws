@@ -1,0 +1,50 @@
+# The plan §5.1 example, completed so it compiles.
+scene ch1_intro:
+    bg classroom_day with dissolve(800)
+    music morning_theme fade(1000)
+    show hana smile uniform at left with fade(300)
+
+    hana "Good morning, [player_name]! You're late {b}again{/b}."   #line:k3f9a1
+    me "Sorry, sorry..."   #line:m1n2p3
+    "The bell rang before I could finish."   #line:q4r5s6
+    $ hana_affection += 1
+
+    menu "What do you say?":
+        "I overslept.":   #line:t7v8w9
+            hana annoyed "Classic."   #line:x0y1z2
+        "I was helping someone." if courage >= 2:   #line:a3b4c5
+            $ hana_affection += 2
+            hana surprised -glasses "Really? That's... actually kind of sweet."   #line:d6e7f8
+            jump ch1_helped
+    # options without a jump fall through to here (Ink-style gather)
+
+    hana "Anyway, let's go."   #line:g9h0j1
+    jump ch1_class
+
+scene ch1_helped:
+    hana "Thank you for telling me."   #line:k2m3n4
+    jump ch1_hub
+
+scene ch1_class:
+    jump ch1_hub
+
+scene ch1_hub:
+    menu "Ask Hana about...":
+        once "The festival.":   #line:p5q6r7
+            call talk_festival
+            jump ch1_hub
+        once "Her transfer rumor." if heard_rumor:   #line:s8t9v0
+            call talk_rumor
+            jump ch1_hub
+        "Nothing, let's go.":   #line:w1x2y3
+            $ ending_true_seen = true
+            end
+
+scene talk_festival:
+    hana "It's next week!"   #line:z4a5b6
+    $ heard_rumor = true
+    return
+
+scene talk_rumor:
+    hana -glasses "...Who told you that?"   #line:c7d8e9
+    return

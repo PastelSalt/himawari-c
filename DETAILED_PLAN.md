@@ -1149,9 +1149,10 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 - ✅ Lossless CST parser with recovery, typed AST, line IDs, formatter, `hwc check` / `hwc fmt` (2026-10-17).
 - ✅ Validator with codes, suggestions, and quick fixes; `hwc check` validates whole projects (2026-10-17).
 - ✅ Structured `edit` API, line-ID anchored, atomic and validated (2026-10-17).
-- Character and layered-sprite schema, presets, attribute resolution, l10n string tables and placeholders.
-- `bytecode.md` v1, compiler, `hwc check|fmt|build|disasm|l10n`.
-- Conformance harness (compile half).
+- ✅ Character frontmatter, presets, attribute discovery (validator). ⏳ l10n string tables and placeholders.
+- ✅ `bytecode.md` v1 (word-aligned variable-length instructions, rich-text programs), compiler, validating reader, `hwc check|fmt|build|disasm` (2026-10-17). ⏳ `hwc l10n`.
+- ✅ Conformance harness (compile half): `tests/conformance/` with golden disassembly and diagnostics.
+- ⏳ Tutorial and starter (`adv` template) projects; `spec/ast.schema.json`.
 - ✅ **Exit:** the tutorial and starter projects compile. Broken inputs produce friendly multi-error diagnostics with fixes. CST round-trip passes property tests.
 
 ### Phase 2: Runtime MVP (⏱ 6)

@@ -1,0 +1,13 @@
+scene start:
+    nobody "Who am I?"
+    hana smil "Typo"
+    show
+    $ scor += 1
+    $ met = 3
+    if score:
+        jump nowhere
+    "Unclosed {b}tag"
+    jump start
+
+scene start:
+    end
