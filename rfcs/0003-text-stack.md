@@ -1,6 +1,6 @@
 # RFC 0003: Text stack, FreeType + libunibreak vs SDL3_ttf (Spike C)
 
-- **Status:** **Accepted** 2026-10-17 (owner accepted the recommendation; plan v0.5, D24). Verified on Windows; first CI run pending
+- **Status:** **Accepted** 2026-10-17 (owner accepted the recommendation; plan v0.5, D24). Verified on the dev PC and on CI (`windows-latest`)
 - **Created:** 2026-10-17
 - **Affects:** runtime (`text/`), `spec/language.md` (ruby), plan §7, §8.2, §8.6
 - **Plan references:** §7, §8.6, §18 Phase 0 · RESEARCH.md §4.3, §4.4, §15
@@ -71,5 +71,5 @@ Both backends gave identical results. Screenshots: [paragraph](assets/0003-parag
 - [ ] Ruby reveal timing: currently all at once with the group's first character; consider spreading it across the group.
 - [ ] Atlas pages + LRU; glyph rasterization off the main thread (plan §8.5 prefetch).
 - [ ] The layout allocates with `malloc` per paragraph; fine per line shown, but the runtime should use its arena (no frame-loop allocations, §8.1).
-- [ ] First CI run on GitHub (`test_layout` under `ctest`, and the kinsoku check if the runner has Yu Gothic).
+- [x] First CI run (38997022400): `test_layout` passed under `ctest`; the runner has Yu Gothic, and the kinsoku check found 0 violations at widths 600, 900, 1200, 1600.
 - [ ] Remove SDL3_ttf from `HimawariDeps.cmake` and the `spike_c_ttf` target once the spikes are retired (Phase 2), since it was not adopted.

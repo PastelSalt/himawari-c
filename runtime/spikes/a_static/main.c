@@ -6,7 +6,7 @@
  * Usage: spike_a [--frames N] [--screenshot out.bmp] [font-file]
  *   --frames N         quit after N frames (CI smoke test); default runs until closed.
  *   --screenshot FILE  save the first rendered frame as a BMP.
- *   font-file          a CJK font; default tries common Windows and Linux paths.
+ *   font-file          a CJK font; default tries the Japanese fonts that ship with Windows.
  * Exit code 0 means every check passed.
  */
 #include <SDL3/SDL.h>
@@ -31,8 +31,6 @@ static const char *const FONT_CANDIDATES[] = {
     "C:/Windows/Fonts/YuGothM.ttc",
     "C:/Windows/Fonts/meiryo.ttc",
     "C:/Windows/Fonts/msgothic.ttc",
-    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
-    "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
 };
 
 static float tone[TONE_SAMPLES];

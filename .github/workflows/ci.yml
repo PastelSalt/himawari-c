@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+env:
+  # Never let corepack stop to ask before downloading pnpm.
+  COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -24,6 +28,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+          # pnpm comes from corepack in the next step, so skip setup-node's automatic
+          # pnpm cache (it runs before pnpm exists and fails the job).
+          package-manager-cache: false
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
@@ -38,6 +45,9 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 24
+          # pnpm comes from corepack in the next step, so skip setup-node's automatic
+          # pnpm cache (it runs before pnpm exists and fails the job).
+          package-manager-cache: false
       - run: corepack enable
       - run: pnpm install --frozen-lockfile
       - run: pnpm check:i18n

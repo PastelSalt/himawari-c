@@ -1141,7 +1141,7 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 - ✅ **Spike B:** `SDL_GPURenderState` rule-wipe shader on D3D12 and Vulkan, pixel-identical (RFC 0002, accepted).
 - ✅ **Spike C:** text stack: FreeType + libunibreak vs SDL3_ttf; a JP paragraph with ruby and kinsoku (RFC 0003, accepted: FreeType direct).
 - ✅ Drafts: `language.md`, `manifest`, `character` schemas.
-- ✅ **Exit:** spikes answered and decisions recorded in `rfcs/0001-0003`. Every push builds a Windows `.exe` that opens a window, plays a sound, and shows JP text, verified on your Windows machine. ⏳ Still to confirm: the first green CI run on GitHub.
+- ✅ **Exit:** spikes answered and decisions recorded in `rfcs/0001-0003`. Every push builds a Windows `.exe` that opens a window, plays a sound, and shows JP text, verified on your Windows machine and by the CI `runtime-win` job. ⏳ The TypeScript CI jobs failed on the first run (a setup-node/pnpm setup issue, fixed in session 8); confirm they pass on the next run.
 
 ### Phase 1: Contract and compiler (⏱ 4)
 - First: verify `win64-asan` / `win64-fuzz` in MSYS2 CLANG64, or adopt the fallbacks (§14.3).

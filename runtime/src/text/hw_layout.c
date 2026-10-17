@@ -177,6 +177,10 @@ bool hw_layout_paragraph(const HwRun *runs, size_t run_count, const HwLayoutPara
         }
         pos += len;
     }
+    if (n == 0) { /* unreachable while total > 0, but keeps items[n - 1] provably in bounds */
+        ok = true;
+        goto done;
+    }
 
     /* 2. UAX #14 break opportunities, one per code point. */
     size_t nb = set_linebreaks_utf8_per_code_point((const utf8_t *)text, total, params->lang, brks);

@@ -1,6 +1,6 @@
 # RFC 0002: Rule-wipe transitions with `SDL_GPURenderState` (Spike B)
 
-- **Status:** **Accepted** 2026-10-17 (owner accepted the recommendation; plan v0.5, D23). Verified on Windows (D3D12 and Vulkan); first CI run pending
+- **Status:** **Accepted** 2026-10-17 (owner accepted the recommendation; plan v0.5, D23). Verified on the dev PC (D3D12 and Vulkan); smoke-tested on CI
 - **Created:** 2026-10-17
 - **Affects:** runtime (`render/`), build (shader pipeline)
 - **Plan references:** §5.1 (`rule(mask, ms)`), §8.5, §18 Phase 0 · RESEARCH.md §4.1, §15
@@ -45,7 +45,7 @@ Spike B's release `.exe` (SDL only) is **4.14 MB**, so SDL alone is about the wh
 - SPIR-V output is kept: Vulkan is a valid backend on Windows too, and it keeps a future Linux port (plan §18.9) cheap.
 
 ## Still to verify
-- [ ] CI `windows-latest` (no GPU): confirm it takes the fallback or WARP path cleanly.
+- [x] CI `windows-latest` (no physical GPU, run 38997022400): SDL created the D3D12 GPU renderer (presumably the WARP software adapter) and the DXIL render state; exit 0. **Pixels were not checked on CI**, so a silent pipeline failure (finding 2) can't be ruled out there. The Phase 2 startup self-test covers this.
 - [ ] An Intel or NVIDIA GPU.
 - [ ] The startup self-test from finding 2, written as part of `render/` in Phase 2.
 - Deferred with Linux (plan §18.9): a Linux Vulkan build and Proton checks.

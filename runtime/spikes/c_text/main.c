@@ -19,11 +19,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#ifdef _WIN32
 #define PSAPI_VERSION 2
 #include <windows.h>
 #include <psapi.h>
-#endif
 
 #include "glyphs.h"
 #include "hw_layout.h"
@@ -170,16 +168,12 @@ static double now_ms(void)
 
 static void log_memory(const char *when)
 {
-#ifdef _WIN32
     PROCESS_MEMORY_COUNTERS pmc;
     if (K32GetProcessMemoryInfo(GetCurrentProcess(), &pmc, sizeof pmc)) {
         SDL_Log("memory (%s): working set %.1f MB, peak %.1f MB, private %.1f MB", when,
                 (double)pmc.WorkingSetSize / 1048576.0, (double)pmc.PeakWorkingSetSize / 1048576.0,
                 (double)pmc.PagefileUsage / 1048576.0);
     }
-#else
-    (void)when;
-#endif
 }
 
 static void draw_text(SDL_Renderer *ren, const HwLayout *layout, float ox, float oy, uint32_t reveal, bool outline)

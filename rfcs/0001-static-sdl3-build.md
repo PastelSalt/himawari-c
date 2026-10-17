@@ -1,6 +1,6 @@
 # RFC 0001: Static SDL 3.4 + SDL3_mixer + FreeType build (Spike A)
 
-- **Status:** **Accepted** 2026-10-17 (owner accepted the recommendation; plan v0.5, D22). Verified on Windows; first CI run pending
+- **Status:** **Accepted** 2026-10-17 (owner accepted the recommendation; plan v0.5, D22). Verified on the dev PC and on CI (`windows-latest`)
 - **Created:** 2026-10-17
 - **Affects:** runtime (build system, dependencies)
 - **Plan references:** §8.1, §8.2, §8.13, §14.3, §18 Phase 0 · RESEARCH.md §4.5, §15 · D04, D19
@@ -38,7 +38,7 @@ Can Himawari-C ship as **one fully static Windows x64 `.exe`** built natively wi
 4. The SDL3_mixer 3.2 API matched the header exactly: `MIX_Init`, `MIX_CreateMixerDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, NULL)`, `MIX_LoadRawAudio`, `MIX_PlayAudio` (fire-and-forget).
 
 ## Still to verify
-- [ ] CI: `runtime-win` on `windows-latest` (the runner has no audio device, so the smoke test uses `SDL_AUDIO_DRIVER=dummy`; check which JP fonts the runner has).
+- [x] CI: `runtime-win` passed on `windows-latest` (run 38997022400): static release build, `ctest`, the DLL-import check (same system-only list as locally), and Spike A with `SDL_AUDIO_DRIVER=dummy`. The runner has Yu Gothic.
 - [ ] `win64-asan` / `win64-fuzz` with MSYS2 CLANG64 (Phase 1 start, plan §14.3).
 - [ ] Size trimming to reach ≤ 4 MB (Phase 2).
 - Deferred with Linux (plan §18.9): Linux builds and the Ubuntu cross-build check. The `win64-cross` preset and its toolchain file were removed in v0.5.

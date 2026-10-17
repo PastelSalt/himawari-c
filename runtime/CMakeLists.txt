@@ -3,9 +3,15 @@ project(himawari_c VERSION 0.0.0 LANGUAGES C)
 
 # Himawari-C, the runtime (plan §8). License: zlib.
 
+# Windows only (plan v0.5, D21). Linux is a future improvement (plan §18.9);
+# core/ and text/ stay portable so that port remains small.
+if(NOT WIN32)
+  message(FATAL_ERROR "Himawari-C builds for Windows only (plan v0.5). Use MSYS2 UCRT64 and a win64-* preset.")
+endif()
+
 option(HW_WITH_SDL "Build the SDL-based targets (spikes, later the game runtime)" ON)
-option(HW_SANITIZE "Build with AddressSanitizer and UBSan" OFF)
-option(HW_FUZZ "Build libFuzzer targets (clang only)" OFF)
+option(HW_SANITIZE "Build with AddressSanitizer and UBSan (MSYS2 CLANG64, to verify)" OFF)
+option(HW_FUZZ "Build libFuzzer targets (MSYS2 CLANG64, to verify)" OFF)
 option(HW_RELEASE_STATIC "Shipping build: LTO, fully static, GUI subsystem, stripped (plan §14.3)" OFF)
 
 set(CMAKE_C_STANDARD 11)
@@ -28,11 +34,7 @@ endif()
 
 if(HW_RELEASE_STATIC)
   set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
-  if(WIN32)
-    add_link_options(-static -static-libgcc -mwindows -s)
-  else()
-    add_link_options(-s)
-  endif()
+  add_link_options(-static -static-libgcc -mwindows -s)
 endif()
 
 # core/: no SDL, no I/O. Shared by the game, headless playtests, tests, and fuzzers (plan §8.3).
@@ -64,9 +66,6 @@ if(HW_WITH_SDL)
 
   add_executable(test_layout tests/test_layout.c)
   target_link_libraries(test_layout PRIVATE hw_text hw_warnings)
-  if(UNIX)
-    target_link_libraries(test_layout PRIVATE m)
-  endif()
   add_test(NAME layout COMMAND test_layout)
 
   # Spike A: static SDL3 + SDL3_mixer + FreeType window, sound, and JP text (rfcs/0001).
@@ -74,9 +73,12 @@ if(HW_WITH_SDL)
   target_link_libraries(spike_a PRIVATE
     hw_core hw_warnings
     SDL3::SDL3-static SDL3_mixer::SDL3_mixer-static freetype)
-  if(UNIX)
-    target_link_libraries(spike_a PRIVATE m)
-  endif()
+
+  # Spike B: rule-wipe transition via SDL_GPURenderState on D3D12 / Vulkan (rfcs/0002).
+  # Shaders are precompiled into shaders/generated/ by shaders/compile-shaders.cmake.
+  add_executable(spike_b spikes/b_rule_wipe/main.c)
+  target_include_directories(spike_b PRIVATE shaders/generated)
+  target_link_libraries(spike_b PRIVATE hw_core hw_warnings SDL3::SDL3-static)
 
   # Spike C: JP paragraph with ruby + kinsoku; FreeType directly vs SDL3_ttf (rfcs/0003).
   # Two executables so each backend's size can be measured on its own.
@@ -86,13 +88,4 @@ if(HW_WITH_SDL)
   endforeach()
   target_link_libraries(spike_c_ft PRIVATE freetype)
   target_link_libraries(spike_c_ttf PRIVATE SDL3_ttf::SDL3_ttf)
-
-  # Spike B: rule-wipe transition via SDL_GPURenderState on D3D12 / Vulkan (rfcs/0002).
-  # Shaders are precompiled into shaders/generated/ by shaders/compile-shaders.cmake.
-  add_executable(spike_b spikes/b_rule_wipe/main.c)
-  target_include_directories(spike_b PRIVATE shaders/generated)
-  target_link_libraries(spike_b PRIVATE hw_core hw_warnings SDL3::SDL3-static)
-  if(UNIX)
-    target_link_libraries(spike_b PRIVATE m)
-  endif()
 endif()

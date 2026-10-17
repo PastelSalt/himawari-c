@@ -235,6 +235,28 @@ You noted that nothing was final and asked for improvements.
 
 **Consequence to watch:** memory-safety tooling (ASan/UBSan, libFuzzer) was planned on Linux. It now depends on MSYS2 CLANG64 working for MinGW targets, to be verified first thing in Phase 1, with fallbacks in plan §14.3.
 
+### Session 8b: code cleanup after the Windows-only decision
+**You asked:** do a proper cleanup of the code, given that consequence.
+
+**First CI run (38997022400), checked before cleaning up:**
+- ✅ `runtime-win` passed on `windows-latest`: static release build, `ctest`, DLL-import check, Spike A (dummy audio, Yu Gothic present), Spike B (D3D12 GPU renderer on a GPU-less runner, presumably WARP; pixels not checked), Spike C kinsoku check (0 violations at 4 widths).
+- ❌ `ts` and `i18n` failed at `actions/setup-node@v5`: it saw `packageManager: pnpm` in `package.json` and tried to cache pnpm before `corepack enable` had run.
+
+**Cleanup:**
+- `runtime/CMakeLists.txt`: **fails fast on non-Windows hosts** with a message pointing at plan v0.5; removed the `if(UNIX)` `-lm` blocks and the non-Windows release-link branch.
+- Spike A: removed the Linux font paths. Spike C: removed the `_WIN32` guards (the Windows memory API is used directly).
+- `hw_layout.c`: an explicit `n == 0` guard. A clean LTO release build showed `-Wstringop-overflow` on `items[n - 1]` (GCC can't prove `n >= 1`); the guard documents the invariant and removes the warning. Link-time warnings aren't covered by `-Werror`, which is why it hadn't failed the build.
+- CI: `package-manager-cache: false` on both setup-node steps, and `COREPACK_ENABLE_DOWNLOAD_PROMPT=0` for the workflow.
+- RFCs 0001–0003 and plan §18 Phase 0 updated with the CI results.
+
+**Checked and left alone:**
+- Portable code in `core/` and `text/` has no OS-specific branches; it stays portable by design.
+- GCC's LTO link runs serially ("serial compilation of N LTRANS jobs") even though CMake already passes `-flto=auto`; parallel LTO on Windows needs a `make` program on `PATH`. A clean release build takes ~130 s, so this was left as is.
+- FreeType's own `-Wstringop-overflow` warning under LTO is upstream code.
+- SDL3_ttf stays pinned only for the Spike C comparison; RFC 0003 schedules its removal when the spikes retire (Phase 2).
+
+**Verified locally:** clean rebuilds of `win64-debug` and `win64-release` with no warnings from our code; `ctest` 2/2 on both; release Spike A and Spike C run; `pnpm check` passes.
+
 ---
 
 ## Decision Register
@@ -277,5 +299,5 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ## Next Steps (after session 8)
 
-1. **CI:** check the first GitHub Actions run of the push and fix anything Windows-runner-specific (fonts, audio device, GPU-less runner).
+1. **CI:** confirm the `ts` and `i18n` jobs pass with the setup-node fix (session 8b). `runtime-win` already passed.
 2. **You:** say when to start **Phase 1** (plan §18): first verify `win64-asan` / `win64-fuzz` in MSYS2 CLANG64 (or adopt the §14.3 fallbacks), then the lossless CST parser, typed AST, validator with codes and quick fixes, formatter, `edit` API, compiler, and `hwc check|fmt|build|disasm|l10n`.
