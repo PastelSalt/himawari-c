@@ -5,6 +5,20 @@
  */
 import type { Token } from "./lexer.js";
 
+/** The quoted text of a line: its own Literal, or (in an invoke statement) the string among its arguments. */
+export function lineText(n: CstNode): Token | undefined {
+  const own = childNodes(n, "Literal")[0];
+  if (own) return childTokens(own, "String")[0];
+  if (n.kind !== "InvokeStmt") return undefined;
+  const list = childNodes(n, "ArgList")[0];
+  for (const a of list ? childNodes(list) : []) {
+    const lit = a.kind === "Literal" ? a : childNodes(a, "Literal")[0];
+    const t = lit ? childTokens(lit, "String")[0] : undefined;
+    if (t) return t;
+  }
+  return undefined;
+}
+
 export type NodeKind =
   | "SourceFile"
   | "Block"
@@ -39,6 +53,8 @@ export type NodeKind =
   | "CallStmt"
   | "ReturnStmt"
   | "EndStmt"
+  | "TextboxStmt"
+  | "InvokeStmt"
   | "BlankLine"
   | "CommentLine"
   | "ErrorStmt"
@@ -49,6 +65,9 @@ export type NodeKind =
   | "Transition"
   | "ArgList"
   | "FadeClause"
+  | "NamedArg"
+  | "ParamList"
+  | "Param"
   | "Error"
   // expressions
   | "BinaryExpr"

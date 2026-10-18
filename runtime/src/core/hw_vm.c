@@ -292,6 +292,25 @@ uint32_t hw_sprite_layers(const hw_module *m, const hw_sprite *sp, const hw_stag
     return count;
 }
 
+/* NVL: adds a line to the page; a full page keeps its newest lines. */
+static void page_add(hw_display *d, uint32_t line)
+{
+    if (d->page_count == HW_VM_MAX_PAGE) {
+        memmove(&d->page[0], &d->page[1], (HW_VM_MAX_PAGE - 1) * sizeof d->page[0]);
+        d->page_count--;
+    }
+    d->page[d->page_count++] = line;
+}
+
+void hw_vm_page_restart(hw_vm *vm)
+{
+    hw_display *d = &vm->s.display;
+    if (d->page_count > 1) {
+        d->page[0] = d->page[d->page_count - 1];
+        d->page_count = 1;
+    }
+}
+
 static hw_transition transition(const hw_module *m, const uint32_t *a)
 {
     hw_transition t = { a[0], 0, -1 };
@@ -356,6 +375,8 @@ bool hw_vm_next(hw_vm *vm, hw_event *ev)
         case HW_OP_SAY:
             if (vm->checkpoint) vm->checkpoint(vm->checkpoint_user, vm);
             vm->seen[a[0]] = 1;
+            d->textbox_hidden = 0;
+            if (d->textbox == HW_TEXTBOX_NVL) page_add(d, a[0]);
             ev->kind = HW_EV_SAY;
             ev->line = a[0];
             s->pc = next;
@@ -381,7 +402,11 @@ bool hw_vm_next(hw_vm *vm, hw_event *ev)
                 s->pc = next; /* nothing to choose: continue after the menu */
                 break;
             }
-            if (a[0] != HW_NONE) vm->seen[a[0]] = 1;
+            if (a[0] != HW_NONE) {
+                vm->seen[a[0]] = 1;
+                if (d->textbox == HW_TEXTBOX_NVL) page_add(d, a[0]);
+            }
+            d->textbox_hidden = 0;
             vm->menu_pc = pc;
             ev->kind = HW_EV_MENU;
             ev->line = a[0];
@@ -489,6 +514,41 @@ bool hw_vm_next(hw_vm *vm, hw_event *ev)
             ev->ms = (int32_t)a[1];
             s->pc = next;
             return true;
+
+        case HW_OP_TEXTBOX:
+            switch (a[0]) {
+            case HW_TEXTBOX_ADV: case HW_TEXTBOX_NVL:
+                if (d->textbox != a[0]) d->page_count = 0;
+                d->textbox = a[0];
+                break;
+            case HW_TEXTBOX_CLEAR: d->page_count = 0; break;
+            case HW_TEXTBOX_HIDE: d->textbox_hidden = 1; break;
+            default: d->textbox_hidden = 0; break;
+            }
+            ev->kind = HW_EV_TEXTBOX;
+            ev->effect = a[0];
+            s->pc = next;
+            return true;
+
+        case HW_OP_XCALL: {
+            const hw_ext_info *e = &m->exts[a[0]];
+            ev->kind = HW_EV_XCALL;
+            ev->subject = a[0];
+            ev->add = &a[2];
+            ev->add_count = a[1];
+            ev->line = HW_NONE;
+            for (uint32_t i = 0; i < e->param_count; i++) {
+                if (m->ext_params[e->param_first + i].type == HW_XP_TEXT && a[2 + i] != HW_NONE) ev->line = a[2 + i];
+            }
+            if (ev->line != HW_NONE) vm->seen[ev->line] = 1;
+            if (a[0] < HW_VM_MAX_EXT) {
+                d->ext_called |= 1u << a[0];
+                memset(d->ext_last[a[0]], 0, sizeof d->ext_last[a[0]]);
+                memcpy(d->ext_last[a[0]], &a[2], (a[1] < HW_VM_EXT_VALUES ? a[1] : HW_VM_EXT_VALUES) * sizeof(uint32_t));
+            }
+            s->pc = next;
+            return true;
+        }
 
         case HW_OP_JMP:
             s->pc = a[0];

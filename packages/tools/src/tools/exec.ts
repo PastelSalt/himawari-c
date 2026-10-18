@@ -112,7 +112,7 @@ export const build = defineTool({
   name: "build",
   title: "Build the game",
   description:
-    "Compile the project and package a playable Windows folder: build/windows/<Game>/<Game>.exe with game.hwb and assets/. Only available when the user started the server with --allow-build.",
+    "Compile the project and package a playable Windows folder: build/windows/<Game>/<Game>.exe with data.hwp (the story and every asset). Only available when the user started the server with --allow-build.",
   kind: "exec",
   input: z.object({}),
   output: z.looseObject({ dir: z.string(), exe: z.string() }),
@@ -123,7 +123,7 @@ export const build = defineTool({
     const c = compileProject(ctx.fs, { debug: false });
     if (!c.bytes) throw new ToolError(`The project doesn't compile yet; fix these first:\n${c.errors}`);
     ctx.fs.write("build/game.hwb", c.bytes);
-    const p = packageGame(ctx.fs, c.bytes, c.title, exe);
-    return { text: `Built ${p.exe} (${p.files} files in ${p.dir}).`, data: { dir: p.dir, exe: p.exe, files: p.files } };
+    const p = packageGame(ctx.fs, c.bytes, c.title, c.gameId, exe);
+    return { text: `Built ${p.exe} with ${p.pack} (${p.entries} files packed) in ${p.dir}.`, data: { dir: p.dir, exe: p.exe, files: p.files } };
   },
 });

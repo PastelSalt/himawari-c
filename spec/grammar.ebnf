@@ -1,4 +1,4 @@
-(* Himawari Script (.hws) grammar, language spec 0.2.0-draft.
+(* Himawari Script (.hws) grammar, language spec 0.3.0-draft.
    License: CC-BY-4.0. Normative behaviour is defined by @himawari/core
    (packages/core/src/syntax/parser.ts); this file documents it.
 
@@ -18,12 +18,14 @@ file            = { top_item } ;
 top_item        = scene | define ;
 
 scene           = "scene" , name , ":" , NEWLINE , block ;
-define          = "define" , { any_token } , ":" , NEWLINE , block ;   (* macro signature: Phase 5 *)
+define          = "define" , "statement" , name , "(" , [ param , { "," , param } ] , ")" , ":" , NEWLINE , block ;
+param           = name , ":" , name , [ "=" , value ] ;         (* name: type [= default]; rfcs/0008 *)
 
 block           = INDENT , statement , { statement } , DEDENT ;
 
 statement       = say | narration | show | hide | move | bg | cg | audio | stop
-                | wait | effect | assign | jump | call | return | end | if | menu ;
+                | wait | effect | textbox | assign | jump | call | return | end | if | menu
+                | invoke ;
 
 (* ---- dialogue ---- *)
 say             = speaker , { attr } , string , line_end ;
@@ -48,6 +50,12 @@ stop            = "stop" , ( "music" | "ambient" | "voice" ) , [ fade ] , NEWLIN
 fade            = "fade" , args ;
 wait            = "wait" , args , NEWLINE ;                   (* wait(ms) *)
 effect          = ( "shake" | "flash" ) , [ args ] , NEWLINE ;
+textbox         = "textbox" , ( "adv" | "nvl" | "clear" | "hide" | "show" ) , NEWLINE ;
+
+(* ---- macros and extension statements (rfcs/0007, rfcs/0008) ---- *)
+invoke          = name , "(" , [ invoke_arg , { "," , invoke_arg } ] , ")" , line_end ;
+invoke_arg      = [ name , "=" ] , value ;                    (* positional arguments first *)
+value           = [ "-" ] , integer | name | string ;          (* at most one string per statement *)
 
 (* ---- state and flow ---- *)
 assign          = "$" , name , ( "=" | "+=" | "-=" | "*=" ) , expr , NEWLINE ;
@@ -91,6 +99,8 @@ id_char         = digit | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "j" | 
 (* Keywords (reserved, never names):
    scene define jump call return end if elif else menu once show hide move bg cg
    music sfx ambient voice stop wait shake flash with at and or not true false
+   textbox
+   ("statement" after "define" is contextual, not reserved.)
 
    Text inside strings (interpolation [var], tags {b}…{/b}, {w=ms}, ruby
    {rb=reading}…{/rb}, {select var: key="…" other="…"}) is specified in

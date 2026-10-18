@@ -1,0 +1,73 @@
+scene classroom:
+    change_place(classroom)
+    show hana neutral at left
+    # Novel mode (textbox nvl): lines gather on a full page.
+    textbox nvl
+    "From Hana's notebook:"   #line:kedxwy
+    "{size=34}Lanterns: 40.{/size} Paper: enough. Glue: {color=#d04040}not enough{/color}."   #line:hn7ndk
+    "Reasons to smile tonight: [hana_heart], at least."   #line:rws0yk
+    textbox clear
+    "The cicadas went quiet.{w=600} Then the bell rang."   #line:fr8fvg
+    textbox adv
+    sfx school_bell
+    shake(400)
+    hana surprised "Ah! The glue!"   #line:vtbh67
+    if met_ren:
+        move ren at center with slide_left(400)
+        ren happy "I brought extra. Obviously."   #line:n7berj
+        $ hana_heart += 1
+    else:
+        hana "I'll run to the shop. Wait here!"   #line:yjny48
+        move hana at right with slide_right(400)
+    wait(300)
+    menu "Where do we watch the fireworks?":   #line:gs7s76
+        "By the river." if hana_heart >= 2:   #line:7caqhh
+            $ path = "river"
+            jump river_night
+        "In the sunflower field.":   #line:1ar9ha
+            $ path = "field"
+            jump field_evening
+
+scene river_night:
+    stop music fade(800)
+    hide ren
+    bg river_night with rule(iris, 900)
+    # An extension statement (rfcs/0007), declared in extensions/screen_tint.schema.json.
+    screen_tint(night, 800)
+    music festival_night fade(1500)
+    show hana yukata neutral at center with dissolve(500)
+    hana "The lanterns look like stars that fell into the water."   #line:hfrrzr
+    hana "{speed=12}I'm glad it's you here.{/speed}"   #line:9e6s3k
+    flash(300)
+    cg fireworks with dissolve(800)
+    "{shake}Boom.{/shake} The sky opened up in colors.{alt=Fireworks burst over the river.}"   #line:0mg2hk
+    textbox hide
+    wait(1500)
+    "For a moment, nobody said anything."   #line:3w3fby
+    jump ending
+
+scene field_evening:
+    hide ren
+    screen_tint(sepia, 1000)
+    bg sunflower_field with wipe(700)
+    show hana yukata -sunflower_pin happy at center
+    hana "In the evening the sunflowers face west. Like they're waving goodbye."   #line:d9bh32
+    cg sunflower_sea with rule(blinds, 1000)
+    "The {select path: field="field" other="river"} glowed gold until the first firework."   #line:7vaqn5
+    jump ending
+
+scene ending:
+    screen_tint(none, 600)
+    $ times_finished += 1
+    if hana_heart >= 3:
+        hana happy "Same time next summer? Promise?"   #line:56mrze
+        "I promised. It was the easiest promise I ever made."   #line:t0edzg
+    elif hana_heart == 2:
+        hana "Thanks for today. Really."   #line:1tfm7r
+        "We walked home slowly, carrying the empty glue bottles."   #line:w32g3v
+    else:
+        hana "Next year, I'm buying the food. You owe me."   #line:jjdt5h
+        "Somehow, that sounded like an invitation."   #line:vetkmd
+    stop music fade(2000)
+    "Thank you for playing Sunflower Days."   #line:cz1hef
+    end

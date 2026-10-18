@@ -6,7 +6,10 @@
 import { type AstResult, type Expr, type MenuOption, type Ref, type Stmt, endsFlow, parseAst } from "../syntax/ast.js";
 import { type Diagnostic, type DiagnosticCode, type Span, diagnostic } from "../syntax/diagnostics.js";
 import { lex } from "../syntax/lexer.js";
+import type { Ast } from "../syntax/ast.js";
 import { type Character, characterWords, readCharacter } from "./character.js";
+import { type ExtensionDef, type MacroEntry, collectMacros, expandInvokes, readExtension } from "./invoke.js";
+import { type ThemeEntries, readTheme } from "./theme.js";
 import { DEFAULT_POSITIONS, type Manifest, type VarType, readManifest } from "./manifest.js";
 import { listNames, suggest } from "./suggest.js";
 import { type L10nTable, type SourceLine, collectLines, parityProblems, parseTable } from "../l10n/table.js";
@@ -28,6 +31,10 @@ export interface ProjectInput {
   assets?: readonly string[];
   /** locales/<lang>.json string tables. */
   locales?: SourceFile[];
+  /** extensions/<name>.schema.json: extension statement signatures (rfcs/0007). */
+  extensions?: SourceFile[];
+  /** theme/theme.json (rfcs/0007). */
+  theme?: SourceFile;
 }
 
 export interface FileReport {
@@ -44,6 +51,12 @@ export interface ProjectCheck {
   parsed: Map<string, AstResult>;
   /** String tables from locales/ that could be read (the compiler builds LOCL from them). */
   locales: L10nTable[];
+  /** Each script's AST with macro calls expanded (for the compiler, flow checks, and the story graph). */
+  expanded: Map<string, Ast>;
+  macros: Map<string, MacroEntry>;
+  extensions: Map<string, ExtensionDef>;
+  /** The compiled theme, when the project has one that could be read. */
+  theme: ThemeEntries | null;
 }
 
 /** Built-in transitions and how many arguments each accepts (spec/language.md §2.4). */
@@ -88,6 +101,19 @@ export function checkProject(input: ProjectInput): ProjectCheck {
     if (c.character) characters.set(c.character.id, c.character);
   }
 
+  const extensions = new Map<string, ExtensionDef>();
+  for (const ef of input.extensions ?? []) {
+    const e = readExtension(ef.file, ef.text);
+    report(ef.file, ef.text).diagnostics.push(...e.diagnostics);
+    if (e.ext) extensions.set(e.ext.name, e.ext);
+  }
+  let theme: ThemeEntries | null = null;
+  if (input.theme) {
+    const t = readTheme(input.theme.text);
+    report(input.theme.file, input.theme.text).diagnostics.push(...t.diagnostics);
+    theme = t.entries;
+  }
+
   // Parse every script, then build the project-wide index.
   const parsed = new Map<string, AstResult>();
   for (const s of input.scripts) {
@@ -95,6 +121,12 @@ export function checkProject(input: ProjectInput): ProjectCheck {
     parsed.set(s.file, r);
     report(s.file, s.text).diagnostics.push(...r.diagnostics);
   }
+
+  // Macros and extension statements: check every call, expand macros (rfcs/0007, rfcs/0008).
+  const files = input.scripts.map((s) => ({ file: s.file, source: s.text, parsed: parsed.get(s.file) as AstResult }));
+  const reportFile = (file: string) => report(file, input.scripts.find((x) => x.file === file)?.text ?? "").diagnostics;
+  const macros = collectMacros(files, extensions, reportFile);
+  const expansion = expandInvokes(files, macros, extensions, reportFile);
 
   const scenes = new Map<string, { file: string; span: Span }>();
   const lineIds = new Map<string, string>();
@@ -125,8 +157,8 @@ export function checkProject(input: ProjectInput): ProjectCheck {
 
   // Scenes that some file `call`s (a `return` anywhere else is suspicious).
   const calls = new Set<string>();
-  for (const r of parsed.values()) {
-    for (const sc of r.ast.scenes) walk(sc.body, (x) => {
+  for (const ast of expansion.asts.values()) {
+    for (const sc of ast.scenes) walk(sc.body, (x) => {
       if (x.kind === "Call") calls.add(x.target);
     });
   }
@@ -136,7 +168,11 @@ export function checkProject(input: ProjectInput): ProjectCheck {
     const r = parsed.get(s.file) as AstResult;
     const out = report(s.file, s.text).diagnostics;
     checkRefs(r.refs, ctx, out);
-    checkTypesAndFlow(r, s.text, ctx, out);
+    // Names that came from a macro body: reported at the call, without quick fixes (they'd edit the wrong text).
+    const fromMacros: Diagnostic[] = [];
+    checkRefs(expansion.expandedRefs.get(s.file) ?? [], ctx, fromMacros);
+    out.push(...fromMacros.map((d) => ({ ...d, fixes: [], note: d.note ? `${d.note} (from a macro)` : "from a macro" })));
+    checkTypesAndFlow({ ...r, ast: expansion.asts.get(s.file) ?? r.ast }, s.text, ctx, out);
   }
 
   // Project-level flow: the entry scene and reachability.
@@ -146,7 +182,7 @@ export function checkProject(input: ProjectInput): ProjectCheck {
         diagnostic("HW0215", { start: 0, end: 0 }, { name: manifest.entry }, withSuggestion(manifest.entry, scenes.keys())),
       );
     } else {
-      const reachable = reachableScenes(manifest.entry, parsed);
+      const reachable = reachableScenes(manifest.entry, expansion.asts);
       for (const [name, where] of scenes) {
         if (!reachable.has(name)) {
           const src = input.scripts.find((x) => x.file === where.file) as SourceFile;
@@ -167,7 +203,7 @@ export function checkProject(input: ProjectInput): ProjectCheck {
   }
 
   for (const r of reports.values()) r.diagnostics.sort((a, b) => a.span.start - b.span.start);
-  return { files: [...reports.values()], manifest, characters, parsed, locales };
+  return { files: [...reports.values()], manifest, characters, parsed, locales, expanded: expansion.asts, macros, extensions: extensions, theme };
 }
 
 function checkLocale(lf: SourceFile, lines: ReadonlyMap<string, SourceLine>, out: Diagnostic[]): L10nTable | null {
@@ -299,6 +335,8 @@ function checkRefs(refs: readonly Ref[], ctx: Ctx, out: Diagnostic[]): void {
       case "function":
         if (ref.name !== "rand") push("HW0214", ref, { name: ref.name }, { help: "the only function is rand(n)" });
         break;
+      case "invoke":
+        break; // checked with its arguments in invoke.ts
       default:
         break;
     }
@@ -417,10 +455,10 @@ function walk(body: readonly Stmt[], fn: (s: Stmt) => void): void {
   }
 }
 
-function reachableScenes(entry: string, parsed: Map<string, AstResult>): Set<string> {
+function reachableScenes(entry: string, asts: Map<string, Ast>): Set<string> {
   const edges = new Map<string, Set<string>>();
-  for (const r of parsed.values()) {
-    for (const sc of r.ast.scenes) {
+  for (const ast of asts.values()) {
+    for (const sc of ast.scenes) {
       const targets = edges.get(sc.id) ?? new Set<string>();
       walk(sc.body, (s) => {
         if (s.kind === "Jump" || s.kind === "Call") targets.add(s.target);

@@ -70,7 +70,7 @@ static bool start(hw_audio *au, MIX_Track *track, int channel, const char *folde
     }
     /* Music and ambient stream from disk; short sounds are decoded up front. */
     bool predecode = channel == HW_CHANNEL_SFX || channel == HW_CHANNEL_VOICE;
-    MIX_Audio *audio = MIX_LoadAudio(au->mixer, path, predecode);
+    MIX_Audio *audio = MIX_LoadAudio_IO(au->mixer, hw_vfs_open(hw_assets_vfs(au->assets), path), predecode, true);
     if (!audio) {
         SDL_Log("audio: %s: %s", path, SDL_GetError());
         au->missing[channel] = "can't be read";

@@ -22,7 +22,7 @@
 #include "hw_play.h"
 #include "hw_vm.h"
 
-#define HW_SAVE_VERSION 1
+#define HW_SAVE_VERSION 2 /* 2: thumbnail, textbox and NVL page, extension state (Phase 5); 1 still loads */
 #define HW_SAVE_HISTORY 16 /* checkpoint line IDs kept for remapping */
 
 typedef struct hw_save_info {
@@ -31,6 +31,9 @@ typedef struct hw_save_info {
     char scene[64];        /* scene name at the checkpoint */
     char preview[160];     /* the line's text (plain), for the save screen */
     char language[16];
+    /* An encoded thumbnail picture (the game chooses the format), or NULL/0. hw_save_peek points it into the save's bytes. */
+    const uint8_t *thumb;
+    uint32_t thumb_size;
 } hw_save_info;
 
 /*

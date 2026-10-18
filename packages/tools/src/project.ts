@@ -26,6 +26,8 @@ export function loadInput(fs: ProjectFs): ProjectInput {
     scripts: fs.list("script", (n) => n.endsWith(".hws")).map(read),
     assets: fs.list("assets").map((f) => f.slice("assets/".length)),
     locales: fs.list("locales", (n) => n.endsWith(".json")).map(read),
+    extensions: fs.list("extensions", (n) => n.endsWith(".schema.json")).map(read),
+    ...(fs.exists("theme/theme.json") ? { theme: read("theme/theme.json") } : {}),
   };
 }
 
@@ -50,11 +52,15 @@ export function withChanges(input: ProjectInput, changes: ReadonlyMap<string, st
     scripts: swap(input.scripts, "script", ".hws"),
     characters: swap(input.characters, "characters", ".md"),
     locales: swap(input.locales, "locales", ".json"),
+    extensions: swap(input.extensions, "extensions", ".schema.json"),
   };
   if (input.assets) next.assets = input.assets;
   const manifest = changes.get("himawari.json");
   if (typeof manifest === "string") next.manifest = { file: "himawari.json", text: manifest };
   else if (input.manifest) next.manifest = input.manifest;
+  const theme = changes.get("theme/theme.json");
+  if (typeof theme === "string") next.theme = { file: "theme/theme.json", text: theme };
+  else if (theme === undefined && input.theme) next.theme = input.theme;
   return next;
 }
 

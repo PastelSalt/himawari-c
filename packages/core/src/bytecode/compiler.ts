@@ -5,13 +5,15 @@
  */
 import { lineIdToNumber } from "../ids.js";
 import type { ProjectCheck } from "../project/check.js";
+import { type ExtensionDef, extensionValues } from "../project/invoke.js";
 import { type Expr, type MenuOption, type Scene, type Stmt, type Transition, endsFlow } from "../syntax/ast.js";
 import type { Diagnostic } from "../syntax/diagnostics.js";
 import { LineIndex } from "../syntax/position.js";
 import { type TextPart, parseText } from "../syntax/text.js";
 import {
-  Channel, type DebugEntry, HWB_MAJOR, HWB_MINOR, type HwbModule, LINE_ONCE, LINE_OPTION, LINE_PROMPT, type LocaleEntry, NONE, Op, type OpName,
-  POSITION_SCALE, SPRITE_ALWAYS, SPRITE_BLINK, SPRITE_LIPFLAP, SPRITE_MULTIPLE, type SpriteEntry, TextOp,
+  Channel, type DebugEntry, type ExtensionEntry, HWB_MAJOR, type HwbModule, LINE_CALL, LINE_ONCE, LINE_OPTION, LINE_PROMPT, type LocaleEntry, NONE, OPS_1_1,
+  Op, type OpName, POSITION_SCALE, SPRITE_ALWAYS, SPRITE_BLINK, SPRITE_LIPFLAP, SPRITE_MULTIPLE, type SpriteEntry, TEXTBOX_MODES, TextOp, type ThemeEntry,
+  XPARAM_TYPES, XTNS_BLOCKING,
 } from "./format.js";
 
 export interface CompileResult {
@@ -51,6 +53,10 @@ class Compiler {
   private readonly debug: DebugEntry[] = [];
   private readonly sceneLabels = new Map<string, Label>();
   private varIndex = new Map<string, number>();
+  /** Extensions in name order; XCALL operand 0 is the index here. */
+  private extList: ExtensionDef[] = [];
+  /** Set when the code uses a 1.1 op. */
+  private uses11 = false;
   /** Code position where a label with pending jumps was placed last; an instruction must follow it. */
   private landing = -1;
   private file = "";
@@ -117,11 +123,14 @@ class Compiler {
       }),
     };
 
-    // Scenes in name order, each with its file for debug info.
+    // Every extension statement the project declares, in name order (XTNS).
+    this.extList = [...this.check.extensions.values()].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+
+    // Scenes in name order, each with its file for debug info. Macro calls are already expanded.
     const all: { scene: Scene; file: string; source: string }[] = [];
     for (const f of this.check.files) {
-      const parsed = this.check.parsed.get(f.file);
-      if (parsed) for (const scene of parsed.ast.scenes) all.push({ scene, file: f.file, source: f.source });
+      const ast = this.check.expanded.get(f.file) ?? this.check.parsed.get(f.file)?.ast;
+      if (ast) for (const scene of ast.scenes) all.push({ scene, file: f.file, source: f.source });
     }
     all.sort((a, b) => (a.scene.id < b.scene.id ? -1 : a.scene.id > b.scene.id ? 1 : 0));
     for (const { scene } of all) this.sceneLabels.set(scene.id, { pc: undefined, refs: [] });
@@ -162,10 +171,21 @@ class Compiler {
       });
     }
 
+    const extensions: ExtensionEntry[] = this.extList.map((e) => ({
+      name: this.str(e.name),
+      flags: e.blocking ? XTNS_BLOCKING : 0,
+      params: e.params.map((p) => ({ name: this.str(p.name), type: XPARAM_TYPES.indexOf(p.type) })),
+    }));
+    const theme: ThemeEntry[] = [...(this.check.theme ?? new Map()).entries()]
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([key, v]) => ({ key: this.str(key), type: v.type === "int" ? 0 : v.type === "color" ? 1 : 2, value: v.type === "str" ? this.str(v.value) : v.value }));
+
+    // The lowest minor version that holds this module, so games without 1.1 features still load in 1.0 players.
+    const minor = this.uses11 || extensions.length > 0 || theme.length > 0 ? 1 : 0;
     return {
-      major: HWB_MAJOR, minor: HWB_MINOR, meta, strings: this.strings, vars, chars, scenes,
+      major: HWB_MAJOR, minor, meta, strings: this.strings, vars, chars, scenes,
       entryScene: entryScene < 0 ? NONE : entryScene, lines: this.lines, texts: this.texts, code: this.code,
-      debug: this.withDebug ? this.debug : null, locales, sprites,
+      debug: this.withDebug ? this.debug : null, locales, sprites, extensions, theme,
     };
   }
 
@@ -198,6 +218,7 @@ class Compiler {
   }
 
   private emit(op: OpName, ...args: (number | Label)[]): void {
+    if (OPS_1_1.has(Op[op])) this.uses11 = true;
     this.code.push(Op[op] | (args.length << 8));
     for (const a of args) {
       if (typeof a === "number") {
@@ -345,7 +366,29 @@ class Compiler {
       case "Menu":
         this.menu(s.prompt, s.promptLineId, s.options);
         break;
+      case "Textbox":
+        this.emit("TEXTBOX", TEXTBOX_MODES.indexOf(s.mode));
+        break;
+      case "Invoke":
+        this.xcall(s);
+        break;
     }
+  }
+
+  /** An extension statement (macro calls were expanded by the checker). */
+  private xcall(s: Extract<Stmt, { kind: "Invoke" }>): void {
+    const index = this.extList.findIndex((e) => e.name === s.name);
+    const ext = this.extList[index];
+    if (!ext) return; // unknown names are errors, so this can't happen in a module we emit
+    const values = extensionValues(ext, s.args, s.span).map((v, i) => {
+      const type = ext.params[i]?.type;
+      if (v === null) return NONE;
+      if (v.kind === "text") return this.line(s.lineId, "", v.text, LINE_CALL);
+      if (v.kind === "int") return v.value;
+      if (type === "bool") return v.value === "true" ? 1 : 0;
+      return this.str(v.value);
+    });
+    this.emit("XCALL", index, values.length, ...values);
   }
 
   private show(char: string, at: string | null, t: Transition | null, add: readonly string[], remove: readonly string[]): void {

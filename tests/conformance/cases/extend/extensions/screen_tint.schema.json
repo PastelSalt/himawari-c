@@ -1,0 +1,9 @@
+{
+  "name": "screen_tint",
+  "description": "Tints the whole screen.",
+  "blocking": false,
+  "params": [
+    { "name": "color", "type": "word", "enum": ["sepia", "night", "none"] },
+    { "name": "ms", "type": "int", "default": 500 }
+  ]
+}

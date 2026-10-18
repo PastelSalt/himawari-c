@@ -1,0 +1,6 @@
+{
+  "colors": { "accent": "#ff8800", "textbox": "#202030" },
+  "textbox": { "opacity": 80, "slice": [12, 12, 12, 12], "image": "ui/textbox" },
+  "text": { "size": 30 },
+  "strings": { "en": { "start": "Begin" }, "ja": { "start": "はじめる" } }
+}

@@ -36,8 +36,10 @@ function load(dir: string): ProjectInput {
     characters: files(join(dir, "characters"), "characters/", ".md").map(read),
     scripts: files(join(dir, "script"), "script/", ".hws").map(read),
     locales: files(join(dir, "locales"), "locales/", ".json").map(read),
+    extensions: files(join(dir, "extensions"), "extensions/", ".schema.json").map(read),
   };
   if (existsSync(join(dir, "himawari.json"))) input.manifest = read("himawari.json");
+  if (existsSync(join(dir, "theme", "theme.json"))) input.theme = read("theme/theme.json");
   return input;
 }
 

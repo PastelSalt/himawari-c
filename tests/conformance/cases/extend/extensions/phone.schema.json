@@ -1,0 +1,11 @@
+{
+  "name": "phone",
+  "description": "Shows a phone message from a character.",
+  "blocking": true,
+  "params": [
+    { "name": "from", "type": "character" },
+    { "name": "message", "type": "text" },
+    { "name": "ms", "type": "int", "default": 300 },
+    { "name": "loud", "type": "bool", "default": false }
+  ]
+}

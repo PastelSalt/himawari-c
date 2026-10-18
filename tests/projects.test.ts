@@ -21,9 +21,13 @@ function toInput(files: readonly SourceFile[]): ProjectInput {
     characters: files.filter((f) => f.file.startsWith("characters/") && f.file.endsWith(".md")),
     scripts: files.filter((f) => f.file.endsWith(".hws")),
     assets: files.filter((f) => f.file.startsWith("assets/") && !f.file.endsWith("README.md")).map((f) => f.file.slice(7)),
+    locales: files.filter((f) => f.file.startsWith("locales/") && f.file.endsWith(".json")),
+    extensions: files.filter((f) => f.file.startsWith("extensions/") && f.file.endsWith(".schema.json")),
   };
   const manifest = files.find((f) => f.file === "himawari.json");
   if (manifest) input.manifest = manifest;
+  const theme = files.find((f) => f.file === "theme/theme.json");
+  if (theme) input.theme = theme;
   return input;
 }
 

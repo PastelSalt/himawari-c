@@ -8,6 +8,7 @@
  * Missing art and sound become labeled placeholders and silence (P5).
  */
 #include "hw_game.h"
+#include "hw_game_int.h"
 
 #include <SDL3/SDL.h>
 
@@ -17,6 +18,7 @@
 #include <string.h>
 
 #include "hw_assets.h"
+#include "hw_crash.h"
 #include "hw_audio.h"
 #include "hw_headless.h"
 #include "hw_hwb.h"
@@ -30,125 +32,10 @@
 #include "hw_ui_text.h"
 #include "hw_vm.h"
 
-/* ---- types ---- */
-
-typedef enum screen { SCR_TITLE, SCR_PLAY, SCR_SYSMENU, SCR_SLOTS, SCR_HISTORY, SCR_CONFIRM_QUIT, SCR_END, SCR_ERROR } screen;
-typedef enum block { B_NONE, B_SAY, B_MENU, B_WAIT, B_TRANS, B_DONE } block;
-typedef enum trans_kind { T_FADE, T_DISSOLVE, T_SLIDE_LEFT, T_SLIDE_RIGHT, T_SLIDE_UP, T_SLIDE_DOWN, T_WIPE, T_RULE } trans_kind;
-
-#define BACKLOG 100
-#define MAX_HITS 64
-#define HISTORY_DEPTH 256
-
-typedef struct backlog_entry {
-    char name[64];
-    char text[400];
-} backlog_entry;
-
-typedef struct hit {
-    SDL_FRect r;
-    int id;
-} hit;
-
-/* Button ids. Menu options are 1000 + index; slots are 2000 + slot. */
-enum {
-    BTN_START = 1, BTN_LOAD, BTN_LANGUAGE, BTN_QUIT, BTN_RESUME, BTN_SAVE, BTN_HISTORY, BTN_TITLE, BTN_SPEED,
-    BTN_BACK, BTN_AUTO, BTN_SKIP, BTN_MENU, BTN_ROLLBACK, BTN_YES, BTN_NO,
-    BTN_OPTION = 1000, BTN_SLOT = 2000
-};
-
-typedef struct game {
-    SDL_Window *win;
-    SDL_Renderer *ren;
-    SDL_GPUDevice *gpu;   /* set when the GPU renderer is in use */
-    hw_rulewipe *wipe;    /* rule wipes, or NULL (they dissolve) */
-    char trans_mask[128]; /* the rule's mask image */
-    float W, H, S; /* canvas size and UI scale (H / 1080) */
-    hw_fonts *fonts;
-    hw_assets *assets;
-    hw_audio *audio;
-    hw_persist persist;
-    hw_settings settings;
-    bool dev;
-    char game_path[1024];
-
-    hw_module m;
-    hw_vm vm;
-    bool vm_ready;
-    hw_history hist;
-    uint8_t *read_lines; /* global: lines read in any playthrough */
-    char lang[16];
-
-    screen scr, back_to;
-    block blk;
-    bool running;
-    double now, play_start;
-    uint64_t playtime_ms;
-
-    /* The scene as currently shown (follows the VM's display state event by event). */
-    hw_display shown;
-    SDL_Texture *scene_tex, *prev_tex;
-    bool trans_active;
-    trans_kind trans;
-    double trans_t0, trans_dur;
-    double shake_until, shake_dur, flash_until, flash_dur;
-    double wait_until;
-
-    /* The line being shown. */
-    bool have_line;
-    uint32_t line;
-    char speaker[128];
-    uint32_t speaker_color;
-    hw_rich_text text;
-    float reveal;
-    uint32_t next_pause;
-    double pause_until;
-    bool line_was_read;
-    double done_at;
-
-    /* The menu being shown. */
-    uint32_t option_count;
-    uint32_t options[HW_VM_MAX_OPTIONS];
-    hw_rich_text *option_text;
-
-    bool auto_mode, skip_mode;
-    int focus; /* keyboard focus among this frame's buttons, -1 = none */
-    hit hits[MAX_HITS], last_hits[MAX_HITS];
-    int hit_count, last_hit_count;
-    float mx, my;
-    bool slots_saving;
-    int history_scroll;
-
-    backlog_entry backlog[BACKLOG];
-    int backlog_count, backlog_start;
-
-    char notice[300];
-    double notice_until;
-    char error[300];
-    bool overlay;
-    const char *shot; /* save the next frame as PNG */
-    float cps_override; /* --text-speed: this run only, never saved */
-
-    /* Auto-blink per stage slot (plan §6.1): when the next blink starts. */
-    double blink_at[HW_VM_MAX_STAGE];
-
-    /* The Studio debug pipe (--link), and the last state reported on it. */
-    hw_link *link;
-    char link_state[512];
-    bool fast_forward; /* skipping to the next menu: no sound effects or voices on the way */
-} game;
-
-static const SDL_Color WHITE = { 255, 255, 255, 255 };
-static const SDL_Color INK = { 18, 18, 28, 255 };
-static const SDL_Color DIM = { 190, 196, 214, 255 };
-static const SDL_Color ACCENT = { 255, 196, 64, 255 };
-
 /* An unattended run (--frames: smoke tests, render_line) never writes the player's data. */
-static bool unattended = false;
+bool unattended = false;
 
 /* ---- small helpers ---- */
-
-static float sc(const game *g, float v) { return v * g->S; }
 
 static uint32_t hash_str(const char *s)
 {
@@ -162,7 +49,7 @@ static SDL_FColor fcol(uint32_t rgb, float a)
     return (SDL_FColor){ (float)((rgb >> 16) & 255) / 255.0f, (float)((rgb >> 8) & 255) / 255.0f, (float)(rgb & 255) / 255.0f, a };
 }
 
-static void fill(game *g, SDL_FRect r, uint32_t rgb, float a)
+void fill(game *g, SDL_FRect r, uint32_t rgb, float a)
 {
     SDL_FColor c = fcol(rgb, a);
     SDL_SetRenderDrawBlendMode(g->ren, SDL_BLENDMODE_BLEND);
@@ -170,7 +57,7 @@ static void fill(game *g, SDL_FRect r, uint32_t rgb, float a)
     SDL_RenderFillRect(g->ren, &r);
 }
 
-static void gradient(game *g, SDL_FRect r, uint32_t top, uint32_t bottom, float a)
+void gradient(game *g, SDL_FRect r, uint32_t top, uint32_t bottom, float a)
 {
     SDL_Vertex v[4] = {
         { { r.x, r.y }, fcol(top, a), { 0, 0 } },
@@ -198,9 +85,9 @@ static uint32_t name_color(const char *name, float light)
     return (uint32_t)(r * 255) << 16 | (uint32_t)(gg * 255) << 8 | (uint32_t)(b * 255);
 }
 
-static void label(game *g, const char *s, float px, float x, float y, int align, SDL_Color c)
+void label(game *g, const char *s, float px, float x, float y, int align, SDL_Color c)
 {
-    hw_text_draw(g->fonts, s, sc(g, px), 0, x, y, align, c, INK, sc(g, px) > 20 ? 2.0f : 0.0f);
+    hw_text_draw(g->fonts, s, sc(g, px), 0, x, y, align, c, col(g->pal.ink), sc(g, px) > 20 ? 2.0f : 0.0f);
 }
 
 static void notify(game *g, const char *msg)
@@ -209,25 +96,21 @@ static void notify(game *g, const char *msg)
     g->notice_until = g->now + 4.0;
 }
 
-static const char *ui(const game *g, hw_ui_string id) { return hw_ui(g->lang, id); }
-
 /* Global data: settings, read lines, global variables. */
-static void save_global(game *g)
+void save_global(game *g)
 {
-    if (!unattended) hw_global_save(&g->persist, &g->m, &g->vm, g->read_lines, &g->settings);
+    if (!unattended) hw_global_save(&g->persist, &g->m, &g->vm, g->read_lines, &g->unlocks, &g->settings);
 }
 
-static bool point_in(float x, float y, SDL_FRect r) { return x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h; }
-
 /* Draws a button and registers it for clicks this frame. */
-static void button(game *g, SDL_FRect r, const char *text, int id, float px, bool active)
+void button(game *g, SDL_FRect r, const char *text, int id, float px, bool active)
 {
     int index = g->hit_count;
     if (g->hit_count < MAX_HITS) g->hits[g->hit_count++] = (hit){ r, id };
     bool hover = point_in(g->mx, g->my, r) || g->focus == index;
-    fill(g, r, hover ? 0x3a4466 : 0x1c2033, hover ? 0.95f : 0.85f);
-    if (active) fill(g, (SDL_FRect){ r.x, r.y, sc(g, 6), r.h }, 0xffc440, 1.0f);
-    label(g, text, px, r.x + r.w / 2, r.y + r.h / 2 + sc(g, px) * 0.36f, 1, hover ? ACCENT : WHITE);
+    fill(g, r, hover ? g->pal.choice_hover : g->pal.panel, hover ? 0.95f : 0.85f);
+    if (active) fill(g, (SDL_FRect){ r.x, r.y, sc(g, 6), r.h }, g->pal.accent, 1.0f);
+    label(g, text, px, r.x + r.w / 2, r.y + r.h / 2 + sc(g, px) * 0.36f, 1, hover ? col(g->pal.accent) : col(g->pal.text));
 }
 
 /* ---- the scene ---- */
@@ -272,10 +155,10 @@ static void draw_backdrop(game *g, const char *folder, const char *name, const c
     gradient(g, all, name_color(name, 0.75f), name_color(name, 0.35f), 1.0f);
     char text[256];
     snprintf(text, sizeof text, "%s: %s", tag, name);
-    label(g, text, 44, g->W / 2, g->H * 0.42f, 1, WHITE);
+    label(g, text, 44, g->W / 2, g->H * 0.42f, 1, col(g->pal.text));
     if (g->dev && why) {
         snprintf(text, sizeof text, "assets/%s/%s.png %s", folder, name, why);
-        label(g, text, 24, g->W / 2, g->H * 0.42f + sc(g, 44), 1, DIM);
+        label(g, text, 24, g->W / 2, g->H * 0.42f + sc(g, 44), 1, col(g->pal.dim));
     }
 }
 
@@ -355,7 +238,7 @@ static void draw_character(game *g, const hw_stage_char *c, int slot)
     fill(g, (SDL_FRect){ cx - w / 2, base - h, w, h }, color, 0.80f);
     float hw = g->H * 0.12f;
     fill(g, (SDL_FRect){ cx - hw / 2, base - h - hw * 1.05f, hw, hw }, color, 0.80f);
-    label(g, ci ? hw_str(&g->m, ci->name) : id, 34, cx, base - h * 0.55f, 1, WHITE);
+    label(g, ci ? hw_str(&g->m, ci->name) : id, 34, cx, base - h * 0.55f, 1, col(g->pal.text));
     char attrs[256] = "";
     size_t n = 0;
     if (sp) {
@@ -371,10 +254,10 @@ static void draw_character(game *g, const hw_stage_char *c, int slot)
             n += (size_t)snprintf(attrs + n, sizeof attrs - n, "%s%s", n ? " " : "", hw_str(&g->m, c->attrs[k]));
         }
     }
-    if (attrs[0]) label(g, attrs, 24, cx, base - h * 0.55f + sc(g, 40), 1, DIM);
+    if (attrs[0]) label(g, attrs, 24, cx, base - h * 0.55f + sc(g, 40), 1, col(g->pal.dim));
 }
 
-static void render_scene(game *g, const hw_display *d, SDL_Texture *target)
+void render_scene(game *g, const hw_display *d, SDL_Texture *target)
 {
     SDL_SetRenderTarget(g->ren, target);
     SDL_SetRenderDrawColor(g->ren, 0, 0, 0, 255);
@@ -385,7 +268,7 @@ static void render_scene(game *g, const hw_display *d, SDL_Texture *target)
     SDL_SetRenderTarget(g->ren, NULL);
 }
 
-static void compose_scene(game *g)
+void compose_scene(game *g)
 {
     float ox = 0, oy = 0;
     if (g->now < g->shake_until) {
@@ -488,12 +371,31 @@ static void plain_text(const hw_rich_text *rt, char *out, size_t cap)
     for (uint32_t i = 0; i < rt->run_count && n + 1 < cap; i++) n += (size_t)snprintf(out + n, cap - n, "%s", rt->runs[i].text);
 }
 
-static float text_width(const game *g) { return g->W * 0.84f - sc(g, 2 * 44); }
+float text_width(const game *g) { return g->W * 0.84f - sc(g, 2 * g->tb_pad); }
 
 static void layout_line(game *g)
 {
     hw_rich_build(&g->text, &g->vm, hw_vm_line_text(&g->vm, g->line));
-    hw_rich_layout(&g->text, g->fonts, text_width(g), sc(g, 40), g->lang);
+    hw_rich_layout(&g->text, g->fonts, text_width(g), sc(g, g->text_px), g->lang);
+}
+
+/* NVL: lays out the page's lines not laid out yet; a page too tall for the screen starts over with its newest line. */
+void layout_page(game *g)
+{
+    const hw_display *d = &g->vm.s.display;
+    if (g->page_built > d->page_count) g->page_built = 0;
+    for (uint32_t i = g->page_built; i < d->page_count; i++) {
+        hw_rich_build(&g->page_text[i], &g->vm, hw_vm_line_text(&g->vm, d->page[i]));
+        hw_rich_layout(&g->page_text[i], g->fonts, g->W * 0.76f, sc(g, g->text_px), g->lang);
+    }
+    g->page_built = d->page_count;
+    float h = 0;
+    for (uint32_t i = 0; i < d->page_count; i++) h += g->page_text[i].layout.height + sc(g, g->text_px * 0.6f);
+    if (h > g->H * 0.80f && d->page_count > 1) {
+        hw_vm_page_restart(&g->vm);
+        g->page_built = 0;
+        layout_page(g);
+    }
 }
 
 static void layout_menu(game *g)
@@ -512,7 +414,7 @@ static bool skipping(const game *g)
 }
 
 /* Skipping passes read lines (any line in dev mode). */
-static bool may_skip_line(const game *g) { return skipping(g) && (g->line_was_read || g->dev); }
+static bool may_skip_line(const game *g) { return skipping(g) && (g->line_was_read || g->dev || g->settings.skip_unread); }
 
 static void show_line(game *g, uint32_t line, bool is_prompt)
 {
@@ -521,7 +423,7 @@ static void show_line(game *g, uint32_t line, bool is_prompt)
     const char *name = is_prompt ? "" : hw_vm_speaker_name(&g->vm, line);
     snprintf(g->speaker, sizeof g->speaker, "%s", name);
     const hw_char_info *ci = char_info(g, g->m.lines[line].speaker);
-    g->speaker_color = ci && ci->color != HW_NONE ? ci->color : 0xffc440;
+    g->speaker_color = ci && ci->color != HW_NONE ? ci->color : g->pal.accent;
     layout_line(g);
     g->line_was_read = g->read_lines[line] != 0;
     g->read_lines[line] = 1;
@@ -537,8 +439,18 @@ static void add_backlog(game *g)
     int slot = (g->backlog_start + g->backlog_count) % BACKLOG;
     if (g->backlog_count == BACKLOG) g->backlog_start = (g->backlog_start + 1) % BACKLOG;
     else g->backlog_count++;
-    snprintf(g->backlog[slot].name, sizeof g->backlog[slot].name, "%.63s", g->speaker);
-    plain_text(&g->text, g->backlog[slot].text, sizeof g->backlog[slot].text);
+    backlog_entry *e = &g->backlog[slot];
+    snprintf(e->name, sizeof e->name, "%.63s", g->speaker);
+    plain_text(&g->text, e->text, sizeof e->text);
+    e->line_id = g->m.lines[g->line].line_id;
+    e->has_voice = false;
+    if (e->line_id != HW_NONE) {
+        static const char *const exts[] = { ".ogg", ".wav", ".mp3", ".flac", ".opus", NULL };
+        char folder[64], id[7], path[1100];
+        hw_line_id_format(e->line_id, id);
+        snprintf(folder, sizeof folder, "voice/%s", g->lang);
+        e->has_voice = hw_assets_find(g->assets, folder, id, exts, path, sizeof path);
+    }
 }
 
 static trans_kind trans_from(const char *name)
@@ -558,9 +470,11 @@ static void stage_change(game *g, const hw_event *ev)
     if (ev->trans.type != 0 && !skipping(g)) {
         render_scene(g, &g->shown, g->prev_tex); /* the scene before this change */
         g->trans = trans_from(hw_str(&g->m, ev->trans.type));
+        if (g->settings.reduce_motion) g->trans = T_DISSOLVE; /* no slides, wipes, or fades through black (§13) */
         snprintf(g->trans_mask, sizeof g->trans_mask, "%s", hw_str(&g->m, ev->trans.mask));
-        g->trans_dur = (ev->trans.ms >= 0 ? ev->trans.ms : 500) / 1000.0;
+        g->trans_dur = (ev->trans.ms >= 0 ? ev->trans.ms : g->trans_ms) / 1000.0;
         if (g->trans_dur < 0.01) g->trans_dur = 0.01;
+        if (g->settings.reduce_motion && g->trans_dur < 0.3) g->trans_dur = 0.3;
         g->trans_t0 = g->now;
         g->trans_active = true;
         g->blk = B_TRANS;
@@ -568,9 +482,91 @@ static void stage_change(game *g, const hw_event *ev)
     g->shown = g->vm.s.display;
 }
 
-static void end_story(game *g)
+/* ---- extension statements (rfcs/0007) ---- */
+
+static void run_extension(game *g, const hw_event *ev)
+{
+    const hw_ext_statement *h = g->ext_of ? g->ext_of[ev->subject] : NULL;
+    if (!h) return; /* not in this player: skipped (reported when the game was loaded) */
+    hw_ext_call call = { &g->vm, ev->subject, ev->add, ev->add_count };
+    if (h->begin) h->begin(h->user, &call);
+    bool blocking = (g->m.exts[ev->subject].flags & HW_XTNS_BLOCKING) && h->update;
+    if (!blocking) return;
+    if (skipping(g) || g->fast_forward) {
+        if (h->finish) h->finish(h->user);
+        return;
+    }
+    g->ext_active = h;
+    g->blk = B_EXT;
+}
+
+/* Ends a blocking statement early (skip, rewind, load, title). */
+static void ext_stop(game *g)
+{
+    if (g->ext_active && g->ext_active->finish) g->ext_active->finish(g->ext_active->user);
+    g->ext_active = NULL;
+}
+
+/* Every statement shows its saved state again (after a load, a rewind, a reload, or a new start). */
+static void ext_restore_all(game *g)
+{
+    const hw_display *d = &g->vm.s.display;
+    for (uint32_t i = 0; g->ext_of && i < g->m.ext_count; i++) {
+        const hw_ext_statement *h = g->ext_of[i];
+        if (!h || !h->restore) continue;
+        bool called = i < HW_VM_MAX_EXT && ((d->ext_called >> i) & 1u);
+        uint32_t n = g->m.exts[i].param_count < HW_VM_EXT_VALUES ? g->m.exts[i].param_count : HW_VM_EXT_VALUES;
+        hw_ext_call last = { &g->vm, i, called ? d->ext_last[i] : NULL, called ? n : 0 };
+        h->restore(h->user, called ? &last : NULL);
+    }
+}
+
+/* Matches the module's extension statements to this player's handlers; reports the missing ones. */
+static void bind_extensions(game *g)
+{
+    SDL_free(g->ext_of);
+    g->ext_of = g->m.ext_count ? SDL_calloc(g->m.ext_count, sizeof *g->ext_of) : NULL;
+    char missing[256] = "";
+    size_t n = 0;
+    for (uint32_t i = 0; g->ext_of && i < g->m.ext_count; i++) {
+        const char *name = hw_str(&g->m, g->m.exts[i].name);
+        g->ext_of[i] = hw_ext_find(name);
+        if (!g->ext_of[i] && n + 1 < sizeof missing) n += (size_t)snprintf(missing + n, sizeof missing - n, "%s%s", n ? ", " : "", name);
+    }
+    if (missing[0]) {
+        SDL_Log("extension statements this player doesn't have (skipped): %s", missing);
+        if (g->dev) {
+            char msg[320];
+            snprintf(msg, sizeof msg, "Skipped extension statements (not in this player): %s", missing);
+            notify(g, msg);
+        }
+    }
+}
+
+/* Theme settings with the default theme's values as fallbacks. */
+static void bind_theme(game *g)
+{
+    hw_theme_palette(&g->m, &g->pal);
+    g->tb_alpha = (float)hw_theme_int(&g->m, "textbox.opacity", 82) / 100.0f;
+    g->tb_height = (float)hw_theme_int(&g->m, "textbox.height", 27) / 100.0f;
+    g->tb_pad = (float)hw_theme_int(&g->m, "textbox.padding", 44);
+    g->text_px = (float)hw_theme_int(&g->m, "text.size", 40);
+    g->trans_ms = hw_theme_int(&g->m, "transition.ms", 500);
+    if (g->name_fonts) hw_fonts_close(g->name_fonts);
+    g->name_fonts = NULL;
+    const char *name_font = hw_theme_str(&g->m, "font.name");
+    char path[1100];
+    static const char *const exts[] = { ".ttf", ".otf", ".ttc", NULL };
+    if (name_font && hw_assets_find(g->assets, "", name_font, exts, path, sizeof path)) {
+        hw_font_source src = { NULL, hw_vfs_open(g->vfs, path) };
+        if (src.io) g->name_fonts = hw_fonts_open_sources(g->ren, &src, 1);
+    }
+}
+
+void end_story(game *g)
 {
     hw_audio_stop_all(g->audio);
+    g->title_music = false;
     save_global(g);
 }
 
@@ -581,6 +577,7 @@ static void handle(game *g, const hw_event *ev)
     case HW_EV_SAY: {
         hw_audio_stop(g->audio, HW_CHANNEL_VOICE, 0);
         show_line(g, ev->line, false);
+        if (g->vm.s.display.textbox == HW_TEXTBOX_NVL) layout_page(g);
         add_backlog(g);
         if (m->lines[ev->line].line_id != HW_NONE && !may_skip_line(g) && !g->fast_forward) {
             char id[7];
@@ -602,9 +599,11 @@ static void handle(game *g, const hw_event *ev)
         break;
     case HW_EV_SHOW: case HW_EV_HIDE: case HW_EV_MOVE: case HW_EV_BG: case HW_EV_CG:
         if (ev->kind == HW_EV_BG) g->have_line = false; /* a new scene starts with an empty textbox */
+        if (ev->kind == HW_EV_CG && hw_unlock(&g->unlocks, false, ev->subject)) save_global(g); /* the gallery */
         stage_change(g, ev);
         break;
     case HW_EV_AUDIO:
+        if (ev->channel == HW_CHANNEL_MUSIC && hw_unlock(&g->unlocks, true, ev->subject)) save_global(g); /* the music room */
         if (g->fast_forward && (ev->channel == HW_CHANNEL_SFX || ev->channel == HW_CHANNEL_VOICE)) break;
         hw_audio_play(g->audio, (int)ev->channel, hw_str(m, ev->subject), ev->ms);
         break;
@@ -618,6 +617,7 @@ static void handle(game *g, const hw_event *ev)
         }
         break;
     case HW_EV_EFFECT:
+        if (g->settings.reduce_motion) break; /* no shaking or flashing (§13) */
         if (ev->effect == 0) {
             g->shake_dur = (ev->ms >= 0 ? ev->ms : 500) / 1000.0;
             g->shake_until = g->now + g->shake_dur;
@@ -625,6 +625,15 @@ static void handle(game *g, const hw_event *ev)
             g->flash_dur = (ev->ms >= 0 ? ev->ms : 300) / 1000.0;
             g->flash_until = g->now + g->flash_dur;
         }
+        break;
+    case HW_EV_TEXTBOX:
+        if (ev->effect == HW_TEXTBOX_ADV || ev->effect == HW_TEXTBOX_NVL || ev->effect == HW_TEXTBOX_CLEAR) {
+            g->page_built = 0;
+            g->have_line = false;
+        }
+        break;
+    case HW_EV_XCALL:
+        run_extension(g, ev);
         break;
     case HW_EV_END:
         end_story(g);
@@ -644,7 +653,7 @@ static void handle(game *g, const hw_event *ev)
 }
 
 /* Runs the VM until something blocks. */
-static void pump(game *g)
+void pump(game *g)
 {
     hw_event ev;
     for (int i = 0; i < 10000 && g->blk == B_NONE; i++) {
@@ -656,7 +665,7 @@ static void pump(game *g)
     }
 }
 
-static void advance(game *g)
+void advance(game *g)
 {
     if (g->blk != B_SAY) return;
     hw_audio_stop(g->audio, HW_CHANNEL_VOICE, 0);
@@ -665,7 +674,7 @@ static void advance(game *g)
 }
 
 /* Shows everything at once (a click while the text is still appearing). */
-static bool finish_reveal(game *g)
+bool finish_reveal(game *g)
 {
     if (g->reveal >= (float)g->text.chars) return false;
     g->reveal = (float)g->text.chars + 1;
@@ -674,7 +683,7 @@ static bool finish_reveal(game *g)
     return true;
 }
 
-static void choose(game *g, uint32_t k)
+void choose(game *g, uint32_t k)
 {
     if (g->blk != B_MENU || k >= g->option_count) return;
     if (!hw_vm_choose(&g->vm, k)) return;
@@ -685,18 +694,23 @@ static void choose(game *g, uint32_t k)
 
 static void reset_presentation(game *g)
 {
+    ext_stop(g);
     g->blk = B_NONE;
+    g->page_built = 0;
     g->trans_active = false;
     g->shake_until = g->flash_until = 0;
     g->have_line = false;
     g->option_count = 0;
     g->shown = g->vm.s.display;
+    ext_restore_all(g);
+    if (g->vm.s.display.textbox == HW_TEXTBOX_NVL) layout_page(g);
 }
 
-static void start_story(game *g)
+void start_story(game *g)
 {
     hw_history_clear(&g->hist);
     hw_audio_stop_all(g->audio);
+    g->title_music = false;
     if (!hw_vm_start(&g->vm, HW_NONE)) {
         snprintf(g->error, sizeof g->error, "%s", g->vm.error);
         g->scr = SCR_ERROR;
@@ -711,7 +725,7 @@ static void start_story(game *g)
     pump(g);
 }
 
-static void rollback(game *g)
+void rollback(game *g)
 {
     if (g->scr != SCR_PLAY || !hw_rollback(&g->vm, &g->hist)) return;
     reset_presentation(g);
@@ -722,10 +736,39 @@ static void rollback(game *g)
 
 /* ---- saves ---- */
 
-static void save_slot(game *g, int slot)
+/* A small PNG of the scene as last drawn (without the textbox), for the save screen (plan §8.9). */
+static bool thumbnail(game *g, void **png, size_t *size)
+{
+    SDL_Texture *prev = SDL_GetRenderTarget(g->ren);
+    SDL_SetRenderTarget(g->ren, g->scene_tex);
+    SDL_Surface *full = SDL_RenderReadPixels(g->ren, NULL);
+    SDL_SetRenderTarget(g->ren, prev);
+    if (!full) return false;
+    int w = 384, h = (int)(384.0f * g->H / g->W);
+    SDL_Surface *small = SDL_ScaleSurface(full, w, h, SDL_SCALEMODE_LINEAR);
+    SDL_DestroySurface(full);
+    if (!small) return false;
+    SDL_IOStream *io = SDL_IOFromDynamicMem();
+    bool ok = io && SDL_SavePNG_IO(small, io, false);
+    SDL_DestroySurface(small);
+    if (ok) {
+        Sint64 n = SDL_GetIOSize(io);
+        const void *data = SDL_GetPointerProperty(SDL_GetIOProperties(io), SDL_PROP_IOSTREAM_DYNAMIC_MEMORY_POINTER, NULL);
+        *png = n > 0 && data ? SDL_malloc((size_t)n) : NULL;
+        if (*png) {
+            memcpy(*png, data, (size_t)n);
+            *size = (size_t)n;
+        }
+        ok = *png != NULL;
+    }
+    if (io) SDL_CloseIO(io);
+    return ok;
+}
+
+void save_slot(game *g, int slot)
 {
     const void *snap = hw_history_peek(&g->hist, 0);
-    if (!snap || !g->persist.dir[0]) return;
+    if (!snap || (slot >= 0 && !g->persist.dir[0])) return;
     uint32_t pcs[HW_SAVE_HISTORY];
     uint32_t n = 0;
     for (uint32_t i = 1; i < g->hist.count && n < HW_SAVE_HISTORY; i++) pcs[n++] = hw_snapshot_pc(hw_history_peek(&g->hist, i));
@@ -744,16 +787,25 @@ static void save_slot(game *g, int slot)
         else snprintf(info.preview, sizeof info.preview, "%.150s", text);
     }
     snprintf(info.language, sizeof info.language, "%s", g->lang);
+    void *png = NULL;
+    size_t png_size = 0;
+    if (thumbnail(g, &png, &png_size)) {
+        info.thumb = png;
+        info.thumb_size = (uint32_t)png_size;
+    }
     hw_buf out = { 0 };
     char path[1100];
-    hw_persist_slot_path(&g->persist, slot, path, sizeof path);
+    if (slot >= 0) hw_persist_slot_path(&g->persist, slot, path, sizeof path);
+    else snprintf(path, sizeof path, "%s", g->save_to);
     bool ok = hw_save_write(&g->vm, snap, pcs, n, &info, &out) && hw_persist_write(path, out.data, out.len);
     hw_buf_free(&out);
+    SDL_free(png);
+    g->slots_cached = false;
     save_global(g);
     notify(g, ok ? ui(g, UI_SAVED) : SDL_GetError());
 }
 
-static bool load_slot(game *g, int slot)
+bool load_slot(game *g, int slot)
 {
     char path[1100];
     hw_persist_slot_path(&g->persist, slot, path, sizeof path);
@@ -802,7 +854,7 @@ static void set_language(game *g, const char *lang)
     if (g->blk == B_MENU) layout_menu(g);
 }
 
-static void next_language(game *g)
+void next_language(game *g)
 {
     const hw_module *m = &g->m;
     uint32_t cur = 0;
@@ -841,13 +893,19 @@ static void pick_language(game *g)
 
 static bool load_module(game *g, hw_module *out, char *err, size_t cap)
 {
+    uint64_t t0 = SDL_GetTicksNS();
     size_t size = 0;
-    uint8_t *bytes = hw_read_file(g->game_path, &size);
+    bool packed = hw_vfs_pack_count(g->vfs) > 0;
+    uint8_t *bytes = packed ? hw_vfs_load(g->vfs, "game.hwb", &size) : hw_read_file(g->game_path, &size);
     if (!bytes) {
-        snprintf(err, cap, "can't read %s: %s", g->game_path, SDL_GetError());
+        snprintf(err, cap, "can't read %s: %s", packed ? "game.hwb in the pack" : g->game_path, SDL_GetError());
         return false;
     }
+    uint64_t t1 = SDL_GetTicksNS();
     bool ok = hw_module_load(out, bytes, size, err, cap);
+    g->perf_load_ms = (double)(SDL_GetTicksNS() - t1) / 1e6;
+    g->perf_read_ms = (double)(t1 - t0) / 1e6;
+    g->perf_hwb_bytes = size;
     SDL_free(bytes);
     return ok;
 }
@@ -864,7 +922,7 @@ static void link_reloaded(game *g, const char *result, const char *message)
     g->link_state[0] = 0; /* report the state again, even if it looks the same */
 }
 
-static void reload(game *g)
+void reload(game *g)
 {
     char err[200], msg[300];
     hw_module fresh;
@@ -902,6 +960,19 @@ static void reload(game *g)
             if (fresh.lines[k].line_id == g->m.lines[l].line_id) read[k] = 1;
         }
     }
+    /* Unlocks survive by asset name. */
+    hw_unlocks unlocks;
+    if (!hw_unlocks_build(&unlocks, &fresh)) memset(&unlocks, 0, sizeof unlocks);
+    for (int list = 0; list < 2; list++) {
+        uint32_t n = list ? g->unlocks.music_count : g->unlocks.cg_count;
+        for (uint32_t i = 0; i < n; i++) {
+            if (!(list ? g->unlocks.music_heard[i] : g->unlocks.cg_seen[i])) continue;
+            uint32_t asset = hw_module_find_string(&fresh, hw_str(&g->m, list ? g->unlocks.music[i] : g->unlocks.cgs[i]));
+            if (asset != HW_NONE) hw_unlock(&unlocks, list == 1, asset);
+        }
+    }
+    hw_unlocks_free(&g->unlocks);
+    g->unlocks = unlocks;
     hw_vm_free(&g->vm);
     hw_module_free(&g->m);
     SDL_free(g->read_lines);
@@ -914,6 +985,9 @@ static void reload(game *g)
     g->read_lines = read;
     hw_history_init(&g->hist, hw_vm_snapshot_size(&g->vm), HISTORY_DEPTH);
     hw_assets_flush(g->assets);
+    bind_theme(g);
+    bind_extensions(g);
+    apply_settings(g);
     SDL_free(g->option_text);
     g->option_text = SDL_calloc(HW_VM_MAX_OPTIONS, sizeof *g->option_text);
     hw_vm_set_language(&g->vm, g->lang);
@@ -941,8 +1015,6 @@ static void reload(game *g)
 }
 
 /* ---- dev: warp, skip to the next menu, and the Studio link ---- */
-
-static void proceed(game *g);
 
 /* Plays from `where` (a scene, file:line, or #lineid) with a state reconstructed along a real path. */
 static bool warp_to(game *g, const char *where, char *msg, size_t cap)
@@ -1001,6 +1073,13 @@ static const char *screen_name(screen s)
     case SCR_CONFIRM_QUIT: return "confirm";
     case SCR_END: return "end";
     case SCR_ERROR: return "error";
+    case SCR_CONFIG: return "config";
+    case SCR_CONTROLS: return "controls";
+    case SCR_A11Y: return "accessibility";
+    case SCR_EXTRAS: return "extras";
+    case SCR_GALLERY: return "gallery";
+    case SCR_CG_VIEW: return "cg";
+    case SCR_MUSIC: return "music";
     }
     return "play";
 }
@@ -1083,273 +1162,6 @@ static void link_poll(game *g)
     }
 }
 
-/* ---- drawing the screens ---- */
-
-static void draw_textbox(game *g)
-{
-    SDL_FRect box = { g->W * 0.08f, g->H * 0.705f, g->W * 0.84f, g->H * 0.265f };
-    fill(g, box, 0x101320, 0.82f);
-    fill(g, (SDL_FRect){ box.x, box.y, box.w, sc(g, 3) }, 0xffc440, 0.7f);
-    if (g->have_line) {
-        if (g->speaker[0]) {
-            float w = hw_text_width(g->fonts, g->speaker, sc(g, 34), HW_TS_BOLD) + sc(g, 48);
-            SDL_FRect plate = { box.x + sc(g, 24), box.y - sc(g, 58), w, sc(g, 58) };
-            fill(g, plate, 0x101320, 0.92f);
-            fill(g, (SDL_FRect){ plate.x, plate.y + plate.h - sc(g, 4), plate.w, sc(g, 4) }, g->speaker_color, 1.0f);
-            hw_text_draw(g->fonts, g->speaker, sc(g, 34), HW_TS_BOLD, plate.x + sc(g, 24), plate.y + sc(g, 42), 0,
-                         WHITE, INK, 2.0f);
-        }
-        hw_rich_draw(g->fonts, &g->text, box.x + sc(g, 44), box.y + sc(g, 18), g->reveal, (float)g->now, 1.0f, WHITE, INK, 2.0f);
-        if (g->blk == B_SAY && g->reveal >= (float)g->text.chars) {
-            float a = 0.5f + 0.5f * sinf((float)g->now * 5.0f);
-            fill(g, (SDL_FRect){ box.x + box.w - sc(g, 54), box.y + box.h - sc(g, 76), sc(g, 18), sc(g, 18) }, 0xffc440, a);
-        }
-    }
-    /* Quick bar. */
-    struct { int id; hw_ui_string s; bool on; } items[] = {
-        { BTN_ROLLBACK, UI_ROLLBACK, false }, { BTN_HISTORY, UI_HISTORY, false }, { BTN_AUTO, UI_AUTO, g->auto_mode },
-        { BTN_SKIP, UI_SKIP, g->skip_mode }, { BTN_SAVE, UI_SAVE, false }, { BTN_LOAD, UI_LOAD, false }, { BTN_MENU, UI_MENU, false },
-    };
-    float x = box.x + box.w - sc(g, 16);
-    float y = box.y + box.h - sc(g, 14);
-    for (int i = (int)(sizeof items / sizeof items[0]) - 1; i >= 0; i--) {
-        const char *s = ui(g, items[i].s);
-        float w = hw_text_width(g->fonts, s, sc(g, 22), 0) + sc(g, 24);
-        SDL_FRect r = { x - w, y - sc(g, 34), w, sc(g, 34) };
-        x -= w + sc(g, 6);
-        int index = g->hit_count;
-        if (g->hit_count < MAX_HITS) g->hits[g->hit_count++] = (hit){ r, items[i].id };
-        bool hover = point_in(g->mx, g->my, r) || g->focus == index;
-        label(g, s, 22, r.x + r.w / 2, r.y + sc(g, 25), 1, items[i].on ? ACCENT : hover ? WHITE : DIM);
-    }
-}
-
-static void draw_menu(game *g)
-{
-    float bw = g->W * 0.55f, bh = sc(g, 76), gap = sc(g, 18);
-    float total = (float)g->option_count * (bh + gap) - gap;
-    float y = g->H * 0.40f - total / 2;
-    if (y < g->H * 0.05f) y = g->H * 0.05f;
-    for (uint32_t i = 0; i < g->option_count; i++) {
-        SDL_FRect r = { (g->W - bw) / 2, y, bw, bh };
-        int index = g->hit_count;
-        if (g->hit_count < MAX_HITS) g->hits[g->hit_count++] = (hit){ r, BTN_OPTION + (int)i };
-        bool hover = point_in(g->mx, g->my, r) || g->focus == index;
-        fill(g, r, hover ? 0x3a4466 : 0x161a2b, hover ? 0.95f : 0.85f);
-        if (hover) fill(g, (SDL_FRect){ r.x, r.y, sc(g, 6), r.h }, 0xffc440, 1.0f);
-        const hw_rich_text *t = &g->option_text[i];
-        float ty = r.y + (r.h - t->layout.height) / 2 - sc(g, 4);
-        hw_rich_draw(g->fonts, t, r.x + (r.w - t->width) / 2, ty, 1e9f, (float)g->now, 1.0f, hover ? ACCENT : WHITE, INK, 2.0f);
-        y += bh + gap;
-    }
-}
-
-static void draw_title(game *g)
-{
-    const char *why = NULL;
-    SDL_Texture *t = hw_assets_image(g->assets, "bg", "title", &why);
-    if (t) {
-        SDL_FRect all = { 0, 0, g->W, g->H };
-        SDL_RenderTexture(g->ren, t, NULL, &all);
-    } else {
-        gradient(g, (SDL_FRect){ 0, 0, g->W, g->H }, 0x2b3a67, 0x0d1020, 1.0f);
-    }
-    hw_text_draw(g->fonts, hw_str(&g->m, g->m.title), sc(g, 88), HW_TS_BOLD, g->W / 2, g->H * 0.32f, 1, WHITE, INK, 4.0f);
-    char lang[64];
-    snprintf(lang, sizeof lang, "%s: %s", ui(g, UI_LANGUAGE), hw_language_name(g->lang));
-    const char *labels[] = { ui(g, UI_START), ui(g, UI_LOAD), lang, ui(g, UI_QUIT) };
-    int ids[] = { BTN_START, BTN_LOAD, BTN_LANGUAGE, BTN_QUIT };
-    for (int i = 0; i < 4; i++) {
-        if (ids[i] == BTN_LANGUAGE && g->m.language_count < 2) continue;
-        SDL_FRect r = { g->W / 2 - sc(g, 220), g->H * 0.48f + (float)i * sc(g, 88), sc(g, 440), sc(g, 70) };
-        button(g, r, labels[i], ids[i], 34, false);
-    }
-}
-
-static void dim_background(game *g, float a) { fill(g, (SDL_FRect){ 0, 0, g->W, g->H }, 0x05060c, a); }
-
-static void draw_sysmenu(game *g)
-{
-    dim_background(g, 0.7f);
-    char lang[64], speed[64];
-    snprintf(lang, sizeof lang, "%s: %s", ui(g, UI_LANGUAGE), hw_language_name(g->lang));
-    snprintf(speed, sizeof speed, "%s: %d", ui(g, UI_TEXT_SPEED), (int)g->settings.cps);
-    const char *labels[] = { ui(g, UI_RESUME), ui(g, UI_SAVE), ui(g, UI_LOAD), ui(g, UI_HISTORY), lang, speed, ui(g, UI_TITLE), ui(g, UI_QUIT) };
-    int ids[] = { BTN_RESUME, BTN_SAVE, BTN_LOAD, BTN_HISTORY, BTN_LANGUAGE, BTN_SPEED, BTN_TITLE, BTN_QUIT };
-    float y = g->H * 0.12f;
-    for (int i = 0; i < 8; i++) {
-        if (ids[i] == BTN_LANGUAGE && g->m.language_count < 2) continue;
-        button(g, (SDL_FRect){ g->W / 2 - sc(g, 260), y, sc(g, 520), sc(g, 68) }, labels[i], ids[i], 32, false);
-        y += sc(g, 86);
-    }
-}
-
-static void draw_slots(game *g)
-{
-    dim_background(g, 0.85f);
-    label(g, ui(g, g->slots_saving ? UI_SAVE : UI_LOAD), 56, g->W / 2, sc(g, 100), 1, WHITE);
-    float cw = g->W * 0.40f, ch = sc(g, 170);
-    int first = g->slots_saving ? 1 : 0; /* the quick save can be loaded, not chosen as a target */
-    for (int s = first; s <= HW_SLOTS; s++) {
-        int i = s - first;
-        float x = i % 2 == 0 ? g->W * 0.08f : g->W * 0.52f;
-        float y = sc(g, 150) + (float)(i / 2) * (ch + sc(g, 20));
-        SDL_FRect r = { x, y, cw, ch };
-        int index = g->hit_count;
-        if (g->hit_count < MAX_HITS) g->hits[g->hit_count++] = (hit){ r, BTN_SLOT + s };
-        bool hover = point_in(g->mx, g->my, r) || g->focus == index;
-        fill(g, r, hover ? 0x3a4466 : 0x161a2b, 0.92f);
-        char title[64];
-        if (s == HW_SLOT_QUICK) snprintf(title, sizeof title, "%s", ui(g, UI_QUICK_SLOT));
-        else snprintf(title, sizeof title, ui(g, UI_SLOT), s);
-        label(g, title, 30, r.x + sc(g, 24), r.y + sc(g, 44), 0, hover ? ACCENT : WHITE);
-        char path[1100];
-        hw_persist_slot_path(&g->persist, s, path, sizeof path);
-        size_t size = 0;
-        uint8_t *data = g->persist.dir[0] ? SDL_LoadFile(path, &size) : NULL;
-        hw_save_info info;
-        if (data && hw_save_peek(data, size, &info)) {
-            SDL_DateTime dt;
-            char when[96] = "";
-            if (SDL_TimeToDateTime((SDL_Time)info.time * SDL_NS_PER_SECOND, &dt, true)) {
-                snprintf(when, sizeof when, "%04d-%02d-%02d %02d:%02d   %u:%02u:%02u", dt.year, dt.month, dt.day, dt.hour,
-                         dt.minute, info.playtime_s / 3600, info.playtime_s / 60 % 60, info.playtime_s % 60);
-            }
-            label(g, when, 22, r.x + sc(g, 24), r.y + sc(g, 82), 0, DIM);
-            char preview[160];
-            snprintf(preview, sizeof preview, "%.60s", info.preview);
-            label(g, preview, 24, r.x + sc(g, 24), r.y + sc(g, 128), 0, WHITE);
-        } else {
-            label(g, ui(g, UI_EMPTY_SLOT), 24, r.x + sc(g, 24), r.y + sc(g, 100), 0, DIM);
-        }
-        SDL_free(data);
-    }
-    button(g, (SDL_FRect){ g->W / 2 - sc(g, 160), g->H - sc(g, 110), sc(g, 320), sc(g, 64) }, ui(g, UI_BACK), BTN_BACK, 30, false);
-}
-
-static void draw_history(game *g)
-{
-    dim_background(g, 0.88f);
-    label(g, ui(g, UI_HISTORY), 52, g->W / 2, sc(g, 90), 1, WHITE);
-    if (g->backlog_count == 0) label(g, ui(g, UI_HISTORY_EMPTY), 30, g->W / 2, g->H / 2, 1, DIM);
-    float y = g->H - sc(g, 170);
-    for (int i = g->backlog_count - 1 - g->history_scroll; i >= 0 && y > sc(g, 140); i--) {
-        const backlog_entry *e = &g->backlog[(g->backlog_start + i) % BACKLOG];
-        if (e->name[0]) label(g, e->name, 26, g->W * 0.1f, y, 0, ACCENT);
-        char text[160];
-        snprintf(text, sizeof text, "%.120s", e->text);
-        label(g, text, 26, g->W * 0.24f, y, 0, WHITE);
-        y -= sc(g, 52);
-    }
-    button(g, (SDL_FRect){ g->W / 2 - sc(g, 160), g->H - sc(g, 110), sc(g, 320), sc(g, 64) }, ui(g, UI_BACK), BTN_BACK, 30, false);
-}
-
-static void draw_center_card(game *g, const char *title, const char *body, const char *detail)
-{
-    dim_background(g, 0.78f);
-    label(g, title, 54, g->W / 2, g->H * 0.38f, 1, WHITE);
-    if (body) {
-        hw_rich_text rt;
-        memset(&rt, 0, sizeof rt);
-        hw_rich_plain(&rt, body);
-        hw_rich_layout(&rt, g->fonts, g->W * 0.7f, sc(g, 30), g->lang);
-        hw_rich_draw(g->fonts, &rt, (g->W - rt.width) / 2, g->H * 0.44f, 1e9f, 0, 1, WHITE, INK, 2.0f);
-        hw_rich_free(&rt);
-    }
-    if (detail) label(g, detail, 24, g->W / 2, g->H * 0.80f, 1, DIM);
-}
-
-static void draw_overlay(game *g)
-{
-    SDL_FRect r = { g->W * 0.70f, sc(g, 16), g->W * 0.29f, g->H * 0.62f };
-    fill(g, r, 0x000000, 0.72f);
-    char line[256];
-    float y = r.y + sc(g, 34);
-    uint32_t pc = g->vm.s.pc;
-    uint32_t scene = hw_module_scene_at(&g->m, pc);
-    const char *file = "?";
-    uint32_t src = 0;
-    hw_module_source_at(&g->m, pc, &file, &src);
-    snprintf(line, sizeof line, "scene %s   %s:%u", scene == HW_NONE ? "?" : hw_str(&g->m, g->m.scenes[scene].name), file, (unsigned)src);
-    label(g, line, 20, r.x + sc(g, 14), y, 0, ACCENT);
-    y += sc(g, 28);
-    snprintf(line, sizeof line, "pc %u  stack %u  calls %u  rewind %u  lang %s", (unsigned)pc, (unsigned)g->vm.s.sp,
-             (unsigned)g->vm.s.fp, (unsigned)g->hist.count, g->lang);
-    label(g, line, 20, r.x + sc(g, 14), y, 0, WHITE);
-    y += sc(g, 28);
-    if (g->vm.div_by_zero) {
-        snprintf(line, sizeof line, "divisions by zero: %u", (unsigned)g->vm.div_by_zero);
-        label(g, line, 20, r.x + sc(g, 14), y, 0, ACCENT);
-        y += sc(g, 28);
-    }
-    for (int c = 0; c < 4; c++) {
-        static const char *const names[4] = { "music", "ambient", "sfx", "voice" };
-        const char *missing = hw_audio_missing(g->audio, c);
-        if (!missing || c == HW_CHANNEL_VOICE) continue;
-        snprintf(line, sizeof line, "%s file %s (silence)", names[c], missing);
-        label(g, line, 20, r.x + sc(g, 14), y, 0, DIM);
-        y += sc(g, 28);
-    }
-    for (uint32_t i = 0; i < g->m.var_count && y < r.y + r.h - sc(g, 10); i++) {
-        char v[64];
-        hw_vm_value_text(&g->vm, i, g->vm.vars[i], v, sizeof v);
-        snprintf(line, sizeof line, "%s = %s%s", hw_str(&g->m, g->m.vars[i].name), v, g->m.vars[i].scope == HW_SCOPE_GLOBAL ? "  (global)" : "");
-        label(g, line, 20, r.x + sc(g, 14), y, 0, WHITE);
-        y += sc(g, 26);
-    }
-}
-
-static void render(game *g)
-{
-    g->hit_count = 0;
-    SDL_SetRenderDrawColor(g->ren, 0, 0, 0, 255);
-    SDL_RenderClear(g->ren);
-    if (g->scr == SCR_TITLE) {
-        draw_title(g);
-    } else {
-        render_scene(g, &g->shown, g->scene_tex);
-        compose_scene(g);
-        if (g->now < g->flash_until) fill(g, (SDL_FRect){ 0, 0, g->W, g->H }, 0xffffff, (float)((g->flash_until - g->now) / g->flash_dur));
-        bool ui_visible = g->scr == SCR_PLAY && !g->trans_active;
-        if (ui_visible && g->blk == B_MENU) draw_menu(g);
-        if (ui_visible || g->scr == SCR_SYSMENU || g->scr == SCR_CONFIRM_QUIT) draw_textbox(g);
-        if (g->scr != SCR_PLAY) g->hit_count = 0; /* the screens below own the clicks */
-        switch (g->scr) {
-        case SCR_SYSMENU: draw_sysmenu(g); break;
-        case SCR_SLOTS: draw_slots(g); break;
-        case SCR_HISTORY: draw_history(g); break;
-        case SCR_END: draw_center_card(g, ui(g, UI_THE_END), NULL, ui(g, UI_CLICK_TO_CONTINUE)); break;
-        case SCR_ERROR:
-            if (g->dev) draw_center_card(g, ui(g, UI_ERROR_TITLE), g->error, "Fix the script, run hwc build, then press F5 to reload.");
-            else draw_center_card(g, ui(g, UI_ERROR_TITLE), ui(g, UI_ERROR_RELEASE), ui(g, UI_CLICK_TO_CONTINUE));
-            break;
-        case SCR_CONFIRM_QUIT:
-            draw_center_card(g, ui(g, UI_CONFIRM_QUIT), NULL, NULL);
-            button(g, (SDL_FRect){ g->W / 2 - sc(g, 300), g->H * 0.5f, sc(g, 260), sc(g, 68) }, ui(g, UI_YES), BTN_YES, 32, false);
-            button(g, (SDL_FRect){ g->W / 2 + sc(g, 40), g->H * 0.5f, sc(g, 260), sc(g, 68) }, ui(g, UI_NO), BTN_NO, 32, false);
-            break;
-        default: break;
-        }
-    }
-    if (g->overlay && g->dev && g->scr != SCR_TITLE) draw_overlay(g);
-    if (g->now < g->notice_until) {
-        float w = hw_text_width(g->fonts, g->notice, sc(g, 26), 0) + sc(g, 48);
-        if (w > g->W * 0.9f) w = g->W * 0.9f;
-        SDL_FRect r = { (g->W - w) / 2, sc(g, 24), w, sc(g, 54) };
-        fill(g, r, 0x101320, 0.92f);
-        label(g, g->notice, 26, g->W / 2, r.y + sc(g, 37), 1, WHITE);
-    }
-    if (g->shot) {
-        SDL_Surface *shot = SDL_RenderReadPixels(g->ren, NULL);
-        if (!shot || !SDL_SavePNG(shot, g->shot)) SDL_Log("screenshot: %s", SDL_GetError());
-        SDL_DestroySurface(shot);
-        g->shot = NULL;
-    }
-    SDL_RenderPresent(g->ren);
-    memcpy(g->last_hits, g->hits, sizeof g->hits);
-    g->last_hit_count = g->hit_count;
-}
-
 /* ---- per-frame update ---- */
 
 static void update(game *g, double dt)
@@ -1361,6 +1173,12 @@ static void update(game *g, double dt)
         g->blk = B_NONE;
     }
     if (g->blk == B_WAIT && (skip || g->now >= g->wait_until)) g->blk = B_NONE;
+    if (g->blk == B_EXT) {
+        const hw_ext_statement *h = g->ext_active;
+        if (!h || skip) ext_stop(g);
+        else if (h->update(h->user, dt)) g->ext_active = NULL;
+        if (!g->ext_active) g->blk = B_NONE;
+    }
     if (g->blk == B_SAY) {
         hw_rich_text *t = &g->text;
         if (g->reveal < (float)t->chars) {
@@ -1375,7 +1193,8 @@ static void update(game *g, double dt)
             }
         } else {
             if (g->done_at < 0) g->done_at = g->now;
-            double wait = 1.0 + 0.035 * t->chars;
+            static const double AUTO[5] = { 2.0, 1.5, 1.0, 0.7, 0.45 };
+            double wait = (1.0 + 0.035 * t->chars) * AUTO[(g->settings.auto_speed >= 1 && g->settings.auto_speed <= 5 ? g->settings.auto_speed : 3) - 1];
             if (t->no_wait) advance(g);
             else if (may_skip_line(g) && g->now - g->done_at > 0.03) advance(g);
             else if (g->auto_mode && g->now - g->done_at > wait) advance(g);
@@ -1384,196 +1203,151 @@ static void update(game *g, double dt)
     if (g->blk == B_NONE) pump(g);
 }
 
-/* ---- input ---- */
-
-static void open_slots(game *g, bool saving)
-{
-    g->slots_saving = saving;
-    if (g->scr != SCR_SLOTS) g->back_to = g->scr == SCR_SYSMENU ? SCR_SYSMENU : g->scr;
-    g->scr = SCR_SLOTS;
-    g->focus = -1;
-}
-
-static void activate(game *g, int id)
-{
-    switch (id) {
-    case BTN_START: start_story(g); break;
-    case BTN_LOAD: open_slots(g, false); break;
-    case BTN_SAVE: if (g->vm_ready && g->hist.count > 0) open_slots(g, true); break;
-    case BTN_LANGUAGE: next_language(g); break;
-    case BTN_QUIT: g->back_to = g->scr; g->scr = SCR_CONFIRM_QUIT; break;
-    case BTN_YES: g->running = false; break;
-    case BTN_NO: g->scr = g->back_to; break;
-    case BTN_RESUME: g->scr = SCR_PLAY; break;
-    case BTN_MENU: g->scr = SCR_SYSMENU; break;
-    case BTN_HISTORY: g->back_to = g->scr; g->history_scroll = 0; g->scr = SCR_HISTORY; break;
-    case BTN_TITLE:
-        end_story(g);
-        g->scr = SCR_TITLE;
-        break;
-    case BTN_SPEED: {
-        static const float speeds[] = { 20, 40, 60, 100, 1000 };
-        int k = 0;
-        for (int i = 0; i < 5; i++) if (speeds[i] <= g->settings.cps) k = i;
-        g->settings.cps = speeds[(k + 1) % 5];
-        save_global(g);
-        break;
-    }
-    case BTN_BACK: g->scr = g->back_to == SCR_SLOTS || g->back_to == SCR_HISTORY ? SCR_PLAY : g->back_to; break;
-    case BTN_AUTO: g->auto_mode = !g->auto_mode; break;
-    case BTN_SKIP: g->skip_mode = !g->skip_mode; break;
-    case BTN_ROLLBACK: rollback(g); break;
-    default:
-        if (id >= BTN_SLOT && id <= BTN_SLOT + HW_SLOTS) {
-            int slot = id - BTN_SLOT;
-            if (g->slots_saving) {
-                save_slot(g, slot);
-                g->scr = SCR_PLAY;
-            } else {
-                load_slot(g, slot);
-            }
-        } else if (id >= BTN_OPTION && id < BTN_OPTION + HW_VM_MAX_OPTIONS) {
-            choose(g, (uint32_t)(id - BTN_OPTION));
-        }
-        break;
-    }
-}
-
-/* Click or Enter in the story: finish what is moving, else go on. */
-static void proceed(game *g)
-{
-    if (g->scr == SCR_END || g->scr == SCR_ERROR) {
-        g->scr = SCR_TITLE;
-        return;
-    }
-    if (g->scr != SCR_PLAY) return;
-    g->auto_mode = false;
-    if (g->blk == B_TRANS) {
-        g->trans_active = false;
-        g->blk = B_NONE;
-        pump(g);
-    } else if (g->blk == B_WAIT) {
-        g->blk = B_NONE;
-        pump(g);
-    } else if (g->blk == B_SAY) {
-        if (!finish_reveal(g)) advance(g);
-    }
-}
-
-static int hit_at(const game *g, float x, float y)
-{
-    for (int i = g->last_hit_count - 1; i >= 0; i--) {
-        if (point_in(x, y, g->last_hits[i].r)) return g->last_hits[i].id;
-    }
-    return 0;
-}
-
-static void escape(game *g)
-{
-    switch (g->scr) {
-    case SCR_PLAY: g->scr = SCR_SYSMENU; g->focus = -1; break;
-    case SCR_SYSMENU: g->scr = SCR_PLAY; break;
-    case SCR_SLOTS: case SCR_HISTORY: activate(g, BTN_BACK); break;
-    case SCR_CONFIRM_QUIT: g->scr = g->back_to; break;
-    case SCR_TITLE: g->back_to = SCR_TITLE; g->scr = SCR_CONFIRM_QUIT; break;
-    default: g->scr = SCR_TITLE; break;
-    }
-}
-
-static void on_event(game *g, SDL_Event *e)
-{
-    SDL_ConvertEventToRenderCoordinates(g->ren, e);
-    switch (e->type) {
-    case SDL_EVENT_QUIT:
-        g->running = false;
-        break;
-    case SDL_EVENT_MOUSE_MOTION:
-        g->mx = e->motion.x;
-        g->my = e->motion.y;
-        g->focus = -1;
-        break;
-    case SDL_EVENT_MOUSE_WHEEL:
-        if (g->scr == SCR_HISTORY) {
-            g->history_scroll += e->wheel.y > 0 ? 1 : -1;
-            if (g->history_scroll < 0) g->history_scroll = 0;
-            if (g->history_scroll > g->backlog_count - 1) g->history_scroll = g->backlog_count > 0 ? g->backlog_count - 1 : 0;
-        } else if (g->scr == SCR_PLAY && e->wheel.y > 0) {
-            rollback(g);
-        } else if (g->scr == SCR_PLAY && e->wheel.y < 0 && g->blk == B_SAY) {
-            proceed(g);
-        }
-        break;
-    case SDL_EVENT_MOUSE_BUTTON_UP: {
-        if (e->button.button == SDL_BUTTON_RIGHT) {
-            escape(g);
-            break;
-        }
-        if (e->button.button != SDL_BUTTON_LEFT) break;
-        int id = hit_at(g, e->button.x, e->button.y);
-        if (id) activate(g, id);
-        else if (g->scr == SCR_PLAY && g->blk != B_MENU) proceed(g);
-        else if (g->scr == SCR_END || g->scr == SCR_ERROR) proceed(g);
-        break;
-    }
-    case SDL_EVENT_KEY_DOWN: {
-        SDL_Keycode k = e->key.key;
-        if (k == SDLK_ESCAPE) escape(g);
-        else if (k == SDLK_F11 || (k == SDLK_RETURN && (e->key.mod & SDL_KMOD_ALT))) {
-            g->settings.fullscreen = !g->settings.fullscreen;
-            SDL_SetWindowFullscreen(g->win, g->settings.fullscreen);
-        } else if (k == SDLK_RETURN || k == SDLK_SPACE || k == SDLK_KP_ENTER || k == SDLK_Z) {
-            if (g->focus >= 0 && g->focus < g->last_hit_count) activate(g, g->last_hits[g->focus].id);
-            else proceed(g);
-        } else if (k == SDLK_DOWN || (k == SDLK_TAB && !(e->key.mod & SDL_KMOD_SHIFT))) {
-            if (k == SDLK_TAB && g->scr == SCR_PLAY && g->blk != B_MENU) g->skip_mode = !g->skip_mode;
-            else if (g->last_hit_count > 0) g->focus = (g->focus + 1) % g->last_hit_count;
-        } else if (k == SDLK_UP) {
-            if (g->last_hit_count > 0) g->focus = g->focus <= 0 ? g->last_hit_count - 1 : g->focus - 1;
-        } else if (k >= SDLK_1 && k <= SDLK_9 && g->scr == SCR_PLAY && g->blk == B_MENU) {
-            choose(g, (uint32_t)(k - SDLK_1));
-        } else if (k == SDLK_PAGEUP && g->scr == SCR_PLAY) {
-            rollback(g);
-        } else if (k == SDLK_A && g->scr == SCR_PLAY) {
-            g->auto_mode = !g->auto_mode;
-        } else if (k == SDLK_H && g->scr == SCR_PLAY) {
-            activate(g, BTN_HISTORY);
-        } else if (k == SDLK_F6 && g->scr == SCR_PLAY) {
-            save_slot(g, HW_SLOT_QUICK);
-        } else if (k == SDLK_F9 && g->vm_ready) {
-            load_slot(g, HW_SLOT_QUICK);
-        } else if (k == SDLK_F3 && g->dev) {
-            g->overlay = !g->overlay;
-        } else if (k == SDLK_F5 && g->dev) {
-            reload(g);
-        }
-        break;
-    }
-    case SDL_EVENT_WINDOW_FOCUS_LOST:
-        g->skip_mode = false;
-        break;
-    default:
-        break;
-    }
-}
-
 /* ---- setup ---- */
 
-static void open_fonts(game *g)
+/*
+ * The text fonts: the theme's or the game's own (assets/fonts/main), then Windows fonts for
+ * whatever they lack. The "easy to read" setting (§13) puts Verdana (wide, clear letterforms)
+ * and UD Digi Kyokasho (Windows' universal-design Japanese font) first instead.
+ */
+void open_fonts(game *g)
 {
-    const char *paths[6];
+    hw_font_source src[8];
     int n = 0;
-    char own[1100], segoe[512], yu[512], meiryo[512];
+    char own[1100], verdana[512], ud[512], segoe[512], yu[512], meiryo[512];
     static const char *const exts[] = { ".ttf", ".otf", ".ttc", NULL };
-    if (hw_assets_find(g->assets, "fonts", "main", exts, own, sizeof own)) paths[n++] = own;
     const char *windir = SDL_getenv("WINDIR");
     if (!windir) windir = "C:/Windows";
+    snprintf(verdana, sizeof verdana, "%s/Fonts/verdana.ttf", windir);
+    snprintf(ud, sizeof ud, "%s/Fonts/UDDigiKyokashoN-R.ttc", windir);
     snprintf(segoe, sizeof segoe, "%s/Fonts/segoeui.ttf", windir);
     snprintf(yu, sizeof yu, "%s/Fonts/YuGothM.ttc", windir);
     snprintf(meiryo, sizeof meiryo, "%s/Fonts/meiryo.ttc", windir);
-    paths[n++] = segoe;
-    paths[n++] = yu;
-    paths[n++] = meiryo;
-    g->fonts = hw_fonts_open(g->ren, paths, n);
+    if (g->settings.font == 1) {
+        if (SDL_GetPathInfo(verdana, NULL)) src[n++] = (hw_font_source){ verdana, NULL };
+        if (SDL_GetPathInfo(ud, NULL)) src[n++] = (hw_font_source){ ud, NULL };
+    }
+    const char *theme_font = hw_theme_str(&g->m, "font.main");
+    if ((theme_font && hw_assets_find(g->assets, "", theme_font, exts, own, sizeof own)) ||
+        hw_assets_find(g->assets, "fonts", "main", exts, own, sizeof own)) {
+        hw_font_source s = { NULL, hw_vfs_open(g->vfs, own) }; /* the game's font may be in its pack */
+        if (s.io) src[n++] = s;
+    }
+    src[n++] = (hw_font_source){ segoe, NULL };
+    src[n++] = (hw_font_source){ yu, NULL };
+    src[n++] = (hw_font_source){ meiryo, NULL };
+    hw_fonts *f = hw_fonts_open_sources(g->ren, src, n);
+    if (!f) return; /* keep the fonts we have */
+    if (g->fonts) hw_fonts_close(g->fonts);
+    g->fonts = f;
+    g->fonts_font = g->settings.font;
+}
+
+/* The player picks a language (Config, the accessibility prompt): it's kept for next time. */
+void choose_language(game *g, const char *lang)
+{
+    set_language(g, lang);
+    save_global(g);
+}
+
+void stop_title_music(game *g)
+{
+    if (g->title_music && hw_theme_str(&g->m, "title.music")) hw_audio_stop(g->audio, HW_CHANNEL_MUSIC, 300);
+}
+
+/*
+ * The player's settings take effect (plan §13): colors (high contrast), the textbox's opacity,
+ * text size, line spacing, the font, volumes, full screen, and the language; then the text on
+ * screen is laid out again.
+ */
+void apply_settings(game *g)
+{
+    const hw_settings *s = &g->settings;
+    bind_theme(g);
+    if (s->high_contrast) {
+        g->pal = (hw_palette){ .accent = 0xffe000, .text = 0xffffff, .dim = 0xe8e8e8, .textbox = 0x000000, .nameplate = 0x000000,
+                               .choice = 0x000000, .choice_hover = 0x1a3fbf, .choice_text = 0xffffff, .background = 0x000000,
+                               .panel = 0x000000, .ink = 0x000000 };
+        g->tb_alpha = 1.0f;
+    } else if (s->textbox_opacity >= 0) {
+        g->tb_alpha = (float)s->textbox_opacity / 100.0f;
+    }
+    static const float SIZE[4] = { 1.0f, 1.15f, 1.3f, 1.5f };
+    static const float SPACING[3] = { 1.0f, 1.25f, 1.5f };
+    g->text_px *= SIZE[s->text_size & 3u];
+    hw_rich_set_line_spacing(SPACING[s->line_spacing % 3u]);
+    if (g->fonts_font != s->font) open_fonts(g);
+    for (int i = 0; i < 4; i++) hw_audio_set_volume(g->audio, i, s->volume[i]);
+    static int fullscreen = -1;
+    if (!g->link && fullscreen != (int)s->fullscreen) {
+        SDL_SetWindowFullscreen(g->win, s->fullscreen);
+        fullscreen = s->fullscreen;
+    }
+    if (g->have_line) {
+        float reveal = g->reveal;
+        layout_line(g);
+        g->reveal = reveal;
+    }
+    if (g->blk == B_MENU) layout_menu(g);
+    g->page_built = 0;
+    if (g->vm_ready && g->vm.s.display.textbox == HW_TEXTBOX_NVL) layout_page(g);
+}
+
+/* Startup phases for --perf: when each one was done, in ms since the process started. */
+typedef struct perf_mark { const char *name; double ms; } perf_mark;
+static perf_mark marks[16];
+static int mark_count;
+static void mark(const char *name)
+{
+    if (mark_count < 16) marks[mark_count++] = (perf_mark){ name, hw_since_process_start_ms() };
+}
+
+static int cmp_double(const void *x, const void *y)
+{
+    double a = *(const double *)x, b = *(const double *)y;
+    return a < b ? -1 : a > b;
+}
+
+/* --perf FILE: startup, frame CPU time, memory, and bytecode load time as JSON. */
+static void write_perf(game *g, const char *path, double first_frame_ms, double *frame_ms, size_t n)
+{
+    /* The first frames include loading textures and fonts; the budget is for steady playing. */
+    size_t skip = n > 30 ? 10 : 0;
+    double avg = 0, p95 = 0, max = 0;
+    if (n > skip) {
+        for (size_t i = skip; i < n; i++) avg += frame_ms[i];
+        avg /= (double)(n - skip);
+        qsort(frame_ms + skip, n - skip, sizeof *frame_ms, cmp_double);
+        p95 = frame_ms[skip + (size_t)((double)(n - skip - 1) * 0.95)];
+        max = frame_ms[n - 1];
+    }
+    hw_buf b = { 0 };
+    hw_buf_printf(&b,
+                  "{\n  \"first_frame_ms\": %.1f,\n  \"frames\": %u,\n  \"frame_cpu_ms_avg\": %.3f,\n  \"frame_cpu_ms_p95\": %.3f,\n"
+                  "  \"frame_cpu_ms_max\": %.3f,\n  \"peak_memory_mb\": %.1f,\n  \"hwb_bytes\": %u,\n  \"hwb_read_ms\": %.3f,\n"
+                  "  \"hwb_load_ms\": %.3f,\n  \"gpu\": %s,\n  \"startup\": {",
+                  first_frame_ms, (unsigned)(n - skip), avg, p95, max, hw_peak_memory_mb(), (unsigned)g->perf_hwb_bytes,
+                  g->perf_read_ms, g->perf_load_ms, g->gpu ? "true" : "false");
+    for (int i = 0; i < mark_count; i++) hw_buf_printf(&b, "%s\"%s\": %.1f", i ? ", " : "", marks[i].name, marks[i].ms);
+    hw_buf_printf(&b, "}\n}\n");
+    if (!b.data || !hw_write_file(path, b.data, b.len)) SDL_Log("perf: can't write %s", path);
+    hw_buf_free(&b);
+}
+
+/* Whether any transition in the game is a rule wipe. */
+static bool uses_rule_wipes(const hw_module *m)
+{
+    uint32_t rule = hw_module_find_string(m, "rule");
+    if (rule == HW_NONE) return false;
+    for (uint32_t pc = 0; pc < m->code_count; pc += 1 + hw_argc(m->code[pc])) {
+        const uint32_t *a = &m->code[pc + 1];
+        switch (hw_op(m->code[pc])) {
+        case HW_OP_SHOW: case HW_OP_MOVE: if (a[2] == rule) return true; break;
+        case HW_OP_HIDE: case HW_OP_BG: case HW_OP_CG: if (a[1] == rule) return true; break;
+        default: break;
+        }
+    }
+    return false;
 }
 
 /* A startup failure: logged, and shown in a message box unless this is an unattended (--frames) run. */
@@ -1600,8 +1374,36 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
     if (project) g->dev = true; /* --project means a project folder: dev tools on */
     snprintf(g->game_path, sizeof g->game_path, "%s", game_path);
 
-    if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_EVENTS)) return fatal(NULL, SDL_GetError());
+    mark("main");
+    if (!SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO)) return fatal(NULL, SDL_GetError());
+    mark("sdl_video");
+    if (!SDL_InitSubSystem(SDL_INIT_AUDIO)) SDL_Log("audio: %s", SDL_GetError());
+    mark("sdl_audio");
+    /* Gamepads start after the first frame (below): enumerating them takes ~200 ms (plan §8.1: start ≤ 250 ms). */
     char err[200];
+    /* Files: a shipped game reads data.hwp (+ patches) beside it; otherwise loose files (spec/pack.md). */
+    char dir[1100];
+    snprintf(dir, sizeof dir, "%s", project ? project : game_path);
+    if (!project) {
+        char *slash = strrchr(dir, '/'), *bslash = strrchr(dir, '\\');
+        if (bslash > slash) slash = bslash;
+        if (slash) slash[1] = 0;
+        else dir[0] = 0;
+    }
+    g->vfs = hw_vfs_create();
+    if (!g->vfs) return fatal(NULL, "Out of memory.");
+    size_t gl = strlen(game_path);
+    if (gl > 4 && SDL_strcasecmp(game_path + gl - 4, ".hwp") == 0) {
+        if (!hw_vfs_mount_packs(g->vfs, dir, err, sizeof err)) {
+            char msg[400];
+            snprintf(msg, sizeof msg, "Can't start the game.\n\n%s", err);
+            SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Himawari", msg, NULL);
+            SDL_Quit();
+            return 2;
+        }
+    } else {
+        hw_vfs_set_root(g->vfs, dir[0] ? dir : ".");
+    }
     if (!load_module(g, &g->m, err, sizeof err)) {
         char msg[400];
         snprintf(msg, sizeof msg, "Can't start the game.\n\n%s\n\n%s", game_path, err);
@@ -1627,36 +1429,33 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
         parent = 0;
         SDL_ShowWindow(g->win);
     }
-    bool allow_gpu = true;
+    /* The GPU renderer (~200 ms to start) is only needed for rule wipes (rfcs/0002). A shipped game that has none
+     * starts on the default renderer (plan §8.1: start ≤ 250 ms); development runs always get it, so previews match. */
+    bool allow_gpu = g->dev || uses_rule_wipes(&g->m);
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--no-gpu") == 0) allow_gpu = false;
+        if (strcmp(argv[i], "--gpu") == 0) allow_gpu = true;
     }
+    mark("window");
     g->ren = g->win ? hw_create_renderer(g->win, allow_gpu, &g->gpu) : NULL;
+    mark("renderer");
     if (!g->ren) return fatal(NULL, SDL_GetError());
     SDL_SetRenderVSync(g->ren, 1);
     g->wipe = hw_rulewipe_open(g->ren, g->gpu);
+    mark("rule_wipes");
     SDL_SetRenderLogicalPresentation(g->ren, (int)g->W, (int)g->H, SDL_LOGICAL_PRESENTATION_LETTERBOX);
     g->scene_tex = SDL_CreateTexture(g->ren, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, (int)g->W, (int)g->H);
     g->prev_tex = SDL_CreateTexture(g->ren, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, (int)g->W, (int)g->H);
     SDL_SetTextureBlendMode(g->scene_tex, SDL_BLENDMODE_BLEND);
     SDL_SetTextureBlendMode(g->prev_tex, SDL_BLENDMODE_BLEND);
 
-    /* Assets: <project>/assets in dev, else assets/ beside the game file. */
-    char assets_dir[1100];
-    if (project) {
-        snprintf(assets_dir, sizeof assets_dir, "%s/assets", project);
-    } else {
-        snprintf(assets_dir, sizeof assets_dir, "%s", game_path);
-        char *slash = strrchr(assets_dir, '/');
-        char *bslash = strrchr(assets_dir, '\\');
-        if (bslash > slash) slash = bslash;
-        if (slash) snprintf(slash + 1, sizeof assets_dir - (size_t)(slash + 1 - assets_dir), "assets");
-        else snprintf(assets_dir, sizeof assets_dir, "assets");
-    }
-    g->assets = hw_assets_open(g->ren, assets_dir);
+    g->assets = hw_assets_open(g->ren, g->vfs);
+    g->fonts_font = -1;
     open_fonts(g);
     if (!g->assets || !g->fonts) return fatal(g->win, "No usable font was found (Segoe UI or Yu Gothic).");
+    mark("fonts");
     g->audio = hw_audio_open(g->assets);
+    mark("audio");
 
     g->read_lines = SDL_calloc(g->m.line_count > 0 ? g->m.line_count : 1, 1);
     g->option_text = SDL_calloc(HW_VM_MAX_OPTIONS, sizeof *g->option_text);
@@ -1667,14 +1466,24 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
     g->vm_ready = true;
     g->vm.checkpoint = on_checkpoint;
     g->vm.checkpoint_user = g;
+    hw_ext_register_all();
+    bind_theme(g);
+    bind_extensions(g);
 
-    g->settings.cps = 40;
-    for (int i = 0; i < 4; i++) g->settings.volume[i] = 1.0f;
+    hw_settings_default(&g->settings);
+    g->rebind = -1;
+    g->music_track = HW_NONE;
+    if (!hw_unlocks_build(&g->unlocks, &g->m)) return fatal(g->win, "Out of memory.");
     hw_persist_open(&g->persist, hw_str(&g->m, g->m.game_id));
-    hw_global_load(&g->persist, &g->m, &g->vm, g->read_lines, &g->settings);
-    for (int i = 0; i < 4; i++) hw_audio_set_volume(g->audio, i, g->settings.volume[i]);
-    if (g->settings.fullscreen && !parent) SDL_SetWindowFullscreen(g->win, true);
+    /* The log and crash reports go to the save folder; never for unattended runs, unless testing the crash handler. */
+    bool crash_test = false;
+    for (int i = 1; i < argc; i++) crash_test |= g->dev && strcmp(argv[i], "--crash-test") == 0;
+    if (!unattended || crash_test) hw_crash_install(g->persist.dir, !unattended);
+    /* Unattended runs (smoke tests, golden images, render_line) use the default settings, so results don't depend on this PC. */
+    if (!unattended) hw_global_load(&g->persist, &g->m, &g->vm, g->read_lines, &g->unlocks, &g->settings);
+    mark("global_data");
     pick_language(g);
+    apply_settings(g);
 
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--lang") == 0 && i + 1 < argc) {
@@ -1690,6 +1499,7 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
 
     g->scr = SCR_TITLE;
     g->focus = -1;
+    g->mx = g->my = -1; /* no hover until the pointer moves */
     g->running = true;
     g->now = (double)SDL_GetTicksNS() / 1e9;
     /* --frames N: quit after N frames (CI smoke test). --start: skip the title screen. */
@@ -1703,6 +1513,10 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
         if (strcmp(argv[i], "--advance") == 0 && i + 1 < argc) clicks = strtol(argv[i + 1], NULL, 10);
         if (strcmp(argv[i], "--pick") == 0 && i + 1 < argc) pick = strtol(argv[i + 1], NULL, 10);
         if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) shot = argv[i + 1];
+        /* --compare FILE: the last frame must match this golden image (HW_UPDATE_GOLDEN=1 writes it instead). */
+        if (strcmp(argv[i], "--compare") == 0 && i + 1 < argc) shot = g->compare = argv[i + 1];
+        /* --save-to FILE: save the last frame's state there (tests; never the player's own save folder). */
+        if (strcmp(argv[i], "--save-to") == 0 && i + 1 < argc) g->save_to = argv[i + 1];
         if (strcmp(argv[i], "--start") == 0) start_story(g);
         if (strcmp(argv[i], "--warp") == 0 && i + 1 < argc) {
             char msg[600];
@@ -1711,6 +1525,35 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
                 if (unattended) warp_failed = true;
             }
         }
+    }
+    /* Smoke tests and golden images: --screen NAME opens a screen; --unlock-all fills the gallery and music room (in memory only). */
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--unlock-all") == 0) {
+            for (uint32_t k = 0; k < g->unlocks.cg_count; k++) g->unlocks.cg_seen[k] = 1;
+            for (uint32_t k = 0; k < g->unlocks.music_count; k++) g->unlocks.music_heard[k] = 1;
+        }
+        if (strcmp(argv[i], "--screen") == 0 && i + 1 < argc) {
+            static const struct { const char *name; screen scr; } SCREENS[] = {
+                { "config", SCR_CONFIG }, { "controls", SCR_CONTROLS }, { "accessibility", SCR_A11Y }, { "extras", SCR_EXTRAS },
+                { "gallery", SCR_GALLERY }, { "music", SCR_MUSIC }, { "load", SCR_SLOTS }, { "menu", SCR_SYSMENU }, { "history", SCR_HISTORY },
+            };
+            for (size_t k = 0; k < sizeof SCREENS / sizeof SCREENS[0]; k++) {
+                if (strcmp(argv[i + 1], SCREENS[k].name) != 0) continue;
+                g->back_to = g->scr == SCR_PLAY ? SCR_SYSMENU : SCR_TITLE;
+                if (SCREENS[k].scr == SCR_SYSMENU || SCREENS[k].scr == SCR_HISTORY) g->back_to = SCR_PLAY;
+                g->scr = SCREENS[k].scr;
+            }
+        }
+    }
+    /* The first-launch accessibility prompt (§13), before the title screen. Never in unattended runs or Studio's preview. */
+    if (g->scr == SCR_TITLE && !g->settings.a11y_prompted && !unattended && !link) {
+        g->scr = SCR_A11Y;
+        g->back_to = SCR_TITLE;
+    }
+    if (crash_test) {
+        SDL_Log("crash test: writing a crash report");
+        volatile int *nowhere = NULL;
+        *nowhere = 1; /* dev only: checks that a crash report gets written */
     }
     if (g->dev) SDL_Log("dev mode: F3 overlay, F5 reload %s", game_path);
     if (warp_failed) g->running = false;
@@ -1722,7 +1565,16 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
         hw_link_send(g->link, ready);
     }
 
+    /* --perf FILE: the runtime budgets of plan §8.1, measured on this run and written as JSON. */
+    const char *perf = NULL;
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "--perf") == 0 && i + 1 < argc) perf = argv[i + 1];
+    }
+    double *frame_ms = perf ? SDL_calloc(100000, sizeof *frame_ms) : NULL;
+    size_t frame_count = 0;
+    double first_frame_ms = -1;
     while (g->running) {
+        uint64_t frame_t0 = SDL_GetTicksNS();
         double t = (double)SDL_GetTicksNS() / 1e9;
         double dt = t - g->now;
         if (dt > 0.1) dt = 0.1;
@@ -1738,18 +1590,43 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
                 proceed(g);
             }
         }
+        if (g->scr == SCR_TITLE && !g->title_music) {
+            const char *music = hw_theme_str(&g->m, "title.music");
+            if (music) hw_audio_play(g->audio, HW_CHANNEL_MUSIC, music, 500);
+            g->title_music = true;
+        }
         update(g, dt);
         link_report(g);
         if (shot && frames == 1) g->shot = shot;
-        render(g);
+        render(g); /* presents, which waits for vsync: CPU time is measured up to here minus that wait (see render) */
+        if (frame_ms && frame_count < 100000) frame_ms[frame_count++] = (double)(g->present_at - frame_t0) / 1e6;
+        if (first_frame_ms < 0) {
+            first_frame_ms = hw_since_process_start_ms();
+            mark("first_frame");
+            /* Pads that are already connected arrive as "added" events. */
+            if (!SDL_InitSubSystem(SDL_INIT_GAMEPAD)) SDL_Log("gamepads: %s", SDL_GetError());
+            mark("gamepads");
+        }
+        if (frames == 1 && g->save_to) save_slot(g, -1);
         if (frames > 0 && --frames == 0) g->running = false;
     }
 
+    if (perf) write_perf(g, perf, first_frame_ms, frame_ms, frame_count);
+    SDL_free(frame_ms);
     save_global(g);
     hw_link_close(g->link);
+    hw_crash_shutdown();
     hw_rich_free(&g->text);
     for (uint32_t i = 0; i < HW_VM_MAX_OPTIONS; i++) hw_rich_free(&g->option_text[i]);
     SDL_free(g->option_text);
+    for (uint32_t i = 0; i < HW_VM_MAX_PAGE; i++) hw_rich_free(&g->page_text[i]);
+    SDL_free(g->ext_of);
+    if (g->name_fonts) hw_fonts_close(g->name_fonts);
+    hw_unlocks_free(&g->unlocks);
+    for (int s = 0; s <= HW_SLOTS; s++) {
+        if (g->slot_thumb[s]) SDL_DestroyTexture(g->slot_thumb[s]);
+    }
+    if (g->pad) SDL_CloseGamepad(g->pad);
     SDL_free(g->read_lines);
     hw_history_free(&g->hist);
     hw_vm_free(&g->vm);
@@ -1757,6 +1634,7 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
     hw_audio_close(g->audio);
     hw_fonts_close(g->fonts);
     hw_assets_close(g->assets);
+    hw_vfs_destroy(g->vfs);
     SDL_DestroyTexture(g->scene_tex);
     SDL_DestroyTexture(g->prev_tex);
     hw_rulewipe_close(g->wipe);
@@ -1764,5 +1642,5 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
     if (g->gpu) SDL_DestroyGPUDevice(g->gpu);
     SDL_DestroyWindow(g->win);
     SDL_Quit();
-    return warp_failed ? 3 : 0;
+    return warp_failed ? 3 : g->compare_failed ? 4 : 0;
 }

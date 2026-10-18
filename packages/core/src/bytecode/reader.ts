@@ -6,7 +6,8 @@
  */
 import { crc32 } from "./crc32.js";
 import {
-  HEADER_SIZE, HWB_MAJOR, HWB_MINOR, type HwbModule, type LocaleEntry, MAGIC, NONE, OP_NAMES, Op, type SpriteEntry, TextOp, expectedArgc,
+  type ExtensionEntry, HEADER_SIZE, HWB_MAJOR, HWB_MINOR, type HwbModule, type LocaleEntry, MAGIC, NONE, OPS_1_1, OP_NAMES, Op, type SpriteEntry,
+  TEXTBOX_MODES, TextOp, type ThemeEntry, XPARAM_BOOL, XPARAM_INT, XPARAM_TEXT, XPARAM_TYPES, expectedArgc,
 } from "./format.js";
 
 export class HwbError extends Error {}
@@ -49,6 +50,8 @@ export function readHwb(bytes: Uint8Array): HwbModule {
     sections.set(tag, { at, size });
   }
   for (const tag of REQUIRED) if (!sections.has(tag)) fail(`missing section ${tag}`);
+  // A 1.0 file knows nothing of 1.1 sections: like any unknown tag, they're skipped (§1.2).
+  if (minor < 1) for (const tag of ["XTNS", "THEM"]) sections.delete(tag);
 
   /** Word reader confined to one section. */
   const section = (tag: string) => {
@@ -142,6 +145,25 @@ export function readHwb(bytes: Uint8Array): HwbModule {
     return { lineId, speaker: str(speaker, "speaker"), text, flags };
   });
 
+  // XTNS (optional, 1.1): needed to validate XCALL.
+  const extensions: ExtensionEntry[] = [];
+  if (sections.has("XTNS")) {
+    const xs = section("XTNS");
+    const entries = Array.from({ length: xs.next() }, () => xs.take(4) as [number, number, number, number]);
+    const params = Array.from({ length: xs.next() }, () => xs.take(2) as [number, number]);
+    for (const [name, flags, first, count] of entries) {
+      if (first + count > params.length) fail("XTNS parameters out of range");
+      extensions.push({
+        name: str(name, "XTNS name"),
+        flags,
+        params: params.slice(first, first + count).map(([pn, type]) => {
+          if (type >= XPARAM_TYPES.length) fail("XTNS parameter type out of range");
+          return { name: str(pn, "XTNS parameter"), type };
+        }),
+      });
+    }
+  }
+
   // CODE
   const code = (() => {
     const c = section("CODE");
@@ -152,7 +174,7 @@ export function readHwb(bytes: Uint8Array): HwbModule {
     const w = code[pc] as number;
     const op = w & 0xff;
     const argc = (w >>> 8) & 0xff;
-    if (!OP_NAMES.has(op)) fail(`unknown opcode 0x${op.toString(16)} at pc ${pc}`);
+    if (!OP_NAMES.has(op) || (minor < 1 && OPS_1_1.has(op))) fail(`unknown opcode 0x${op.toString(16)} at pc ${pc}`);
     if (pc + 1 + argc > code.length) fail(`instruction at pc ${pc} runs past the end of CODE`);
     if (expectedArgc(op, code, pc + 1) !== argc) fail(`instruction at pc ${pc} has the wrong argument count`);
     opStarts.add(pc);
@@ -190,6 +212,24 @@ export function readHwb(bytes: Uint8Array): HwbModule {
     if (op === Op.JMP || op === Op.JZ || op === Op.CALL) target(a(0), "jump");
     if (op === Op.SAY && a(0) >>> 0 >= lines.length) fail(`SAY at pc ${pc}: line out of range`);
     if (op === Op.LOAD || op === Op.STORE) if (a(0) >>> 0 >= vars.length) fail(`pc ${pc}: variable out of range`);
+    if (op === Op.TEXTBOX && a(0) >>> 0 >= TEXTBOX_MODES.length) fail(`pc ${pc}: invalid textbox mode`);
+    if (op === Op.XCALL) {
+      const ext = extensions[a(0) >>> 0];
+      if (!ext) fail(`XCALL at pc ${pc}: extension out of range`);
+      else if (a(1) !== ext.params.length) fail(`XCALL at pc ${pc}: wrong number of values`);
+      else {
+        ext.params.forEach((p, i) => {
+          const v = a(2 + i) >>> 0;
+          if (p.type === XPARAM_TEXT) {
+            if (v !== NONE && v >= lines.length) fail(`XCALL at pc ${pc}: text line out of range`);
+          } else if (p.type === XPARAM_BOOL) {
+            if (v > 1) fail(`XCALL at pc ${pc}: invalid bool`);
+          } else if (p.type !== XPARAM_INT) {
+            s(2 + i);
+          }
+        });
+      }
+    }
     if (op === Op.MENU) {
       if (a(0) >>> 0 !== NONE && a(0) >>> 0 >= lines.length) fail(`MENU at pc ${pc}: prompt out of range`);
       for (let i = 0; i < a(1); i++) {
@@ -275,7 +315,24 @@ export function readHwb(bytes: Uint8Array): HwbModule {
     }
   }
 
-  return { major, minor, meta, strings, vars, chars, scenes, entryScene, lines, texts, code, debug, locales, sprites };
+  // THEM (optional, 1.1)
+  const theme: ThemeEntry[] = [];
+  if (sections.has("THEM")) {
+    const th = section("THEM");
+    let prev = "";
+    for (let i = 0, n = th.next(); i < n; i++) {
+      const [key, type, value] = th.take(3) as [number, number, number];
+      str(key, "THEM key");
+      if (type > 2) fail("THEM entry type out of range");
+      if (type === 2) str(value, "THEM value");
+      const k = strings[key] as string;
+      if (i > 0 && k <= prev) fail("THEM keys must be sorted and unique");
+      prev = k;
+      theme.push({ key, type: type as 0 | 1 | 2, value: type === 0 ? value | 0 : value });
+    }
+  }
+
+  return { major, minor, meta, strings, vars, chars, scenes, entryScene, lines, texts, code, debug, locales, sprites, extensions, theme };
 }
 
 function readTextProgram(

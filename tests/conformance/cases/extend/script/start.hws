@@ -1,0 +1,21 @@
+define statement enter(who: character, side: position = left, ms: int = 400):
+    show who at side with dissolve(ms)
+    $ calls += 1
+
+define statement leave_all():
+    hide hana with fade(200)
+
+scene start:
+    enter(hana)
+    hana "Watch this."   #line:200001
+    textbox nvl
+    "The first line of a page."   #line:200002
+    "The second line of a page."   #line:200003
+    textbox clear
+    screen_tint(night)
+    phone(hana, "Are you coming?", loud=true)   #line:200004
+    textbox adv
+    enter(hana, side=right, ms=0)
+    screen_tint(color=none, ms=0)
+    leave_all()
+    end

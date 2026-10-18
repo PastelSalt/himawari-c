@@ -6,6 +6,7 @@ import {
   type Diagnostic,
   SPEC_VERSIONS,
   HwbError,
+  PackError,
   checkProject,
   compile,
   disassemble,
@@ -13,6 +14,7 @@ import {
   lex,
   parseAst,
   readHwb,
+  readPack,
   renderDiagnostic,
   writeHwb,
 } from "@himawari/core";
@@ -40,9 +42,11 @@ Commands:
                          Write locales/ja.csv (or .xlf) for translators
   l10n import <file> --lang ja [--ai]
                          Bring translations back (placeholders are checked)
-  build [--release]      Compile the project to build/game.hwb
+  build [--release [--patch]]
+                         Compile the project to build/game.hwb
                          (--release: without debug info, and package a playable
-                         build/windows/<Game>/ folder with the runtime)
+                         build/windows/<Game>/ folder: the runtime and data.hwp;
+                         --patch: only patch<N>.hwp with what changed since then)
   run [--warp scene|file:line|#lineid] [--lang xx]
                          Play the project in the runtime (dev mode: F3, F5)
   playtest [--choices "0 1"] [--seed N] [--lang xx] [--out report.json]
@@ -212,7 +216,7 @@ function build(args: readonly string[]): number {
     `✓ ${display(out)}: ${bytes.length} bytes, ${m.scenes.length} scene(s), ${m.lines.length} line(s)${release ? "" : ", with debug info"}`,
   );
   if (release) {
-    const packaged = packageRelease(root);
+    const packaged = packageRelease(root, args.includes("--patch"));
     if (packaged) console.log(packaged);
   }
   return 0;
@@ -220,14 +224,34 @@ function build(args: readonly string[]): number {
 
 function disasm(args: readonly string[]): number {
   const [file] = args;
-  if (!file) throw new UsageError("usage: hwc disasm <file.hwb>");
+  if (!file) throw new UsageError("usage: hwc disasm <file.hwb | file.hwp>");
   if (!existsSync(file)) throw new UsageError(`no such file: ${file}`);
+  if (file.toLowerCase().endsWith(".hwp")) return listPack(file);
   try {
     process.stdout.write(disassemble(readHwb(readFileSync(file))));
     return 0;
   } catch (e) {
     if (e instanceof HwbError) {
       console.error(`hwc disasm: ${file} isn't a valid .hwb file: ${e.message}`);
+      return 1;
+    }
+    throw e;
+  }
+}
+
+/** hwc disasm <file.hwp>: what a pack holds (spec/pack.md). */
+function listPack(file: string): number {
+  try {
+    const p = readPack(readFileSync(file));
+    const codec = ["store", "lz4", "removed"];
+    console.log(`; Himawari pack ${p.major}.${p.minor}, priority ${p.priority}${p.priority ? " (a patch)" : ""}${p.obfuscated ? ", obfuscated" : ""}, ${p.entries.length} entries`);
+    for (const e of [...p.entries].sort((a, b) => (a.path < b.path ? -1 : 1))) {
+      console.log(`${(codec[e.codec] ?? "?").padEnd(8)} ${String(e.size).padStart(10)} ${String(e.stored).padStart(10)}  ${e.path}`);
+    }
+    return 0;
+  } catch (e) {
+    if (e instanceof PackError) {
+      console.error(`hwc disasm: ${file} isn't a valid .hwp pack: ${e.message}`);
       return 1;
     }
     throw e;

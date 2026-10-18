@@ -17,6 +17,8 @@ export function isProjectText(file: string): boolean {
   if (file.startsWith("script/") && file.endsWith(".hws")) return true;
   if (file.startsWith("characters/") && file.endsWith(".md")) return true;
   if (file.startsWith("locales/") && file.endsWith(".json")) return true;
+  if (file.startsWith("extensions/") && file.endsWith(".schema.json")) return true;
+  if (file === "theme/theme.json") return true;
   return false;
 }
 
@@ -143,7 +145,7 @@ export class Project {
   exportGame(runtime: string, zip: boolean): BuildReport {
     const c = compileProject(this.fs, { debug: false });
     if (!c.bytes) return { ok: false, errors: c.errors };
-    const p = packageGame(this.fs, c.bytes, c.title, runtime);
+    const p = packageGame(this.fs, c.bytes, c.title, c.gameId, runtime);
     if (!zip) return { ok: true, errors: "", dir: p.dir, exe: p.exe, files: p.files };
     const entries: Record<string, Uint8Array> = {};
     const name = safeName(c.title);

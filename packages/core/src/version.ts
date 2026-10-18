@@ -7,11 +7,11 @@ export const CORE_VERSION = "0.0.0";
  * spec is still pre-1.0 and may change without an RFC.
  */
 export const SPEC_VERSIONS = {
-  language: "0.2.0-draft",
+  language: "0.3.0-draft",
   manifest: "1.0.0-draft",
   character: "1.0.0-draft",
-  bytecode: "1.0.0",
-  ast: "1.0.0",
+  bytecode: "1.1.0",
+  ast: "1.1.0",
 } as const;
 
 export type SpecName = keyof typeof SPEC_VERSIONS;

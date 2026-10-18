@@ -170,6 +170,31 @@ void hw_describe_event(const hw_vm *vm, const hw_event *ev, hw_buf *out)
         put_str(out, ev->effect ? "flash" : "shake");
         if (ev->ms >= 0) hw_buf_printf(out, "(%d)", (int)ev->ms);
         break;
+    case HW_EV_TEXTBOX: {
+        static const char *const MODES[5] = { "adv", "nvl", "clear", "hide", "show" };
+        hw_buf_printf(out, "textbox %s", MODES[ev->effect < 5 ? ev->effect : 0]);
+        break;
+    }
+    case HW_EV_XCALL: {
+        const hw_ext_info *e = &m->exts[ev->subject];
+        hw_buf_printf(out, "%s(", hw_str(m, e->name));
+        for (uint32_t i = 0; i < e->param_count && i < ev->add_count; i++) {
+            const hw_ext_param *p = &m->ext_params[e->param_first + i];
+            uint32_t v = ev->add[i];
+            hw_buf_printf(out, "%s%s=", i ? ", " : "", hw_str(m, p->name));
+            if (p->type == HW_XP_INT) hw_buf_printf(out, "%d", (int)(int32_t)v);
+            else if (p->type == HW_XP_BOOL) put_str(out, v ? "true" : "false");
+            else if (p->type == HW_XP_TEXT && v == HW_NONE) put_str(out, "-");
+            else if (p->type == HW_XP_TEXT) {
+                put_str(out, "\"");
+                put_markup(vm, v, out);
+                put_str(out, "\"");
+            } else put_str(out, hw_str(m, v));
+        }
+        put_str(out, ")");
+        if (ev->line != HW_NONE) put_line_id(m, ev->line, out);
+        break;
+    }
     case HW_EV_END:
         put_str(out, "end");
         break;

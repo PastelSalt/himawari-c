@@ -218,3 +218,65 @@ describe("binary format", () => {
     for (const n of [0, 10, 24, Math.floor(bytes.length / 2)]) expect(() => readHwb(bytes.slice(0, n))).toThrow(HwbError);
   });
 });
+
+describe("bytecode 1.1 (rfcs/0007, rfcs/0008)", () => {
+  const ext = {
+    file: "extensions/phone.schema.json",
+    text: JSON.stringify({ name: "phone", blocking: true, params: [{ name: "from", type: "character" }, { name: "message", type: "text" }, { name: "ms", type: "int", default: 300 }, { name: "loud", type: "bool", default: false }] }),
+  };
+  const theme = { file: "theme/theme.json", text: JSON.stringify({ colors: { accent: "#ff8800" }, textbox: { opacity: 70, image: "ui/box" } }) };
+  const script = `define statement enter(who: character):
+    show who at left
+
+scene start:
+    enter(hana)
+    textbox nvl
+    phone(hana, "On my way!", loud=true)   #line:ccccc1
+    textbox clear
+    end
+`;
+  const build = (withExtras: boolean) => {
+    const input: ProjectInput = {
+      manifest: { file: "himawari.json", text: MANIFEST },
+      characters: [{ file: "characters/hana.md", text: HANA }],
+      scripts: [{ file: "script/start.hws", text: script.replace(/\n    phone\(.*\n/, withExtras ? "$&" : "\n") }],
+      ...(withExtras ? { extensions: [ext], theme } : {}),
+    };
+    const r = compile(checkProject(input));
+    expect(r.errors).toEqual([]);
+    return r.module!;
+  };
+
+  test("TEXTBOX, XCALL, XTNS, and THEM round-trip and disassemble", () => {
+    const m = build(true);
+    expect(m.minor).toBe(1);
+    const back = readHwb(writeHwb(m));
+    expect(back).toEqual(m);
+    const text = disassemble(back);
+    expect(text).toContain("extension phone(from: character, message: text, ms: int, loud: bool) [blocking]");
+    expect(text).toContain('theme color.accent = #ff8800');
+    expect(text).toContain('theme textbox.image = "ui/box"');
+    expect(text).toContain("SHOW     hana at left");
+    expect(text).toContain("TEXTBOX  nvl");
+    expect(text).toContain('XCALL    phone(from=hana, message="On my way!" #ccccc1, ms=300, loud=true)');
+  });
+
+  test("a module without 1.1 features is written as 1.0, and a 1.0 module can't use 1.1 ops", () => {
+    const plain = compile(checkProject({ manifest: { file: "himawari.json", text: MANIFEST }, characters: [{ file: "characters/hana.md", text: HANA }], scripts: [{ file: "script/start.hws", text: "scene start:\n    end\n" }] })).module!;
+    expect(plain.minor).toBe(0);
+    const m = build(true);
+    expect(() => readHwb(writeHwb({ ...m, minor: 0 }))).toThrow(HwbError);
+  });
+
+  test("the reader refuses a bad XCALL", () => {
+    const m = build(true);
+    let at = 0;
+    while ((m.code[at]! & 0xff) !== Op.XCALL) at += 1 + ((m.code[at]! >>> 8) & 0xff); // walk instructions, not argument words
+    const bad = [...m.code];
+    bad[at + 1] = 7; // no such extension
+    expect(() => readHwb(writeHwb({ ...m, code: bad }))).toThrow(/extension out of range/);
+    const lineOut = [...m.code];
+    lineOut[at + 4] = 999; // the text operand
+    expect(() => readHwb(writeHwb({ ...m, code: lineOut }))).toThrow(/text line out of range/);
+  });
+});

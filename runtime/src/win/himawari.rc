@@ -1,0 +1,37 @@
+/* Windows resources (plan §8.13): the manifest and version information. Exports patch the name, icon, and version (plan §14.4). */
+#include <winver.h>
+#include "hw_version.h"
+
+/* Language-neutral, like the loader looks it up; it wins over the toolchain's default manifest. */
+LANGUAGE 0, 0
+1 24 "himawari.manifest"
+LANGUAGE 9, 1
+
+VS_VERSION_INFO VERSIONINFO
+FILEVERSION HW_VERSION_MAJOR, HW_VERSION_MINOR, HW_VERSION_PATCH, 0
+PRODUCTVERSION HW_VERSION_MAJOR, HW_VERSION_MINOR, HW_VERSION_PATCH, 0
+FILEFLAGSMASK 0x3fL
+FILEFLAGS 0x0L
+FILEOS VOS_NT_WINDOWS32
+FILETYPE VFT_APP
+FILESUBTYPE 0x0L
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904b0"
+    BEGIN
+      VALUE "CompanyName", "Moesoft"
+      VALUE "FileDescription", "Himawari visual novel runtime"
+      VALUE "FileVersion", HW_VERSION_STRING
+      VALUE "InternalName", "himawari"
+      VALUE "LegalCopyright", "zlib license"
+      VALUE "OriginalFilename", "himawari.exe"
+      VALUE "ProductName", "Himawari"
+      VALUE "ProductVersion", HW_VERSION_STRING
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0x409, 1200
+  END
+END

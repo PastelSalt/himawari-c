@@ -10,7 +10,7 @@ export interface LineLocation {
   scene: string;
   start: number;
   end: number;
-  kind: "say" | "narration" | "prompt" | "option";
+  kind: "say" | "narration" | "prompt" | "option" | "call";
 }
 
 export interface SceneLocation {
@@ -30,6 +30,7 @@ export interface ProjectModel {
 export const isScript = (f: string) => f.startsWith("script/") && f.endsWith(".hws");
 export const isCharacter = (f: string) => f.startsWith("characters/") && f.endsWith(".md");
 export const isLocale = (f: string) => f.startsWith("locales/") && f.endsWith(".json");
+export const isExtension = (f: string) => f.startsWith("extensions/") && f.endsWith(".schema.json");
 
 export function buildModel(files: Record<string, string>, assets: string[]): ProjectModel {
   const pick = (test: (f: string) => boolean) =>
@@ -44,6 +45,8 @@ export function buildModel(files: Record<string, string>, assets: string[]): Pro
     scripts: pick(isScript),
     assets,
     locales: pick(isLocale),
+    extensions: pick(isExtension),
+    ...(files["theme/theme.json"] !== undefined ? { theme: { file: "theme/theme.json", text: files["theme/theme.json"] } } : {}),
   });
   const lines = new Map<string, LineLocation>();
   const scenes: SceneLocation[] = [];
@@ -54,6 +57,8 @@ export function buildModel(files: Record<string, string>, assets: string[]): Pro
         for (const s of body) {
           if ((s.kind === "Say" || s.kind === "Narration") && s.lineId) {
             lines.set(s.lineId, { file, scene: scene.id, start: s.span.start, end: s.span.end, kind: s.kind === "Say" ? "say" : "narration" });
+          } else if (s.kind === "Invoke" && s.lineId) {
+            lines.set(s.lineId, { file, scene: scene.id, start: s.span.start, end: s.span.end, kind: "call" });
           } else if (s.kind === "Menu") {
             if (s.promptLineId) lines.set(s.promptLineId, { file, scene: scene.id, start: s.span.start, end: s.span.start, kind: "prompt" });
             for (const o of s.options) {

@@ -1,0 +1,41 @@
+# Sunflower Days: a short story that uses every Himawari feature (plan §18, Phase 5).
+# Macros (rfcs/0008): reusable stage directions, expanded when the game is built.
+
+define statement enter(who: character, side: position = center, ms: int = 400):
+    show who at side with dissolve(ms)
+
+define statement change_place(place: bg, ms: int = 600):
+    stop ambient fade(300)
+    bg place with fade(ms)
+
+scene start:
+    change_place(sunflower_field, 800)
+    music summer_theme fade(1000)
+    ambient cicadas fade(500)
+    "Summer vacation. The sunflowers are taller than I am."   #line:c1a2ng
+    enter(hana, left)
+    hana happy "There you are! I {b}knew{/b} you'd come."   #line:07cgn7
+    voice hana_hello
+    hana "The festival is tonight. Will you help me get ready?"   #line:6sv56e
+    jump ask
+
+# A "once" option disappears after it's chosen, so coming back here offers the rest.
+scene ask:
+    menu "What do you say?":   #line:7qff7k
+        "Of course!":   #line:g85k56
+            $ hana_heart += 2
+            hana happy "I knew I could count on you."   #line:v055rk
+        "Only if there's food.":   #line:b7ss6q
+            $ hana_heart += 1
+            hana "There's {i}always{/i} food."   #line:g9gzae
+        once "Who else is coming?":   #line:b3jptz
+            call meet_ren
+            hana "See? It's a whole team now."   #line:hzhpwq
+            jump ask
+    jump classroom
+
+scene meet_ren:
+    enter(ren, right, 300)
+    ren glasses "Someone has to make sure the lanterns don't catch fire."   #line:6q5we0
+    $ met_ren = true
+    return

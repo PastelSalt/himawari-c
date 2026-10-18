@@ -1,6 +1,6 @@
 # Himawari Script (`.hws`) Language Specification
 
-> **Version:** 0.2.0-draft · **Status:** draft, implemented by `@himawari/core` and the runtime (Phases 1–3). Not stable yet; changes don't need an RFC until 1.0.
+> **Version:** 0.3.0-draft · **Status:** draft, implemented by `@himawari/core` and the runtime (Phases 1–5). 0.3 adds macros (rfcs/0008), extension statements, `textbox`, and themes (rfcs/0007). Not stable yet; changes don't need an RFC until 1.0.
 > **License:** CC-BY-4.0 · **Source of truth for semantics:** `@himawari/core` (D03). Where this document and Core disagree before 1.0, file an issue; one of them is a bug.
 > Plan references: DETAILED_PLAN.md §5.1–5.2, §6, §7, §12.
 
@@ -41,6 +41,7 @@ scene ch1_intro:
 | End | `end` | Ends the game (to the title screen). |
 | Conditional | `if <expr>:` / `elif <expr>:` / `else:` | Blocks are indented. |
 | Menu | `menu ["prompt"]:` | See §2.3. |
+| Macro | `define statement <name>(<params>):` | Top level, like `scene`. See §2.6. |
 
 If control reaches the end of a scene's body without `jump`, `call`, `return`, or `end`, the validator reports a dead end (`HW0320`, warning) and the runtime ends the game.
 
@@ -89,6 +90,7 @@ If control reaches the end of a scene's body without `jump`, `call`, `return`, o
 | CG | `cg <asset> [with <transition>]`. Unlocks the gallery entry automatically. |
 | Audio | `music <asset> [fade(ms)]`, `sfx <asset>`, `ambient <asset> [fade(ms)]`, `voice <asset>`, `stop music\|ambient\|voice [fade(ms)]` |
 | Effects | `wait(ms)`, `shake [(ms)]`, `flash [(ms)]` |
+| Textbox | `textbox adv\|nvl\|clear\|hide\|show` (§2.8) |
 
 **What the stage keeps** (the runtime's display state, which saves and rewinds restore): one background, one CG (drawn over the characters; a new `bg` ends it), the characters on stage in the order they appeared (a new one starts at `center` unless `at` says otherwise), and the looping music and ambient tracks. `sfx` and `voice` play once.
 
@@ -108,19 +110,55 @@ If control reaches the end of a scene's body without `jump`, `call`, `return`, o
 - Types: `int` (32-bit signed; arithmetic wraps on overflow, §5), `bool`, `str` (string enums only; free-text strings can only be set by the engine, e.g. a name-entry screen).
 - **Expressions:** integer and boolean literals, string-enum literals, variables, `+ - * / %` (integer division truncates toward zero), `== != < <= > >=`, `and or not`, parentheses, and `rand(n)` (seeded, `0 ≤ r < n`). **No floats in logic.**
 
-### 2.6 Macros (Tier A extensibility)
+### 2.6 Macros (Tier A extensibility, rfcs/0008)
 
 ```hws
-define statement entrance(char, side = "left"):
-    show {char} at offscreen_{side}
-    move {char} at {side} with slide_right(400)
+define statement enter(who: character, side: position = left, ms: int = 400):
+    show who at side with dissolve(ms)
+    $ met_count += 1
+
+scene school:
+    enter(hana)
+    enter(ren, side=right, ms=0)
 ```
 
-Macros are expanded at compile time with typed parameters, so every expansion is fully analyzable. Details are deferred to an RFC in Phase 5.
+- A macro is defined at the top level of any script file and can be called from every scene in the project: `name(arg, …, key=value, …)`. Positional arguments come first.
+- **Parameters are typed:** `character`, `position`, `scene`, `bg`, `cg`, `music`, `sfx`, `ambient`, `voice`, `transition`, `word` (an attribute or any bare word), `int`, and `bool`. A parameter with `= default` is optional. Arguments are checked like names written in place (`hanna` gets "did you mean hana?" at the argument), and wrong kinds of values are errors (`HW0223`).
+- **Expansion:** each parameter name in the body is replaced by its argument as a whole token, at compile time. The expanded statements are checked, compiled, and shown in the story graph like hand-written ones; problems inside a body are reported at the call with a note.
+- **Bodies hold stage and flow statements only**: no dialogue, narration, or menus (`HW0227`), because every line needs its own line ID. A macro may call other macros, but not itself, directly or indirectly (`HW0230`).
+- Macro names share one namespace with extension statements (§2.7) and can't be keywords.
+
+### 2.7 Extension statements (Tier B, rfcs/0007)
+
+```hws
+    screen_tint(sepia)
+    phone(hana, "Running late, sorry!")   #line:9xk2mp
+```
+
+A game can add statements the language doesn't have. Each one is declared in `extensions/<name>.schema.json` ([extension.schema.json](extension.schema.json)) with typed parameters, and implemented in C in the game's runtime with `hw_register_statement()`. The call syntax and type checks are the same as for macros. In addition:
+- One parameter may have type `text`: a quoted string that is translated and gets the line ID (§3). A statement can have only one quoted text (`HW0229`).
+- `blocking: true` means the story waits until the extension says it's done (like `wait`).
+- A player without the extension skips the statement and reports it in dev builds and playtests; it never crashes.
+
+### 2.8 Textbox modes
+
+| Form | Effect |
+|---|---|
+| `textbox adv` | The default: one line at a time in the textbox at the bottom. |
+| `textbox nvl` | Novel mode: lines accumulate on a full-screen page. The page starts over when it's full. Menus appear on the page. |
+| `textbox clear` | Starts a new NVL page. |
+| `textbox hide` | Hides the textbox until the next line (to show off a CG, say). |
+| `textbox show` | Shows it again without waiting for a line. |
+
+The mode is part of the saved state.
+
+### 2.9 Themes
+
+`theme/theme.json` ([theme.schema.json](theme.schema.json)) restyles the built-in UI without code: colors, the textbox (opacity, height, a nine-slice image), text size, fonts, the title and menu backgrounds and music, the default transition time, and per-language UI strings. Core validates it (`HW0130`, unknown settings `HW0131` with suggestions) and compiles it into the bytecode, so the runtime never reads JSON.
 
 ## 3. Line IDs
 
-- Every dialogue line, narration line, menu option, and menu prompt (`menu "Where to?":`) has a **line ID**: a trailing `#line:xxxxxx` comment.
+- Every dialogue line, narration line, menu option, menu prompt (`menu "Where to?":`), and extension statement with a quoted text has a **line ID**: a trailing `#line:xxxxxx` comment.
 - An ID is **6 characters of lowercase Crockford base32**: `0123456789abcdefghjkmnpqrstvwxyz` (no `i`, `l`, `o`, `u`). That gives 2³⁰ ≈ 1.07 billion IDs.
 - IDs are **persistent tags, not hashes.** Tooling (`hwc fmt`, Studio, MCP) assigns them; writers never type them, and Studio hides them.
 - Moving a line keeps its ID. Editing keeps the ID, but a large change marks translations and voice as `needs-review`. Duplicated IDs (from copy-paste) are reassigned on the copy.
@@ -136,4 +174,4 @@ Floats in story logic, user-defined functions, embedded general-purpose code (ex
 2. **`return` in a scene nothing calls:** a warning (`HW0310`), not an error. At runtime, `return` with no caller ends the story, like `end` (`spec/bytecode.md` §2.7).
 3. **`int` overflow:** wraps (two's complement) in every build, so a story behaves the same in development and release. Division by zero gives 0 and is reported in dev builds and playtests.
 4. **Speaker attributes persist:** `hana happy "…"` changes Hana's sprite exactly like `show hana happy`, and it stays changed after the line.
-5. **Macros** (`define statement`): still open; they get their own RFC in Phase 5.
+5. **Macros** (`define statement`): decided in rfcs/0008 (§2.6): typed parameters, whole-token substitution, no lines in bodies.

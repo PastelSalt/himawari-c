@@ -19,8 +19,11 @@ export interface ParseResult {
 export const KEYWORDS: ReadonlySet<string> = new Set([
   "scene", "define", "jump", "call", "return", "end", "if", "elif", "else", "menu", "once",
   "show", "hide", "move", "bg", "cg", "music", "sfx", "ambient", "voice", "stop", "wait",
-  "shake", "flash", "with", "at", "and", "or", "not", "true", "false",
+  "shake", "flash", "with", "at", "and", "or", "not", "true", "false", "textbox",
 ]);
+
+/** `textbox` modes (NVL and ADV presentation, plan §8.10). */
+export const TEXTBOX_MODES: readonly string[] = ["adv", "nvl", "clear", "hide", "show"];
 
 type Ctx = "file" | "scene" | "menu";
 
@@ -287,8 +290,13 @@ class Parser {
         });
       case "define":
         return this.blockStmt("DefineDecl", "DefineHeader", line, "scene", "define", (c) => {
-          // Macro signatures are specified in Phase 5; keep the tokens, require the trailing colon.
-          while (c.peek() && c.peek(1)) c.bump();
+          // define statement name(param: type [= default], …):   (rfcs/0008)
+          c.bump();
+          if (isKw(c.peek(), "statement")) c.bump();
+          else return this.fail(c, "\"statement\" (define statement name(…):)");
+          this.expectName(c, "a macro name");
+          if (c.peek()?.kind === "LParen") this.paramList(c);
+          else this.fail(c, "a parameter list in parentheses, like (who: character)");
           this.expectColon(c);
         });
       case "if":
@@ -371,6 +379,13 @@ class Parser {
           c.bump();
           if (c.peek()?.kind === "LParen") this.argList(c);
         });
+      case "textbox":
+        return this.lineNode("TextboxStmt", line, (c) => {
+          c.bump();
+          const mode = c.peek();
+          if (mode?.kind === "Identifier" && TEXTBOX_MODES.includes(mode.text)) c.bump();
+          else this.fail(c, "adv, nvl, clear, hide, or show");
+        });
       default:
         break;
     }
@@ -391,6 +406,13 @@ class Parser {
         }
       });
     }
+    if (first.kind === "Identifier" && !KEYWORDS.has(first.text) && this.nextIsParen(line)) {
+      // A macro or extension statement: name(arg, key=value, …)   (rfcs/0007, rfcs/0008)
+      return this.lineNode("InvokeStmt", line, (c) => {
+        c.bump();
+        this.argList(c, true);
+      });
+    }
     if (first.kind === "Identifier" && !KEYWORDS.has(first.text)) {
       return this.lineNode("SayStmt", line, (c) => {
         c.bump(); // speaker
@@ -404,6 +426,12 @@ class Parser {
     return this.lineNode("ErrorStmt", line, (c) => {
       c.failed = true;
     });
+  }
+
+  /** True when the line's second significant token is "(" (a call, not a speaker). */
+  private nextIsParen(line: Line): boolean {
+    const sig = line.content.filter((t) => !isTrivia(t.kind));
+    return sig[1]?.kind === "LParen";
   }
 
   private blockStmt(
@@ -553,22 +581,77 @@ class Parser {
     c.finish();
   }
 
-  /** `( arg, arg, ... )` where args are numbers, names, or strings. */
-  private argList(c: Cursor): void {
+  /** `( arg, arg, ... )` where args are numbers, names, or strings; with `named`, also `key=value` (invoke statements). */
+  private argList(c: Cursor, named = false): void {
     c.start("ArgList");
     c.bump(); // (
     if (c.peek()?.kind !== "RParen") {
       for (;;) {
-        const t = c.peek();
-        if (t?.kind === "Number" || t?.kind === "String") this.literal(c);
-        else if (t?.kind === "Identifier") {
-          c.start("NameRef");
+        if (named && c.peek()?.kind === "Identifier" && c.peek(1)?.kind === "Eq") {
+          c.start("NamedArg");
           c.bump();
+          c.bump();
+          const ok = this.argValue(c, named);
           c.finish();
-        } else {
-          this.fail(c, "a value");
+          if (!ok) break;
+        } else if (!this.argValue(c, named)) {
           break;
         }
+        if (c.peek()?.kind === "Comma") c.bump();
+        else break;
+      }
+    }
+    if (c.peek()?.kind === "RParen") c.bump();
+    else this.fail(c, "\")\"");
+    c.finish();
+  }
+
+  /** One argument value: a number (optionally negative), a string, or a name. */
+  private argValue(c: Cursor, allowNegative: boolean): boolean {
+    const t = c.peek();
+    if (t?.kind === "Number" || t?.kind === "String") {
+      this.literal(c);
+      return true;
+    }
+    if (allowNegative && t?.kind === "Minus" && c.peek(1)?.kind === "Number") {
+      c.start("Literal");
+      c.bump();
+      c.bump();
+      c.finish();
+      return true;
+    }
+    if (t?.kind === "Identifier") {
+      c.start("NameRef");
+      c.bump();
+      c.finish();
+      return true;
+    }
+    this.fail(c, "a value");
+    return false;
+  }
+
+  /** `(name: type [= default], …)` in a macro definition. */
+  private paramList(c: Cursor): void {
+    c.start("ParamList");
+    c.bump(); // (
+    if (c.peek()?.kind !== "RParen") {
+      for (;;) {
+        c.start("Param");
+        if (c.peek()?.kind === "Identifier" && !KEYWORDS.has(c.peek()?.text ?? "")) c.bump();
+        else this.fail(c, "a parameter name");
+        if (c.peek()?.kind === "Colon") {
+          c.bump();
+          if (c.peek()?.kind === "Identifier") c.bump();
+          else this.fail(c, "a parameter type, like character or position");
+        } else {
+          this.fail(c, "\":\" and a type, like who: character");
+        }
+        if (c.peek()?.kind === "Eq") {
+          c.bump();
+          this.argValue(c, true);
+        }
+        c.finish();
+        if (c.failed) break;
         if (c.peek()?.kind === "Comma") c.bump();
         else break;
       }

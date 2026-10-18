@@ -22,6 +22,15 @@ typedef struct hw_fonts hw_fonts;
 
 /* Opens the faces of a fallback chain (the first that has a character wins). */
 hw_fonts *hw_fonts_open(SDL_Renderer *ren, const char *const *paths, int count);
+/*
+ * A face from a stream (read on demand, so a 10 MB font file isn't loaded whole; the fonts take
+ * it over, even on failure), else from a file path (streamed the same way).
+ */
+typedef struct hw_font_source {
+    const char *path;
+    SDL_IOStream *io;
+} hw_font_source;
+hw_fonts *hw_fonts_open_sources(SDL_Renderer *ren, const hw_font_source *sources, int count);
 void hw_fonts_close(hw_fonts *f);
 /* Forgets every cached glyph (for example after the window's pixel scale changed). */
 void hw_fonts_flush(hw_fonts *f);
@@ -80,6 +89,8 @@ typedef struct hw_rich_text {
 void hw_rich_build(hw_rich_text *rt, const hw_vm *vm, uint32_t text);
 /* From plain UTF-8 (no markup). */
 void hw_rich_plain(hw_rich_text *rt, const char *utf8);
+/* Line spacing for every later layout (1.0 = the default; the player's accessibility setting). */
+void hw_rich_set_line_spacing(float spacing);
 /* Lays the runs out in `max_width` px at `base_px`. */
 bool hw_rich_layout(hw_rich_text *rt, hw_fonts *f, float max_width, float base_px, const char *lang);
 /* Draws the first `reveal` characters (fractional: the next one fades in). `time` drives {shake}. */

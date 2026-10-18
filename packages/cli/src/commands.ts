@@ -131,15 +131,23 @@ export function report(root: string, args: readonly string[]): number {
   return 0;
 }
 
-/** After `hwc build --release`: build/windows/<Game>/ with the runtime, when it can be found. */
-export function packageRelease(root: string): string {
+/**
+ * After `hwc build --release`: build/windows/<Game>/ with the runtime and data.hwp, when the
+ * runtime can be found. With --patch: patch<N>.hwp with only what changed since the shipped packs.
+ */
+export function packageRelease(root: string, patch: boolean): string {
   const fs = new ProjectFs(root);
   const exe = findRuntime();
   if (!exe) return "note: himawari.exe wasn't found, so only build/game.hwb was written (set HIMAWARI_RUNTIME to package a playable folder)";
   const c = compileProject(fs, { debug: false });
   if (!c.bytes) return "";
-  const p = packageGame(fs, c.bytes, c.title, exe);
-  return `✓ ${p.exe}: a playable folder (${p.files} files) in ${p.dir}`;
+  try {
+    const p = packageGame(fs, c.bytes, c.title, c.gameId, exe, { patch });
+    if (patch) return p.pack ? `✓ ${p.pack}: a patch with ${p.entries} changed or removed file(s); ship it beside data.hwp` : "✓ nothing changed since the shipped packs; no patch written";
+    return `✓ ${p.exe}: a playable folder in ${p.dir} (${p.pack}, ${p.entries} files packed)`;
+  } catch (e) {
+    throw new CommandError((e as Error).message);
+  }
 }
 
 /** himawari-mcp's entry point beside this package in a checkout (packages/mcp/dist/main.js). */

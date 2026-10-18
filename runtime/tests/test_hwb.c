@@ -218,6 +218,34 @@ int main(void)
         free(bytes);
     }
 
+    /* 1.1 (rfcs/0007): extension statements, textbox modes, and the theme. */
+    snprintf(path, sizeof path, "%s/extend/expected.hwb", dir);
+    bytes = read_file(path, &size);
+    CHECK(bytes != NULL);
+    if (bytes) {
+        CHECK(hw_module_load(&m, bytes, size, err, sizeof err));
+        CHECK(m.minor == 1 && m.ext_count == 2 && m.theme_count > 0);
+        CHECK(strcmp(hw_str(&m, m.exts[0].name), "phone") == 0 && (m.exts[0].flags & HW_XTNS_BLOCKING));
+        const hw_theme_entry *accent = hw_module_theme(&m, "color.accent");
+        CHECK(accent && accent->type == HW_THEME_COLOR && accent->value == 0xff8800);
+        CHECK(hw_module_theme(&m, "color.nope") == NULL);
+        /* Find the first TEXTBOX and XCALL by walking the instructions. */
+        uint32_t code_at = section_at(bytes, "CODE", NULL) + 4, textbox = 0, xcall = 0;
+        for (uint32_t pc = 0; pc < m.code_count; pc += 1 + hw_argc(m.code[pc])) {
+            if (!textbox && hw_op(m.code[pc]) == HW_OP_TEXTBOX) textbox = code_at + 4 * pc;
+            if (!xcall && hw_op(m.code[pc]) == HW_OP_XCALL) xcall = code_at + 4 * pc;
+        }
+        CHECK(textbox && xcall);
+        hw_module_free(&m);
+        expect_refused(bytes, size, 4, 0x00000001u, "unknown opcode");       /* minor 0: 1.1 ops are unknown */
+        expect_refused(bytes, size, textbox + 4, 9, "invalid textbox mode");
+        expect_refused(bytes, size, xcall + 4, 5, "extension out of range");
+        uint32_t them = section_at(bytes, "THEM", NULL);
+        expect_refused(bytes, size, them + 8, 7, "THEM entry type");
+        expect_refused(bytes, size, them + 4, get32(bytes + them + 16), "sorted");  /* first key = second key */
+        free(bytes);
+    }
+
     /* Every truncation of a real file is refused without crashing. */
     snprintf(path, sizeof path, "%s/text/expected.hwb", dir);
     bytes = read_file(path, &size);

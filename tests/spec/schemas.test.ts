@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, test } from "vitest";
 import { parse as parseYaml } from "yaml";
+import { readExtension } from "../../packages/core/src/project/invoke.js";
+import { readTheme } from "../../packages/core/src/project/theme.js";
 import { parseAst } from "../../packages/core/src/syntax/ast.js";
 
 const specDir = fileURLToPath(new URL("../../spec/", import.meta.url));
@@ -20,10 +22,48 @@ ajv.addSchema(readJson("manifest.schema.json") as object);
 ajv.addSchema(readJson("character.schema.json") as object);
 
 ajv.addSchema(readJson("ast.schema.json") as object);
-const validateAst = ajv.getSchema("https://pastelsalt.github.io/himawari-c/spec/ast/1.0.json")!;
+const validateAst = ajv.getSchema("https://pastelsalt.github.io/himawari-c/spec/ast/1.1.json")!;
 
 const validateManifest = ajv.getSchema("https://pastelsalt.github.io/himawari-c/spec/manifest/1.0.json")!;
 const validateCharacter = ajv.getSchema("https://pastelsalt.github.io/himawari-c/spec/character/1.0.json")!;
+const validateExtension = ajv.compile(readJson("extension.schema.json") as object);
+const validateTheme = ajv.compile(readJson("theme.schema.json") as object);
+const caseFile = (f: string) => readFileSync(fileURLToPath(new URL(`../conformance/cases/extend/${f}`, import.meta.url)), "utf8");
+
+describe("extension and theme schemas (rfcs/0007)", () => {
+  test.each(["extensions/phone.schema.json", "extensions/screen_tint.schema.json"])("%s is valid, and Core agrees", (f) => {
+    const text = caseFile(f);
+    expect(validateExtension(JSON.parse(text)), JSON.stringify(validateExtension.errors)).toBe(true);
+    expect(readExtension(f, text).diagnostics).toEqual([]);
+  });
+
+  test("the conformance theme is valid, and Core agrees", () => {
+    const text = caseFile("theme/theme.json");
+    expect(validateTheme(JSON.parse(text)), JSON.stringify(validateTheme.errors)).toBe(true);
+    expect(readTheme(text).diagnostics).toEqual([]);
+  });
+
+  test("every setting the theme schema allows is one Core knows", () => {
+    const schema = readJson("theme.schema.json") as { properties: Record<string, { properties?: Record<string, unknown> }> };
+    for (const [group, def] of Object.entries(schema.properties)) {
+      if (group === "$schema" || group === "strings") continue;
+      for (const key of Object.keys(def.properties ?? {})) {
+        const value = key === "slice" ? [1, 1, 1, 1] : group === "colors" ? "#000000" : ["image", "main", "name", "background", "music"].includes(key) ? "a/b" : 50;
+        const r = readTheme(JSON.stringify({ [group]: { [key]: value } }));
+        expect(r.diagnostics.filter((d) => d.code === "HW0131"), `${group}.${key}`).toEqual([]);
+      }
+    }
+  });
+
+  test.each([
+    ["extension without params", validateExtension, { name: "x" }],
+    ["extension with a bad type", validateExtension, { name: "x", params: [{ name: "a", type: "float" }] }],
+    ["theme color", validateTheme, { colors: { accent: "orange" } }],
+    ["theme unknown group", validateTheme, { colours: {} }],
+  ])("rejects %s", (_name, validate, value) => {
+    expect(validate(value)).toBe(false);
+  });
+});
 
 describe("manifest schema", () => {
   const example = readJson("examples/himawari.json") as Record<string, unknown>;
@@ -96,7 +136,13 @@ describe("AST schema", () => {
   });
 
   test("covers every statement and expression kind", () => {
-    const src = `scene s:
+    const src = `define statement m(c: character, n: int = -2, w: word = x):
+    show c
+
+scene s:
+    textbox nvl
+    m(h, w=y)
+    ext(h, "t {b}u{/b}")   #line:aaaaaa
     bg a with rule(m, 300)
     cg b
     show h x -y at left with fade(1)
@@ -130,7 +176,7 @@ describe("AST schema", () => {
   });
 
   test("rejects malformed ASTs", () => {
-    expect(validateAst({ version: "1.0", file: "x", scenes: [{ kind: "Scene", id: "s", span: { start: 0, end: 1 }, body: [{ kind: "Teleport" }] }] })).toBe(false);
-    expect(validateAst({ version: "2.0", file: "x", scenes: [] })).toBe(false);
+    expect(validateAst({ version: "1.1", file: "x", macros: [], scenes: [{ kind: "Scene", id: "s", span: { start: 0, end: 1 }, body: [{ kind: "Teleport" }] }] })).toBe(false);
+    expect(validateAst({ version: "2.0", file: "x", scenes: [], macros: [] })).toBe(false);
   });
 });

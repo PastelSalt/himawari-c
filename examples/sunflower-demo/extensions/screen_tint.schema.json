@@ -1,0 +1,10 @@
+{
+  "$schema": "https://pastelsalt.github.io/himawari-c/spec/extension/1.0.json",
+  "name": "screen_tint",
+  "description": "Tints the whole picture: sepia for memories, night for evenings, none to clear it. Built into the stock Himawari runtime as a sample (runtime/ext/screen_tint.c).",
+  "blocking": false,
+  "params": [
+    { "name": "color", "type": "word", "enum": ["sepia", "night", "none"], "description": "The tint." },
+    { "name": "ms", "type": "int", "default": 500, "description": "How long the change takes." }
+  ]
+}

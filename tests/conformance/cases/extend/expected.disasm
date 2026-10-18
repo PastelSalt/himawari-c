@@ -1,0 +1,52 @@
+; Himawari bytecode 1.1
+; 47 strings, 1 variables, 1 characters, 1 scenes, 4 lines, 65 code words
+; entry: start
+; game: "Conformance: extend" dev.moesoft.conformance.extend 1920x1080, languages en ja
+; positions: center(0.5, 1) left(0.25, 1) right(0.75, 1)
+
+var 0: calls int = 0 (save)
+char hana "Hana" #f2a541
+extension phone(from: character, message: text, ms: int, loud: bool) [blocking]
+extension screen_tint(color: word, ms: int)
+theme color.accent = #ff8800
+theme color.textbox = #202030
+theme string.en.start = "Begin"
+theme string.ja.start = "はじめる"
+theme text.size = 30
+theme textbox.image = "ui/textbox"
+theme textbox.opacity = 80
+theme textbox.slice.bottom = 12
+theme textbox.slice.left = 12
+theme textbox.slice.right = 12
+theme textbox.slice.top = 12
+
+
+scene start:  ; script/start.hws
+  0000  SHOW     hana at left with dissolve(400)   ; script/start.hws:9
+  0008  LOAD     calls   ; script/start.hws:9
+  0010  PUSH     1
+  0012  ADD
+  0013  STORE    calls
+  0015  SAY      hana "Watch this." #200001   ; script/start.hws:10
+  0017  TEXTBOX  nvl   ; script/start.hws:11
+  0019  SAY      "The first line of a page." #200002   ; script/start.hws:12
+  0021  SAY      "The second line of a page." #200003   ; script/start.hws:13
+  0023  TEXTBOX  clear   ; script/start.hws:14
+  0025  XCALL    screen_tint(color=night, ms=500)   ; script/start.hws:15
+  0030  XCALL    phone(from=hana, message="Are you coming?" #200004, ms=300, loud=true)   ; script/start.hws:16
+  0037  TEXTBOX  adv   ; script/start.hws:17
+  0039  SHOW     hana at right with dissolve(0)   ; script/start.hws:18
+  0047  LOAD     calls   ; script/start.hws:18
+  0049  PUSH     1
+  0051  ADD
+  0052  STORE    calls
+  0054  XCALL    screen_tint(color=none, ms=0)   ; script/start.hws:19
+  0059  HIDE     hana with fade(200)   ; script/start.hws:20
+  0064  END   ; script/start.hws:21
+
+locale ja:
+  char hana "花"
+  #200001 "見てて。"
+  #200002 "ページの一行目。"
+  #200003 "ページの二行目。"
+  #200004 "来る？"

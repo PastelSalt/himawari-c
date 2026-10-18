@@ -31,7 +31,7 @@ describe("AST from the CST", () => {
 
   test("no diagnostics, versioned, one scene", () => {
     expect(diagnostics).toEqual([]);
-    expect(ast.version).toBe("1.0");
+    expect(ast.version).toBe("1.1");
     expect(ast.file).toBe("script/ch1.hws");
     expect(ast.scenes.map((s) => s.id)).toEqual(["ch1_intro"]);
   });

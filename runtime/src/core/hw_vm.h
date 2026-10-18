@@ -24,6 +24,9 @@
 #define HW_VM_MAX_STAGE 16   /* characters on stage at once */
 #define HW_VM_MAX_ATTRS 16   /* attributes per character */
 #define HW_VM_MAX_OPTIONS 128
+#define HW_VM_MAX_PAGE 32      /* lines kept on an NVL page */
+#define HW_VM_MAX_EXT 16       /* extension statements (by XTNS index) whose last call is remembered */
+#define HW_VM_EXT_VALUES 8     /* values remembered of that call */
 
 typedef enum hw_vm_status {
     HW_VM_IDLE,         /* not started */
@@ -46,6 +49,8 @@ typedef enum hw_event_kind {
     HW_EV_STOP,     /* channel, ms */
     HW_EV_WAIT,     /* ms */
     HW_EV_EFFECT,   /* effect (0 shake, 1 flash), ms (-1 = default) */
+    HW_EV_TEXTBOX,  /* effect = the mode (HW_TEXTBOX_*); 1.1 */
+    HW_EV_XCALL,    /* subject = XTNS index, add/add_count = one value per parameter, line = its text or HW_NONE; 1.1 */
     HW_EV_END,      /* the story ended (END, or RET with no caller) */
     HW_EV_ERROR     /* a content error; the message is in vm->error */
 } hw_event_kind;
@@ -88,6 +93,15 @@ typedef struct hw_display {
     uint32_t music, ambient;  /* looping audio, 0 = none */
     uint32_t stage_count;
     hw_stage_char stage[HW_VM_MAX_STAGE]; /* in the order they appeared (draw order) */
+    /* 1.1: textbox mode and the NVL page (spec/language.md §2.8). */
+    uint32_t textbox;         /* HW_TEXTBOX_ADV or HW_TEXTBOX_NVL */
+    uint32_t textbox_hidden;  /* `textbox hide` until the next line or `textbox show` */
+    uint32_t page_count;
+    uint32_t page[HW_VM_MAX_PAGE]; /* line indices on the NVL page, oldest first */
+    /* 1.1: each extension statement's most recent call (rfcs/0007), by XTNS index, so whatever it left on
+     * screen comes back after a load, a rewind, a reload, or a warp. Bit i of ext_called: statement i has run. */
+    uint32_t ext_called;
+    uint32_t ext_last[HW_VM_MAX_EXT][HW_VM_EXT_VALUES];
 } hw_display;
 
 /* The fixed-size part of the state. Saves and rollback snapshots hold this plus the variables. */
@@ -141,6 +155,9 @@ bool hw_vm_next(hw_vm *vm, hw_event *ev);
 
 /* Picks option k (0-based, among the options the MENU event showed). */
 bool hw_vm_choose(hw_vm *vm, uint32_t k);
+
+/* NVL: the page is full on screen, so it starts over with only its newest line. */
+void hw_vm_page_restart(hw_vm *vm);
 
 /* ---- layered sprites (spec §2.9) ---- */
 

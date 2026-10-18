@@ -1,0 +1,17 @@
+{
+  "$schema": "https://pastelsalt.github.io/himawari-c/spec/manifest/1.0.json",
+  "name": "Sunflower Days",
+  "id": "dev.moesoft.sunflowerdays",
+  "version": "0.1.0",
+  "engine": "^1.1.0",
+  "resolution": [1920, 1080],
+  "sourceLanguage": "en",
+  "languages": ["en", "ja", "es"],
+  "entry": "start",
+  "variables": {
+    "hana_heart": { "type": "int", "default": 0, "scope": "save" },
+    "met_ren": { "type": "bool", "default": false, "scope": "save" },
+    "path": { "type": "str", "enum": ["field", "river"], "default": "field", "scope": "save" },
+    "times_finished": { "type": "int", "default": 0, "scope": "global" }
+  }
+}

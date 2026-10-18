@@ -5,7 +5,7 @@
  * so translators can't break a line.
  */
 import type { AstResult } from "../syntax/ast.js";
-import { type CstNode, childNodes, childTokens, isNode } from "../syntax/cst.js";
+import { type CstNode, childTokens, isNode, lineText } from "../syntax/cst.js";
 import { parseText } from "../syntax/text.js";
 
 export type L10nStatus = "ok" | "needs-review" | "missing";
@@ -33,7 +33,7 @@ export interface SourceLine {
   scene: string;
   /** Character id for dialogue; "" for narration and menu options. */
   speaker: string;
-  kind: "say" | "narration" | "option" | "prompt";
+  kind: "say" | "narration" | "option" | "prompt" | "call";
   /** The text between the quotes, as written. */
   text: string;
 }
@@ -45,11 +45,11 @@ export function collectLines(parsed: ReadonlyMap<string, AstResult>): SourceLine
     let scene = "";
     const visit = (n: CstNode) => {
       if (n.kind === "SceneHeader") scene = childTokens(n, "Identifier")[1]?.text ?? "";
-      const kind = n.kind === "SayStmt" ? "say" : n.kind === "NarrationStmt" ? "narration" : n.kind === "OptionHeader" ? "option" : n.kind === "MenuHeader" ? "prompt" : null;
+      const kind =
+        n.kind === "SayStmt" ? "say" : n.kind === "NarrationStmt" ? "narration" : n.kind === "OptionHeader" ? "option" : n.kind === "MenuHeader" ? "prompt" : n.kind === "InvokeStmt" ? "call" : null;
       if (kind) {
         const tag = childTokens(n, "LineTag")[0];
-        const lit = childNodes(n, "Literal")[0];
-        const str = lit ? childTokens(lit, "String")[0] : undefined;
+        const str = lineText(n);
         if (tag && str) {
           out.push({
             id: tag.text.slice("#line:".length),

@@ -129,7 +129,7 @@ class Formatter {
       text += cur.tok.text;
     }
 
-    const isPrompt = n.kind === "MenuHeader" && sig.some((p) => p.tok.kind === "String");
+    const isPrompt = (n.kind === "MenuHeader" || n.kind === "InvokeStmt") && sig.some((p) => p.tok.kind === "String");
     if (this.lineIds && (NEEDS_ID.has(n.kind) || isPrompt)) {
       const id = tag?.slice(6);
       if (!id) {
@@ -200,6 +200,7 @@ function spaceBetween(prev: { tok: Token; parent: string }, cur: { tok: Token; p
     // f(x), fade(300), wait(500), shake(200); but keywords like `if (a)` and `not (b)` keep a space.
     return !(p === "Identifier" && (!KEYWORDS.has(prev.tok.text) || CALL_LIKE.has(prev.tok.text)));
   }
-  if (p === "Minus" && (prev.parent === "UnaryExpr" || prev.parent === "Attr")) return false; // -1, -glasses
+  if (p === "Minus" && (prev.parent === "UnaryExpr" || prev.parent === "Attr" || prev.parent === "Literal")) return false; // -1, -glasses
+  if ((c === "Eq" && cur.parent === "NamedArg") || (p === "Eq" && prev.parent === "NamedArg")) return false; // side=right
   return true;
 }

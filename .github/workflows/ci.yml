@@ -93,6 +93,17 @@ jobs:
           ./build/win64-release/himawari.exe --headless ../tests/conformance/cases/basic/expected.hwb --playtest
           ./build/win64-release/himawari.exe ../tests/conformance/cases/l10n/expected.hwb --lang ja --start --frames 240 --advance 4 --screenshot player-ja.png
           test -s player-ja.png
+      - name: Packs (a patched pack plays headlessly)
+        run: |
+          mkdir -p packed && cp ../tests/packs/data.hwp ../tests/packs/patch1.hwp packed/
+          ./build/win64-release/himawari.exe --headless packed/data.hwp --playtest
+      - name: Performance budgets (plan §8.1)
+        env:
+          SDL_AUDIO_DRIVER: dummy
+        run: |
+          ./build/win64-release/himawari.exe ../tests/conformance/cases/l10n/expected.hwb --start --advance 4 --frames 300 --perf perf.json
+          cat perf.json
+          sh tests/check_budgets.sh perf.json build/win64-release/himawari.exe
       - name: Spike A smoke test (window, audio on the dummy driver, JP text)
         env:
           SDL_AUDIO_DRIVER: dummy
@@ -112,6 +123,7 @@ jobs:
           path: |
             runtime/build/win64-release/himawari.exe
             runtime/player-ja.png
+            runtime/perf.json
             runtime/build/win64-release/spike_a.exe
             runtime/build/win64-release/spike_b.exe
             runtime/build/win64-release/spike_c_ft.exe
@@ -153,6 +165,8 @@ jobs:
           ./build/win64-fuzz/fuzz_hwb.exe -max_total_time=60 corpus-hwb
           mkdir -p corpus-save && HW_WRITE_SAVE=corpus-save/basic.hwsav ./build/win64-fuzz/test_save.exe
           ./build/win64-fuzz/fuzz_save.exe -max_total_time=60 corpus-save
+          mkdir -p corpus-pack && cp ../tests/packs/*.hwp corpus-pack/
+          ./build/win64-fuzz/fuzz_pack.exe -max_total_time=60 -max_len=8192 corpus-pack
 
   studio:
     name: Studio (e2e + P1 budgets, Windows installer)
@@ -173,6 +187,10 @@ jobs:
       - run: pnpm exec tsc -b
       - name: Fetch the Electron binary
         run: node packages/studio/node_modules/electron/install.js
+      - name: Golden images (sunflower-demo; Japanese cases need Yu Gothic on the runner)
+        env:
+          SDL_AUDIO_DRIVER: dummy
+        run: pnpm vitest run tests/golden
       - name: End to end (first run, edit → preview under 1 s, export, Japanese UI)
         run: pnpm --filter @himawari/studio e2e
       - name: Package (NSIS installer and portable)

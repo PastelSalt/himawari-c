@@ -1,0 +1,10 @@
+{
+  "language": "ja",
+  "sourceLanguage": "en",
+  "lines": [
+    { "id": "200001", "source": "Watch this.", "text": "見てて。", "status": "ok", "provenance": "human" },
+    { "id": "200002", "source": "The first line of a page.", "text": "ページの一行目。", "status": "ok", "provenance": "human" },
+    { "id": "200003", "source": "The second line of a page.", "text": "ページの二行目。", "status": "ok", "provenance": "human" },
+    { "id": "200004", "source": "Are you coming?", "text": "来る？", "status": "ok", "provenance": "human" }
+  ]
+}

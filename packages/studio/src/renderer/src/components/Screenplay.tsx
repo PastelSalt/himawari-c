@@ -96,7 +96,7 @@ const Row = memo(function Row({ s, ctx, depth }: { s: Stmt; ctx: Ctx; depth: num
   const preview = useStudio((st) => st.preview);
   const ref = useRef<HTMLDivElement>(null);
   const [drop, setDrop] = useState<"before" | "after" | null>(null);
-  const lineId = s.kind === "Say" || s.kind === "Narration" ? s.lineId : s.kind === "Menu" ? s.promptLineId : null;
+  const lineId = s.kind === "Say" || s.kind === "Narration" || s.kind === "Invoke" ? s.lineId : s.kind === "Menu" ? s.promptLineId : null;
   const active = lineId !== null && preview.line === lineId;
   const line = lineAt(ctx.text, s.span.start);
 
@@ -259,6 +259,8 @@ function iconFor(s: Stmt): string {
       return "next";
     case "Assign":
       return "variables";
+    case "Textbox":
+      return "book";
     default:
       return "settings";
   }
@@ -283,6 +285,10 @@ function summary(s: Stmt, intl: ReturnType<typeof useIntl>): string | undefined 
       return t("screenplay.stage.call", { name: s.target });
     case "End":
       return t("screenplay.stage.end");
+    case "Textbox":
+      return t(`screenplay.stage.textbox.${s.mode}`);
+    case "Invoke":
+      return t("screenplay.stage.invoke", { name: s.name, args: s.args.map((a) => (a.value.kind === "text" ? `"${a.value.raw}"` : String(a.value.value))).join(", ") });
     default:
       return undefined;
   }

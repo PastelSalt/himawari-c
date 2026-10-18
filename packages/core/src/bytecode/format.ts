@@ -1,10 +1,11 @@
 /**
- * The .hwb format (spec/bytecode.md v1.0): constants and the in-memory module
+ * The .hwb format (spec/bytecode.md v1.1): constants and the in-memory module
  * that the compiler builds, the writer serializes, and the reader validates.
  */
 
 export const HWB_MAJOR = 1;
-export const HWB_MINOR = 0;
+/** The newest minor version this code reads and writes. Writers emit the lowest minor a module needs (§1). */
+export const HWB_MINOR = 1;
 export const MAGIC = [0x48, 0x57, 0x42, 0x01] as const; // "HWB\x01"
 export const HEADER_SIZE = 24;
 export const FLAG_DEBUG = 1;
@@ -12,7 +13,7 @@ export const NONE = 0xffffffff;
 
 export const Op = {
   SAY: 0x01, SHOW: 0x02, HIDE: 0x03, MOVE: 0x04, BG: 0x05, CG: 0x06, AUDIO: 0x07, STOP: 0x08,
-  WAIT: 0x09, EFFECT: 0x0a, MENU: 0x0b,
+  WAIT: 0x09, EFFECT: 0x0a, MENU: 0x0b, TEXTBOX: 0x0c, XCALL: 0x0d,
   JMP: 0x10, JZ: 0x11, CALL: 0x12, RET: 0x13, END: 0x14,
   PUSH: 0x20, LOAD: 0x21, STORE: 0x22,
   ADD: 0x23, SUB: 0x24, MUL: 0x25, DIV: 0x26, MOD: 0x27, NEG: 0x28,
@@ -22,9 +23,12 @@ export const Op = {
 export type OpName = keyof typeof Op;
 export const OP_NAMES: ReadonlyMap<number, OpName> = new Map(Object.entries(Op).map(([k, v]) => [v, k as OpName]));
 
-/** Fixed argument counts; SHOW and MENU are computed from their own arguments. */
+/** Ops added in bytecode 1.1. */
+export const OPS_1_1: ReadonlySet<number> = new Set([Op.TEXTBOX, Op.XCALL]);
+
+/** Fixed argument counts; SHOW, MENU, and XCALL are computed from their own arguments. */
 export const FIXED_ARGC: Readonly<Partial<Record<OpName, number>>> = {
-  SAY: 1, HIDE: 4, MOVE: 5, BG: 4, CG: 4, AUDIO: 3, STOP: 2, WAIT: 1, EFFECT: 2,
+  SAY: 1, HIDE: 4, MOVE: 5, BG: 4, CG: 4, AUDIO: 3, STOP: 2, WAIT: 1, EFFECT: 2, TEXTBOX: 1,
   JMP: 1, JZ: 1, CALL: 1, RET: 0, END: 0, PUSH: 1, LOAD: 1, STORE: 1,
   ADD: 0, SUB: 0, MUL: 0, DIV: 0, MOD: 0, NEG: 0, EQ: 0, NE: 0, LT: 0, LE: 0, GT: 0, GE: 0, NOT: 0, AND: 0, OR: 0, RAND: 0,
 };
@@ -36,6 +40,35 @@ export const Channel = { music: 0, ambient: 1, sfx: 2, voice: 3 } as const;
 export const LINE_OPTION = 1;
 export const LINE_ONCE = 2;
 export const LINE_PROMPT = 4;
+/** 1.1: the quoted text of an extension statement (shown by the extension, not the textbox). */
+export const LINE_CALL = 8;
+
+/** TEXTBOX modes (1.1), in operand order. */
+export const TEXTBOX_MODES = ["adv", "nvl", "clear", "hide", "show"] as const;
+
+/**
+ * Extension parameter types (XTNS, 1.1), in code order. How XCALL encodes each value:
+ * int as itself, bool as 0/1, text as a LINE index (NONE when left out), every other type as a string index.
+ */
+export const XPARAM_TYPES = ["character", "position", "scene", "bg", "cg", "music", "sfx", "ambient", "voice", "transition", "word", "int", "bool", "text"] as const;
+export const XPARAM_INT = XPARAM_TYPES.indexOf("int");
+export const XPARAM_BOOL = XPARAM_TYPES.indexOf("bool");
+export const XPARAM_TEXT = XPARAM_TYPES.indexOf("text");
+export const XTNS_BLOCKING = 1;
+
+/** An extension statement's signature (XTNS). */
+export interface ExtensionEntry {
+  name: number;
+  flags: number;
+  params: { name: number; type: number }[];
+}
+
+/** A theme entry (THEM, 1.1), sorted by key. type 0 = int, 1 = color (0xRRGGBB), 2 = string index. */
+export interface ThemeEntry {
+  key: number;
+  type: 0 | 1 | 2;
+  value: number;
+}
 
 export interface VarEntry {
   name: number;
@@ -128,6 +161,10 @@ export interface HwbModule {
   debug: DebugEntry[] | null;
   locales: LocaleEntry[];
   sprites: SpriteEntry[];
+  /** 1.1: extension statement signatures; XCALL operand 0 indexes this. */
+  extensions: ExtensionEntry[];
+  /** 1.1: the compiled theme. */
+  theme: ThemeEntry[];
 }
 
 /** Argument count an instruction must have, given its op and (for SHOW/MENU) its leading arguments. */
@@ -142,6 +179,10 @@ export function expectedArgc(op: number, code: readonly number[], argStart: numb
   if (name === "MENU") {
     const n = code[argStart + 1];
     return n === undefined ? undefined : 2 + 2 * n;
+  }
+  if (name === "XCALL") {
+    const n = code[argStart + 1];
+    return n === undefined ? undefined : 2 + n;
   }
   return FIXED_ARGC[name];
 }

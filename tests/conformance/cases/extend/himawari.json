@@ -1,0 +1,12 @@
+{
+  "name": "Conformance: extend",
+  "id": "dev.moesoft.conformance.extend",
+  "version": "0.1.0",
+  "engine": "^1.1.0",
+  "entry": "start",
+  "sourceLanguage": "en",
+  "languages": ["en", "ja"],
+  "variables": {
+    "calls": { "type": "int", "default": 0, "scope": "save" }
+  }
+}

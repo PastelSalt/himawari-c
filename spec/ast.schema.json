@@ -1,15 +1,16 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://pastelsalt.github.io/himawari-c/spec/ast/1.0.json",
+  "$id": "https://pastelsalt.github.io/himawari-c/spec/ast/1.1.json",
   "title": "Himawari Script AST (JSON)",
-  "description": "AST version 1.0 for language spec 0.2.0-draft (plan §5.3). Produced by @himawari/core parseAst(); `ast` in its result. Spans are [start, end) offsets in UTF-16 code units. Tools edit scripts through the CST/edit API, never by writing this JSON back.",
+  "description": "AST version 1.1 for language spec 0.3.0-draft (plan §5.3). Produced by @himawari/core parseAst(); `ast` in its result. 1.1 adds macros (rfcs/0008), and the Textbox and Invoke statements (rfcs/0007). The AST keeps macro calls as written; the project checker expands them. Spans are [start, end) offsets in UTF-16 code units. Tools edit scripts through the CST/edit API, never by writing this JSON back.",
   "type": "object",
-  "required": ["version", "file", "scenes"],
+  "required": ["version", "file", "scenes", "macros"],
   "additionalProperties": false,
   "properties": {
-    "version": { "const": "1.0" },
+    "version": { "const": "1.1" },
     "file": { "type": "string" },
-    "scenes": { "type": "array", "items": { "$ref": "#/$defs/scene" } }
+    "scenes": { "type": "array", "items": { "$ref": "#/$defs/scene" } },
+    "macros": { "type": "array", "items": { "$ref": "#/$defs/macro" } }
   },
   "$defs": {
     "span": {
@@ -56,14 +57,87 @@
     },
     "body": { "type": "array", "items": { "$ref": "#/$defs/stmt" } },
 
+    "macro": {
+      "description": "define statement name(params): with a body of stage and flow statements (rfcs/0008).",
+      "type": "object",
+      "required": ["name", "span", "params", "body", "bodySpan"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "$ref": "#/$defs/name" },
+        "span": { "$ref": "#/$defs/span" },
+        "params": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "type", "default", "span"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "$ref": "#/$defs/name" },
+              "type": { "type": "string" },
+              "default": { "oneOf": [{ "$ref": "#/$defs/argValue" }, { "type": "null" }] },
+              "span": { "$ref": "#/$defs/span" }
+            }
+          }
+        },
+        "body": { "$ref": "#/$defs/body" },
+        "bodySpan": { "oneOf": [{ "$ref": "#/$defs/span" }, { "type": "null" }] }
+      }
+    },
+    "argValue": {
+      "oneOf": [
+        { "type": "object", "required": ["kind", "value"], "additionalProperties": false, "properties": { "kind": { "const": "int" }, "value": { "type": "integer" } } },
+        { "type": "object", "required": ["kind", "value"], "additionalProperties": false, "properties": { "kind": { "const": "name" }, "value": { "type": "string" } } },
+        {
+          "type": "object", "required": ["kind", "raw", "text"], "additionalProperties": false,
+          "properties": { "kind": { "const": "text" }, "raw": { "type": "string" }, "text": { "$ref": "#/$defs/text" } }
+        }
+      ]
+    },
+
     "stmt": {
       "oneOf": [
         { "$ref": "#/$defs/say" }, { "$ref": "#/$defs/narration" }, { "$ref": "#/$defs/show" },
         { "$ref": "#/$defs/hide" }, { "$ref": "#/$defs/move" }, { "$ref": "#/$defs/image" },
         { "$ref": "#/$defs/audio" }, { "$ref": "#/$defs/stop" }, { "$ref": "#/$defs/wait" },
         { "$ref": "#/$defs/effect" }, { "$ref": "#/$defs/assign" }, { "$ref": "#/$defs/goto" },
-        { "$ref": "#/$defs/terminal" }, { "$ref": "#/$defs/if" }, { "$ref": "#/$defs/menu" }
+        { "$ref": "#/$defs/terminal" }, { "$ref": "#/$defs/if" }, { "$ref": "#/$defs/menu" },
+        { "$ref": "#/$defs/textbox" }, { "$ref": "#/$defs/invoke" }
       ]
+    },
+    "textbox": {
+      "type": "object",
+      "required": ["kind", "span", "mode"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "Textbox" },
+        "span": { "$ref": "#/$defs/span" },
+        "mode": { "enum": ["adv", "nvl", "clear", "hide", "show"] }
+      }
+    },
+    "invoke": {
+      "description": "A macro or extension statement call: name(arg, key=value). Its quoted text, if any, has the line ID.",
+      "type": "object",
+      "required": ["kind", "span", "name", "lineId", "args"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "Invoke" },
+        "span": { "$ref": "#/$defs/span" },
+        "name": { "$ref": "#/$defs/name" },
+        "lineId": { "$ref": "#/$defs/lineId" },
+        "args": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "value", "span"],
+            "additionalProperties": false,
+            "properties": {
+              "name": { "$ref": "#/$defs/strOrNull" },
+              "value": { "$ref": "#/$defs/argValue" },
+              "span": { "$ref": "#/$defs/span" }
+            }
+          }
+        }
+      }
     },
     "say": {
       "type": "object",

@@ -8,7 +8,7 @@
  * Shared by the Screenplay view, quick fixes, refactors, and MCP.
  */
 import { type RandomSource, cryptoRandomSource, generateLineId } from "./ids.js";
-import { type CstNode, childNodes, childTokens, isNode, spanOf } from "./syntax/cst.js";
+import { type CstNode, childNodes, childTokens, isNode, lineText, spanOf } from "./syntax/cst.js";
 import type { Diagnostic, Span } from "./syntax/diagnostics.js";
 import { type Token, isTrivia, lex } from "./syntax/lexer.js";
 import { parse } from "./syntax/parser.js";
@@ -110,8 +110,7 @@ function applyOne(text: string, op: EditOp): { text: string; inserted?: Span } {
     }
     case "replace_text": {
       const at = locate(root, op.lineId);
-      const lit = childNodes(at.line, "Literal")[0];
-      const tok = lit ? childTokens(lit, "String")[0] : undefined;
+      const tok = lineText(at.line);
       if (!tok) throw new EditError(`line ${op.lineId} has no text to replace`);
       return { text: splice(text, { start: tok.start, end: tok.start + tok.text.length }, `"${op.text}"`) };
     }
@@ -163,7 +162,7 @@ function locate(root: CstNode, lineId: string): Located {
   let found: Located | undefined;
   const visit = (n: CstNode) => {
     if (found) return;
-    if (n.kind === "SayStmt" || n.kind === "NarrationStmt") {
+    if (n.kind === "SayStmt" || n.kind === "NarrationStmt" || n.kind === "InvokeStmt") {
       if (hasTag(n, lineId)) found = { line: n, unit: n, indent: indentOf(n) };
       return;
     }
@@ -255,7 +254,7 @@ export function addLineIds(
   const inserts: { at: number; text: string }[] = [];
   const added: string[] = [];
   const visit = (n: CstNode) => {
-    const isLine = n.kind === "SayStmt" || n.kind === "NarrationStmt" || n.kind === "OptionHeader";
+    const isLine = n.kind === "SayStmt" || n.kind === "NarrationStmt" || n.kind === "OptionHeader" || (n.kind === "InvokeStmt" && lineText(n) !== undefined);
     if (isLine) {
       const span = spanOf(n);
       if (span && span.start >= within.start && span.start < within.end && childTokens(n, "LineTag").length === 0) {

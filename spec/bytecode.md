@@ -1,6 +1,6 @@
 # Himawari Bytecode (`.hwb`) Specification
 
-> **Version:** 1.0 (format major 1, minor 0) · **Status:** **frozen** at the end of Phase 2 (2026-10-17). `META`, `LOCL`, menu prompt line IDs, and the stricter loader rules were added before the freeze (rfcs/0004), then `SPRT` (rfcs/0005). From now on, additions bump the minor version (§5.6) and unknown sections are skipped.
+> **Version:** 1.1 (format major 1, minor 1) · **Status:** 1.0 was **frozen** at the end of Phase 2 (2026-10-17). `META`, `LOCL`, menu prompt line IDs, and the stricter loader rules were added before the freeze (rfcs/0004), then `SPRT` (rfcs/0005). **1.1** (Phase 5, rfcs/0007) adds `TEXTBOX`, `XCALL`, the `XTNS` and `THEM` sections, and the `LINE` call flag. Additions bump the minor version (§5.6) and unknown sections are skipped.
 > **License:** CC-BY-4.0 · **Producer:** `@himawari/core` compiler (`hwc build`) · **Consumer:** Himawari-C runtime.
 > Plan references: DETAILED_PLAN.md §5.4, §5.6, §8.4.
 
@@ -20,13 +20,13 @@ Sections (each 4-byte aligned)
 |---|---|---|---|
 | 0 | u8[4] | magic | `48 57 42 01` (`"HWB\x01"`) |
 | 4 | u16 | major | 1 |
-| 6 | u16 | minor | 0 |
+| 6 | u16 | minor | 0 or 1 |
 | 8 | u32 | flags | bit 0: has `DBUG` section |
 | 12 | u32 | section_count | |
 | 16 | u32 | file_size | total size in bytes |
 | 20 | u32 | crc32 | CRC-32 (IEEE 802.3, as in zlib) of the whole file with this field set to 0 |
 
-A runtime accepts a file when `major` equals its own and `minor` is equal or lower (plan §5.6).
+A runtime accepts a file when `major` equals its own and `minor` is equal or lower (plan §5.6). **Writers emit the lowest minor that holds the module:** 1 only when it uses a 1.1 op or section, so games without 1.1 features still load in 1.0 players.
 
 ### 1.2 Section table
 
@@ -44,9 +44,11 @@ A runtime accepts a file when `major` equals its own and `minor` is equal or low
 | `CODE` | yes | Instructions |
 | `LOCL` | no | Translations: per-language line texts and character names |
 | `SPRT` | no | Layered sprites: groups, presets, and rules per character (rfcs/0005) |
+| `XTNS` | no (1.1) | Extension statement signatures (rfcs/0007) |
+| `THEM` | no (1.1) | The compiled theme (rfcs/0007) |
 | `DBUG` | no | pc → source location (stripped in release builds) |
 
-Reserved for later minor versions: `ASST` (asset table and per-scene prefetch lists), `XTNS` (extension statements).
+A 1.0 file's `XTNS` or `THEM` is an unknown section and is skipped. Reserved for later minor versions: `ASST` (asset table and per-scene prefetch lists).
 
 ## 2. Sections
 
@@ -101,7 +103,7 @@ entry_scene          index into entries, or 0xFFFFFFFF if none
 ```
 
 ### 2.5 `LINE`: line table
-Every dialogue line, narration line, menu option, and menu prompt has an entry.
+Every dialogue line, narration line, menu option, menu prompt, and extension statement text (1.1) has an entry.
 ```
 count
 entries[count] = { line_id: u32, speaker: str, text: u32, flags: u32 }
@@ -109,7 +111,7 @@ entries[count] = { line_id: u32, speaker: str, text: u32, flags: u32 }
 - `line_id`: the 30-bit value of the `#line:` ID (Crockford base32, first character most significant), or `0xFFFFFFFF` for lines without one (menu prompts, untagged lines).
 - `speaker`: string index of the character id; 0 for narration, options, and prompts.
 - `text`: index into `TEXT`.
-- `flags`: bit 0 menu option, bit 1 `once` option, bit 2 menu prompt.
+- `flags`: bit 0 menu option, bit 1 `once` option, bit 2 menu prompt, bit 3 (1.1) the text of an extension statement (shown by the extension, not the textbox).
 
 Menu prompts carry a line ID like dialogue (`menu "Where to?":   #line:k3f9a1`), so they can be translated.
 
@@ -162,6 +164,8 @@ The VM is a stack machine of signed 32-bit integers. Booleans are 0/1. String va
 | STOP | 0x08 | channel, fade_ms | channel: 0 music, 1 ambient, 3 voice |
 | WAIT | 0x09 | ms | |
 | EFFECT | 0x0A | kind, ms | kind: 0 shake, 1 flash. `ms` −1 = default |
+| TEXTBOX | 0x0C | mode | 1.1. mode: 0 `adv`, 1 `nvl`, 2 `clear`, 3 `hide`, 4 `show` (`spec/language.md` §2.8). The mode is saved |
+| XCALL | 0x0D | ext, n, value × n | 1.1. Runs extension statement `ext` (an `XTNS` index) with one value per parameter, in parameter order (`n` equals its parameter count). Values: `int` as itself, `bool` 0/1, `text` a `LINE` index (0xFFFFFFFF = left out), every other type a string index. A `blocking` extension holds the story until its handler finishes. With no handler registered for the name, the player skips it (reported in dev builds and playtests) |
 | MENU | 0x0B | prompt_line, n, then n × { line, target_pc } | pops n condition values (the first option's value deepest); shows the options whose value is non-zero and that are not spent `once` options; jumps to the chosen option's `target_pc`. If none can be shown, continues at the next instruction. `prompt_line` 0xFFFFFFFF = none |
 | JMP | 0x10 | pc | |
 | JZ | 0x11 | pc | pop; jump if zero |
@@ -222,7 +226,25 @@ pool_total, pool[pool_total]
 
 The runtime draws `<root>/<group>/<attr>.png` for each attribute in effect, bottom to top. **Auto-blink:** a `blink` group with `<attr>_half` and `<attr>_closed` frames blinks every 2–6 s. **Lip-flap:** a `lipflap` group with `<attr>_open` alternates while that character's line is appearing or their voice is playing.
 
-### 2.10 `DBUG`: debug info
+### 2.10 `XTNS`: extension statements (1.1)
+```
+ext_count
+exts[ext_count] = { name: str, flags, param_first, param_count }
+param_total, params[param_total] = { name: str, type }
+```
+- Every extension the project declares, sorted by name. `flags` bit 0: blocking.
+- `type`: 0 character, 1 position, 2 scene, 3 bg, 4 cg, 5 music, 6 sfx, 7 ambient, 8 voice, 9 transition, 10 word, 11 int, 12 bool, 13 text.
+- The runtime matches names against its registered handlers (`hw_register_statement`) when it loads the file.
+
+### 2.11 `THEM`: theme (1.1)
+```
+count
+entries[count] = { key: str, type, value }
+```
+- Sorted by key, keys unique. `type`: 0 int, 1 color (`0xRRGGBB`), 2 string (`value` is a string index).
+- Keys are `theme.schema.json`'s settings flattened with dots: `color.accent`, `textbox.opacity`, `textbox.slice.left`, `font.main`, `title.music`, …, and `string.<lang>.<key>` for UI strings. The runtime uses the keys it knows and ignores the rest.
+
+### 2.12 `DBUG`: debug info
 ```
 count
 entries[count] = { pc: u32, file: str, line: u32 }
@@ -236,7 +258,8 @@ The loader validates everything **once**, before running (plan §5.4), and rejec
 2. Every section lies inside the file, is 4-byte aligned, and its counts fit its size.
 3. Every string index < string count, including every string operand of SHOW, HIDE, MOVE, BG, CG, and AUDIO (and a `rule` transition's mask); every string is NUL-terminated inside `STRS` and is valid UTF-8.
 4. Every var, char, line, text, and scene index is in range; `TEXT` programs end with `END` inside the section and `SELECT` case texts have a lower index than their text. `META` has a valid resolution and lists the source language first; `LOCL` tables fit and their texts are in range; every `SPRT` range, string, and preset group index is in range and the scale is non-zero.
-5. Every instruction's `argc` matches its opcode (fixed for most ops; computed for SHOW and MENU), every instruction ends inside `CODE`, and every pc argument (JMP, JZ, CALL, MENU targets, scene entries) points at an op word. AUDIO and STOP channels are 0–3; EFFECT kinds are 0–1.
+5. Every instruction's `argc` matches its opcode (fixed for most ops; computed for SHOW, MENU, and XCALL), every instruction ends inside `CODE`, and every pc argument (JMP, JZ, CALL, MENU targets, scene entries) points at an op word. AUDIO and STOP channels are 0–3; EFFECT kinds are 0–1.
+6. (1.1) TEXTBOX and XCALL appear only in files with minor ≥ 1. TEXTBOX modes are 0–4. An XCALL's `ext` is an `XTNS` index, `n` matches its parameter count, and each value fits its type (strings in range, bools 0/1, texts a `LINE` index or 0xFFFFFFFF). `XTNS` ranges and types and `THEM` types and strings are in range, and `THEM` keys are sorted and unique.
 
 After validation the interpreter needs no further bounds checks.
 
@@ -246,4 +269,5 @@ After validation the interpreter needs no further bounds checks.
 - `speaker attrs "text"` compiles to `SHOW speaker` (attributes only, position kept) followed by `SAY`.
 - `if/elif/else` compiles to `JZ`/`JMP` chains. A menu compiles its option conditions (`PUSH 1` for options without one), then `MENU`, then each option body; bodies that fall through end with `JMP` to the gather point after the menu. `MENU` is followed by a `JMP` to the gather point (taken when no option can be shown) only when the menu can run out: when no option is both unconditional and not `once`.
 - `$ x += e` compiles to `LOAD x`, `e`, `ADD`, `STORE x`.
+- Macro calls are expanded before compiling (rfcs/0008); nothing of a macro remains in the bytecode except its statements, whose debug entries point at the call.
 - The compiler is deterministic: the same project always produces identical bytes.

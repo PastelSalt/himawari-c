@@ -8,9 +8,26 @@
 
 #include "hw_hwb.h"
 #include "hw_play.h"
+#include "hw_vfs.h"
 
 uint8_t *hw_read_file(const char *path, size_t *size)
 {
+    /* A pack: the game's bytecode is its game.hwb entry, with patches applied (spec/pack.md). */
+    size_t n = strlen(path);
+    if (n > 4 && SDL_strcasecmp(path + n - 4, ".hwp") == 0) {
+        char dir[1100], err[200];
+        snprintf(dir, sizeof dir, "%s", path);
+        char *slash = strrchr(dir, '/'), *bslash = strrchr(dir, '\\');
+        if (bslash > slash) slash = bslash;
+        if (slash) slash[1] = 0;
+        else dir[0] = 0;
+        hw_vfs *v = hw_vfs_create();
+        uint8_t *bytes = NULL;
+        if (v && hw_vfs_mount_packs(v, dir[0] ? dir : ".", err, sizeof err)) bytes = hw_vfs_load(v, "game.hwb", size);
+        else SDL_SetError("%s", v ? err : "out of memory");
+        hw_vfs_destroy(v);
+        return bytes;
+    }
     /* SDL_LoadFile takes UTF-8 paths, so non-ASCII user folders work (plan §8.13). */
     return SDL_LoadFile(path, size);
 }

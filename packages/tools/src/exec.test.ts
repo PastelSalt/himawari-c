@@ -2,11 +2,12 @@
  * Exec tools against the real runtime. Skipped when himawari.exe isn't built
  * (the TS-only CI job); the runtime CI job covers the runtime itself.
  */
-import { cpSync, existsSync, mkdtempSync, rmSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { readPack } from "@himawari/core";
 import { ProjectFs } from "./fs.js";
 import { type ToolContext, type ToolOk, isConfirm } from "./registry.js";
 import { findRuntime } from "./runtime.js";
@@ -53,7 +54,12 @@ describe.skipIf(!runtime)("exec tools (with himawari.exe)", () => {
   test("build packages a playable folder", async () => {
     const r = ok(await build.run(ctx, {}));
     expect(r.data["exe"]).toBe("build/windows/Layered Sprites/Layered Sprites.exe");
-    expect(existsSync(join(dir, "build/windows/Layered Sprites/game.hwb"))).toBe(true);
-    expect(existsSync(join(dir, "build/windows/Layered Sprites/assets/sprites/mio/body/base.png"))).toBe(true);
+    // One pack with the bytecode and every asset (spec/pack.md), the credits, and no loose files.
+    const pack = readPack(new Uint8Array(readFileSync(join(dir, "build/windows/Layered Sprites/data.hwp"))));
+    const paths = pack.entries.map((e) => e.path);
+    expect(paths).toContain("game.hwb");
+    expect(paths).toContain("assets/sprites/mio/body/base.png");
+    expect(existsSync(join(dir, "build/windows/Layered Sprites/CREDITS.txt"))).toBe(true);
+    expect(existsSync(join(dir, "build/windows/Layered Sprites/game.hwb"))).toBe(false);
   });
 });

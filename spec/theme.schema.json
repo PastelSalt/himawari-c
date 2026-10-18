@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pastelsalt.github.io/himawari-c/spec/theme/1.0.json",
+  "title": "Himawari theme",
+  "description": "theme/theme.json: restyles the built-in UI (rfcs/0007, spec/language.md §2.9). Core compiles it into the bytecode's THEM section. Asset names have no extension. Unknown settings are warnings (HW0131).",
+  "type": "object",
+  "additionalProperties": false,
+  "$defs": {
+    "color": { "type": "string", "pattern": "^#[0-9a-fA-F]{6}$" },
+    "asset": { "type": "string", "pattern": "^[a-z0-9_][a-z0-9_/-]*$" }
+  },
+  "properties": {
+    "$schema": { "type": "string" },
+    "colors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "accent": { "$ref": "#/$defs/color" }, "text": { "$ref": "#/$defs/color" }, "dim": { "$ref": "#/$defs/color" },
+        "textbox": { "$ref": "#/$defs/color" }, "nameplate": { "$ref": "#/$defs/color" }, "choice": { "$ref": "#/$defs/color" },
+        "choice_hover": { "$ref": "#/$defs/color" }, "choice_text": { "$ref": "#/$defs/color" }, "background": { "$ref": "#/$defs/color" },
+        "panel": { "$ref": "#/$defs/color" }
+      }
+    },
+    "textbox": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "opacity": { "type": "integer", "minimum": 0, "maximum": 100, "description": "Percent." },
+        "height": { "type": "integer", "minimum": 10, "maximum": 60, "description": "Percent of the screen height." },
+        "padding": { "type": "integer", "minimum": 0, "maximum": 200, "description": "Pixels at the game's resolution." },
+        "image": { "$ref": "#/$defs/asset", "description": "A nine-slice image for the textbox." },
+        "slice": { "type": "array", "items": { "type": "integer", "minimum": 0, "maximum": 4096 }, "minItems": 4, "maxItems": 4, "description": "Nine-slice borders: left, top, right, bottom." }
+      }
+    },
+    "text": { "type": "object", "additionalProperties": false, "properties": { "size": { "type": "integer", "minimum": 12, "maximum": 96 } } },
+    "font": { "type": "object", "additionalProperties": false, "properties": { "main": { "$ref": "#/$defs/asset" }, "name": { "$ref": "#/$defs/asset" } } },
+    "title": { "type": "object", "additionalProperties": false, "properties": { "background": { "$ref": "#/$defs/asset" }, "music": { "$ref": "#/$defs/asset" } } },
+    "menu": { "type": "object", "additionalProperties": false, "properties": { "background": { "$ref": "#/$defs/asset" } } },
+    "transition": { "type": "object", "additionalProperties": false, "properties": { "ms": { "type": "integer", "minimum": 0, "maximum": 10000, "description": "The default for transitions written without a duration." } } },
+    "strings": {
+      "type": "object",
+      "description": "Per language, replacements for the built-in UI strings (keys as in @himawari/core THEME_STRING_KEYS).",
+      "additionalProperties": { "type": "object", "additionalProperties": { "type": "string" } }
+    }
+  }
+}

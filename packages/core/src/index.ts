@@ -37,11 +37,19 @@ export { type GraphEdge, type GraphNode, type StoryGraph, exprToString, graphToM
 export { DEFAULT_POSITIONS, type Manifest, type VarType, type VariableDecl, readManifest } from "./project/manifest.js";
 export { editDistance, suggest } from "./project/suggest.js";
 export { RenameError, type RenameKind, type RenamePlan, planRename, splitFrontmatter } from "./project/rename.js";
+export { type ExtensionDef, type ExtensionParam, type MacroEntry, PARAM_TYPES, type ParamType, readExtension } from "./project/invoke.js";
+export { THEME_STRING_KEYS, type ThemeEntries, type ThemeValue, readTheme } from "./project/theme.js";
 export { lineIdToNumber, numberToLineId } from "./ids.js";
 export { type CompileResult, compile } from "./bytecode/compiler.js";
 export { writeHwb } from "./bytecode/writer.js";
 export { HwbError, readHwb } from "./bytecode/reader.js";
 export { disassemble, textPreview } from "./bytecode/disasm.js";
+export { xxh64, xxh64String } from "./pack/hash.js";
+export { lz4Compress, lz4Decompress } from "./pack/lz4.js";
+export {
+  Codec, PACK_MAJOR, PACK_MINOR, type PackEntry, PackError, type PackFile, type PackOptions, type ReadPack, diffForPatch, normalizePackPath, readPack,
+  writePack,
+} from "./pack/pack.js";
 export { HWB_MAJOR, HWB_MINOR, type HwbModule, Op, TextOp } from "./bytecode/format.js";
 export {
   type L10nEntry,
@@ -61,8 +69,12 @@ export {
   AST_VERSION,
   type Ast,
   type AstResult,
+  type ArgValue,
   type AttrChange,
   type Expr,
+  type InvokeArg,
+  type MacroDef,
+  type MacroParam,
   type MenuOption,
   type Scene,
   type Stmt,

@@ -43,7 +43,7 @@ export interface ProjectFile {
 
 export interface ProjectSnapshot {
   root: string;
-  /** himawari.json, script/**\/*.hws, characters/*.md, locales/*.json, AGENTS.md. */
+  /** himawari.json, script/**\/*.hws, characters/*.md, locales/*.json, extensions/*.schema.json, theme/theme.json, AGENTS.md. */
   files: ProjectFile[];
   /** Everything under assets/, relative to assets/. */
   assets: string[];

@@ -17,6 +17,8 @@
 
 #include "hw_game.h"
 #include "hw_headless.h"
+#include "hw_hwb.h"
+#include "hw_pack.h"
 #include "hw_version.h"
 
 static const char *USAGE =
@@ -60,11 +62,12 @@ int main(int argc, char **argv)
             return 0;
         } else if (strcmp(argv[i], "--version") == 0) {
             attach_console();
-            printf("himawari %s (bytecode %d.%d)\n", HW_VERSION_STRING, 1, 0);
+            printf("himawari %s (bytecode %d.%d, packs %d.%d, %s)\n", HW_VERSION_STRING, HW_HWB_MAJOR, HW_HWB_MINOR, HW_PACK_MAJOR, HW_PACK_MINOR,
+                   GetACP() == CP_UTF8 ? "UTF-8 code page" : "legacy code page: the manifest is missing");
             return 0;
         } else {
             size_t n = strlen(argv[i]);
-            if (n > 4 && SDL_strcasecmp(argv[i] + n - 4, ".hwb") == 0) game = argv[i];
+            if (n > 4 && (SDL_strcasecmp(argv[i] + n - 4, ".hwb") == 0 || SDL_strcasecmp(argv[i] + n - 4, ".hwp") == 0)) game = argv[i];
         }
     }
 
@@ -73,8 +76,10 @@ int main(int argc, char **argv)
         snprintf(path, sizeof path, "%s/build/game.hwb", project);
         game = path;
     } else if (!game) {
+        /* A shipped game: data.hwp beside the exe (plan §8.12); else game.hwb with loose assets. */
         const char *base = SDL_GetBasePath();
-        snprintf(path, sizeof path, "%sgame.hwb", base ? base : "");
+        snprintf(path, sizeof path, "%sdata.hwp", base ? base : "");
+        if (!SDL_GetPathInfo(path, NULL)) snprintf(path, sizeof path, "%sgame.hwb", base ? base : "");
         game = path;
     }
 

@@ -9,7 +9,7 @@ import type { Token } from "./lexer.js";
 import { KEYWORDS, type ParseResult, parse } from "./parser.js";
 import { type TextPart, parseText } from "./text.js";
 
-export const AST_VERSION = "1.0";
+export const AST_VERSION = "1.1";
 
 export type Expr =
   | { kind: "Int"; value: number }
@@ -45,7 +45,43 @@ export type Stmt =
   | (Base & { kind: "Jump" | "Call"; target: string })
   | (Base & { kind: "Return" | "End" })
   | (Base & { kind: "If"; clauses: { cond: Expr | null; body: Stmt[] }[] })
-  | (Base & { kind: "Menu"; prompt: TextPart[] | null; promptLineId: string | null; options: MenuOption[] });
+  | (Base & { kind: "Menu"; prompt: TextPart[] | null; promptLineId: string | null; options: MenuOption[] })
+  | (Base & { kind: "Textbox"; mode: "adv" | "nvl" | "clear" | "hide" | "show" })
+  /** A macro or extension statement: `name(arg, key=value)` (rfcs/0007, rfcs/0008). Which one is resolved project-wide. */
+  | (Base & { kind: "Invoke"; name: string; lineId: string | null; args: InvokeArg[] });
+
+/** A value written in an invoke statement or as a macro parameter default. */
+export type ArgValue =
+  | { kind: "int"; value: number }
+  /** A bare word: a character, position, scene, asset, transition, attribute, `true`, or `false`. */
+  | { kind: "name"; value: string }
+  /** A quoted, translatable string (at most one per statement; it gets the line ID). */
+  | { kind: "text"; raw: string; text: TextPart[] };
+
+export interface InvokeArg {
+  /** The parameter name for `key=value`; null for a positional argument. */
+  name: string | null;
+  value: ArgValue;
+  span: Span;
+}
+
+export interface MacroParam {
+  name: string;
+  /** One of PARAM_TYPES (project/invoke.ts) except text; checked by the project checker. */
+  type: string;
+  default: ArgValue | null;
+  span: Span;
+}
+
+/** `define statement name(params):` and its body (rfcs/0008). The body is expanded at each call. */
+export interface MacroDef {
+  name: string;
+  span: Span;
+  params: MacroParam[];
+  body: Stmt[];
+  /** The body's source range (re-parsed with the arguments substituted). */
+  bodySpan: Span | null;
+}
 
 export interface AttrChange {
   add: string[];
@@ -74,6 +110,8 @@ export interface Ast {
   version: string;
   file: string;
   scenes: Scene[];
+  /** Macros defined in this file (visible to the whole project). */
+  macros: MacroDef[];
 }
 
 /**
@@ -81,7 +119,7 @@ export interface Ast {
  * validator, and later go-to-definition, find-references, and rename.
  */
 export interface Ref {
-  kind: "sceneDecl" | "scene" | "speaker" | "character" | "attr" | "position" | "transition" | "asset" | "variable" | "function";
+  kind: "sceneDecl" | "scene" | "speaker" | "character" | "attr" | "position" | "transition" | "asset" | "variable" | "function" | "macroDecl" | "invoke";
   name: string;
   span: Span;
   /** attr: the character it applies to. */
@@ -112,9 +150,10 @@ export function parseAst(source: string, file = "<memory>"): AstResult {
   const parsed = parse(source);
   const b = new Builder();
   const scenes = childNodes(parsed.root, "SceneDecl").map((n) => b.scene(n));
+  const macros = childNodes(parsed.root, "DefineDecl").map((n) => b.macro(n));
   const diagnostics = [...parsed.diagnostics, ...b.diagnostics].sort((x, y) => x.span.start - y.span.start);
   const refs = [...collectRefs(parsed.root), ...b.textRefs].sort((x, y) => x.span.start - y.span.start);
-  return { ast: { version: AST_VERSION, file, scenes }, diagnostics, refs, cst: parsed.root };
+  return { ast: { version: AST_VERSION, file, scenes, macros }, diagnostics, refs, cst: parsed.root };
 }
 
 const tokSpan = (t: Token): Span => ({ start: t.start, end: t.start + t.text.length });
@@ -151,6 +190,15 @@ function collectRefs(root: CstNode): Ref[] {
       case "SceneHeader":
         add("sceneDecl", ids[1]);
         break;
+      case "DefineDecl": {
+        // A macro body is checked where it's expanded (its names may be parameters), not as written.
+        const header = n.children[0];
+        if (header && isNode(header)) add("macroDecl", idents(header)[2]);
+        return;
+      }
+      case "InvokeStmt":
+        add("invoke", ids[0]);
+        return; // its arguments are typed by the macro or extension, project-wide (check.ts)
       case "SayStmt":
         add("speaker", ids[0]);
         attrs(n, ids[0]?.text ?? "");
@@ -223,6 +271,45 @@ const blockOf = (n: CstNode): CstNode | undefined => childNodes(n, "Block")[0];
 class Builder {
   readonly diagnostics: Diagnostic[] = [];
   readonly textRefs: Ref[] = [];
+
+  macro(n: CstNode): MacroDef {
+    const header = n.children[0] as CstNode;
+    const block = blockOf(n);
+    const list = childNodes(header, "ParamList")[0];
+    const params: MacroParam[] = (list ? childNodes(list, "Param") : []).map((p) => {
+      const ids = childTokens(p, "Identifier");
+      const def = childNodes(p).find((c) => c.kind === "Literal" || c.kind === "NameRef");
+      return { name: ids[0]?.text ?? "", type: ids[1]?.text ?? "", default: def ? this.argValue(def) : null, span: span(p) };
+    });
+    return { name: firstIdent(header, 2), span: span(header), params, body: block ? this.block(block) : [], bodySpan: block ? (spanOf(block) ?? null) : null };
+  }
+
+  argValue(n: CstNode): ArgValue {
+    const toks = sig(n);
+    if (n.kind === "Literal") {
+      const minus = toks[0]?.kind === "Minus";
+      const t = minus ? toks[1] : toks[0];
+      if (t?.kind === "Number") return { kind: "int", value: (minus ? -1 : 1) * Number(t.text) };
+      if (t?.kind === "String") {
+        const r = parseText(t.text, t.start);
+        this.diagnostics.push(...r.diagnostics);
+        return { kind: "text", raw: t.text.slice(1, t.text.endsWith('"') ? -1 : undefined), text: r.parts };
+      }
+    }
+    return { kind: "name", value: toks[0]?.text ?? "" };
+  }
+
+  invokeArgs(n: CstNode): InvokeArg[] {
+    const list = childNodes(n, "ArgList")[0];
+    if (!list) return [];
+    return childNodes(list).map((a) => {
+      if (a.kind === "NamedArg") {
+        const v = childNodes(a)[0];
+        return { name: childTokens(a, "Identifier")[0]?.text ?? null, value: v ? this.argValue(v) : { kind: "name", value: "" }, span: span(a) };
+      }
+      return { name: null, value: this.argValue(a), span: span(a) };
+    });
+  }
 
   scene(n: CstNode): Scene {
     const header = n.children[0] as CstNode;
@@ -340,6 +427,10 @@ class Builder {
       case "JumpStmt":
       case "CallStmt":
         return { kind: n.kind === "JumpStmt" ? "Jump" : "Call", span: s, target: firstIdent(n, 1) };
+      case "TextboxStmt":
+        return { kind: "Textbox", span: s, mode: (firstIdent(n, 1) || "adv") as "adv" | "nvl" | "clear" | "hide" | "show" };
+      case "InvokeStmt":
+        return { kind: "Invoke", span: s, name: firstIdent(n), lineId: lineIdOf(n), args: this.invokeArgs(n) };
       case "ReturnStmt":
         return { kind: "Return", span: s };
       case "EndStmt":

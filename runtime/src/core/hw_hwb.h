@@ -14,7 +14,7 @@
 #include <stdint.h>
 
 #define HW_HWB_MAJOR 1
-#define HW_HWB_MINOR 0
+#define HW_HWB_MINOR 1 /* 1.1: TEXTBOX, XCALL, XTNS, THEM (rfcs/0007) */
 #define HW_NONE 0xFFFFFFFFu
 #define HW_POSITION_SCALE 10000
 
@@ -22,7 +22,7 @@
 enum {
     HW_OP_SAY = 0x01, HW_OP_SHOW = 0x02, HW_OP_HIDE = 0x03, HW_OP_MOVE = 0x04,
     HW_OP_BG = 0x05, HW_OP_CG = 0x06, HW_OP_AUDIO = 0x07, HW_OP_STOP = 0x08,
-    HW_OP_WAIT = 0x09, HW_OP_EFFECT = 0x0A, HW_OP_MENU = 0x0B,
+    HW_OP_WAIT = 0x09, HW_OP_EFFECT = 0x0A, HW_OP_MENU = 0x0B, HW_OP_TEXTBOX = 0x0C, HW_OP_XCALL = 0x0D,
     HW_OP_JMP = 0x10, HW_OP_JZ = 0x11, HW_OP_CALL = 0x12, HW_OP_RET = 0x13, HW_OP_END = 0x14,
     HW_OP_PUSH = 0x20, HW_OP_LOAD = 0x21, HW_OP_STORE = 0x22,
     HW_OP_ADD = 0x23, HW_OP_SUB = 0x24, HW_OP_MUL = 0x25, HW_OP_DIV = 0x26, HW_OP_MOD = 0x27,
@@ -41,6 +41,24 @@ enum { HW_CHANNEL_MUSIC = 0, HW_CHANNEL_AMBIENT = 1, HW_CHANNEL_SFX = 2, HW_CHAN
 #define HW_LINE_OPTION 1u
 #define HW_LINE_ONCE 2u
 #define HW_LINE_PROMPT 4u
+#define HW_LINE_CALL 8u /* 1.1: the text of an extension statement */
+
+/* TEXTBOX modes (1.1). */
+enum { HW_TEXTBOX_ADV = 0, HW_TEXTBOX_NVL = 1, HW_TEXTBOX_CLEAR = 2, HW_TEXTBOX_HIDE = 3, HW_TEXTBOX_SHOW = 4 };
+
+/* Extension parameter types (XTNS, 1.1), in code order. */
+enum {
+    HW_XP_CHARACTER, HW_XP_POSITION, HW_XP_SCENE, HW_XP_BG, HW_XP_CG, HW_XP_MUSIC, HW_XP_SFX, HW_XP_AMBIENT,
+    HW_XP_VOICE, HW_XP_TRANSITION, HW_XP_WORD, HW_XP_INT, HW_XP_BOOL, HW_XP_TEXT, HW_XP_COUNT
+};
+#define HW_XTNS_BLOCKING 1u
+
+typedef struct hw_ext_info { uint32_t name, flags, param_first, param_count; } hw_ext_info;
+typedef struct hw_ext_param { uint32_t name, type; } hw_ext_param;
+
+/* THEM entry types (1.1). */
+enum { HW_THEME_INT = 0, HW_THEME_COLOR = 1, HW_THEME_STR = 2 };
+typedef struct hw_theme_entry { uint32_t key, type; int32_t value; } hw_theme_entry;
 
 typedef struct hw_var_info {
     uint32_t name;
@@ -132,6 +150,14 @@ typedef struct hw_module {
     uint32_t sprite_pool_count;
     uint32_t *sprite_pool;
 
+    /* 1.1 */
+    uint32_t ext_count;
+    hw_ext_info *exts;
+    uint32_t ext_param_count;
+    hw_ext_param *ext_params;
+    uint32_t theme_count;
+    hw_theme_entry *theme; /* sorted by key */
+
     /* Owned allocations, released by hw_module_free(). */
     char *string_bytes;
     uint32_t *locale_words;
@@ -160,6 +186,8 @@ const hw_sprite *hw_module_sprite_of(const hw_module *m, uint32_t char_id);
 uint32_t hw_module_scene_at(const hw_module *m, uint32_t pc);
 /* The source file and 1-based line of `pc`, from DBUG. Returns false without debug info. */
 bool hw_module_source_at(const hw_module *m, uint32_t pc, const char **file, uint32_t *line);
+/* A theme entry by key (THEM is sorted), or NULL. */
+const hw_theme_entry *hw_module_theme(const hw_module *m, const char *key);
 
 /* An op word's opcode and argument count. */
 static inline uint32_t hw_op(uint32_t word) { return word & 0xFFu; }

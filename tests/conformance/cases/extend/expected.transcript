@@ -1,0 +1,32 @@
+== choices: 0 | language: en | seed: 1
+-- scene start
+show hana () at left with dissolve(400)
+Hana: Watch this.   #200001
+textbox nvl
+The first line of a page.   #200002
+The second line of a page.   #200003
+textbox clear
+screen_tint(color=night, ms=500)
+phone(from=hana, message="Are you coming?", ms=300, loud=true)   #200004
+textbox adv
+show hana () at right with dissolve(0)
+screen_tint(color=none, ms=0)
+hide hana with fade(200)
+end
+-- vars: calls=2
+== choices: 0 | language: ja | seed: 1
+-- scene start
+show hana () at left with dissolve(400)
+花: 見てて。   #200001
+textbox nvl
+ページの一行目。   #200002
+ページの二行目。   #200003
+textbox clear
+screen_tint(color=night, ms=500)
+phone(from=hana, message="来る？", ms=300, loud=true)   #200004
+textbox adv
+show hana () at right with dissolve(0)
+screen_tint(color=none, ms=0)
+hide hana with fade(200)
+end
+-- vars: calls=2

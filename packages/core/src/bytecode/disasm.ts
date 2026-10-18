@@ -1,6 +1,6 @@
 /** Human-readable listing of an HwbModule (`hwc disasm`, golden conformance files). */
 import { numberToLineId } from "../ids.js";
-import { type HwbModule, NONE, OP_NAMES, POSITION_SCALE, TextOp } from "./format.js";
+import { type HwbModule, NONE, OP_NAMES, POSITION_SCALE, TEXTBOX_MODES, TextOp, XPARAM_BOOL, XPARAM_INT, XPARAM_TEXT, XPARAM_TYPES, XTNS_BLOCKING } from "./format.js";
 
 export function disassemble(m: HwbModule): string {
   const s = (i: number) => JSON.stringify(m.strings[i] ?? `?${i}`);
@@ -39,6 +39,14 @@ export function disassemble(m: HwbModule): string {
     for (const r of sp.rules) {
       out.push(`  rule ${r.hide ? `hide ${m.strings[r.hide]}` : `show ${m.strings[r.show]}`} when ${words(r.when)}`);
     }
+  }
+  for (const e of m.extensions) {
+    const params = e.params.map((p) => `${m.strings[p.name]}: ${XPARAM_TYPES[p.type]}`).join(", ");
+    out.push(`extension ${m.strings[e.name]}(${params})${e.flags & XTNS_BLOCKING ? " [blocking]" : ""}`);
+  }
+  for (const t of m.theme) {
+    const value = t.type === 0 ? String(t.value) : t.type === 1 ? `#${t.value.toString(16).padStart(6, "0")}` : s(t.value);
+    out.push(`theme ${m.strings[t.key]} = ${value}`);
   }
   out.push("");
 
@@ -104,6 +112,20 @@ export function disassemble(m: HwbModule): string {
       case "EFFECT":
         text = `EFFECT   ${a(0) ? "flash" : "shake"}${a(1) >= 0 ? ` ${a(1)}` : ""}`;
         break;
+      case "TEXTBOX":
+        text = `TEXTBOX  ${TEXTBOX_MODES[a(0)] ?? a(0)}`;
+        break;
+      case "XCALL": {
+        const ext = m.extensions[a(0)];
+        const values = (ext?.params ?? []).map((p, i) => {
+          const v = a(2 + i);
+          const shown =
+            p.type === XPARAM_INT ? String(v) : p.type === XPARAM_BOOL ? (v ? "true" : "false") : p.type === XPARAM_TEXT ? (v >>> 0 === NONE ? "-" : lineDesc(m, v)) : (m.strings[v] ?? `?${v}`);
+          return `${m.strings[p.name]}=${shown}`;
+        });
+        text = `XCALL    ${ext ? m.strings[ext.name] : `extension ${a(0)}`}(${values.join(", ")})`;
+        break;
+      }
       case "MENU": {
         const lines = [`MENU     ${a(0) >>> 0 === NONE ? "(no prompt)" : lineDesc(m, a(0))}`];
         for (let i = 0; i < a(1); i++) lines.push(`           option ${lineDesc(m, a(2 + 2 * i))} -> ${where(a(3 + 2 * i))}`);

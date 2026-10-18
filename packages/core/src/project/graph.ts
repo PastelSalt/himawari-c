@@ -72,7 +72,7 @@ export function storyGraph(check: ProjectCheck): StoryGraph {
   const nodes: GraphNode[] = [];
   const edges: GraphEdge[] = [];
   const scenes: { scene: Scene; file: string }[] = [];
-  for (const [file, r] of check.parsed) for (const scene of r.ast.scenes) scenes.push({ scene, file });
+  for (const [file, ast] of check.expanded) for (const scene of ast.scenes) scenes.push({ scene, file });
   scenes.sort((a, b) => (a.scene.id < b.scene.id ? -1 : a.scene.id > b.scene.id ? 1 : 0));
 
   for (const { scene, file } of scenes) {

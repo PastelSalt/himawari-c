@@ -27,14 +27,23 @@ export const projectInfo = defineTool({
     };
     const ds = diagnosticsJson(c);
     const problems = { errors: ds.filter((d) => d.severity === "error").length, warnings: ds.filter((d) => d.severity === "warning").length };
+    // Signatures of the project's own statements (rfcs/0007, rfcs/0008), so calls can be written correctly.
+    const param = (p: { name: string; type: string; default?: unknown }) => `${p.name}: ${p.type}${p.default === undefined || p.default === null ? "" : " (optional)"}`;
+    const macros = [...c.macros.values()].map((e) => `${e.def.name}(${e.def.params.map(param).join(", ")})`).sort();
+    const extensions = [...c.extensions.values()]
+      .map((e) => `${e.name}(${e.params.map(param).join(", ")})${e.blocking ? " [blocking]" : ""}${e.description ? `: ${e.description}` : ""}`)
+      .sort();
     const data = {
       name: m?.name ?? "", id: m?.id ?? "", entry: m?.entry ?? "", sourceLanguage: m?.sourceLanguage ?? "", languages: m?.languages ?? [],
-      resolution: m?.resolution ?? [1920, 1080], counts, problems, core: CORE_VERSION, specs: SPEC_VERSIONS, runtime: ctx.runtime !== null,
+      resolution: m?.resolution ?? [1920, 1080], counts, problems, macros, extensions, theme: input.theme !== undefined,
+      core: CORE_VERSION, specs: SPEC_VERSIONS, runtime: ctx.runtime !== null,
     };
     const text = [
       `${data.name} (${data.id}), entry scene ${data.entry}, languages ${data.languages.join(", ")} (source ${data.sourceLanguage})`,
       `${counts.scenes} scenes in ${counts.scripts} files, ${counts.lines} lines, ${counts.characters} characters, ${counts.variables} variables, ${counts.assets} assets`,
       `${problems.errors} errors, ${problems.warnings} warnings${ctx.runtime ? "" : "; playtest and render_line are unavailable (no himawari.exe found)"}`,
+      ...(macros.length ? [`macros: ${macros.join("; ")}`] : []),
+      ...(extensions.length ? [`extension statements: ${extensions.join("; ")}`] : []),
     ].join("\n");
     return { text, data };
   },

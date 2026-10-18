@@ -15,7 +15,10 @@ export function findProjectRoot(from: string): string | undefined {
   }
 }
 
-/** Reads himawari.json, characters/*.md, script/**\/*.hws, locales/*.json, and the assets/ listing (the same loader the AI tools use). */
+/**
+ * Reads himawari.json, characters/*.md, script/**\/*.hws, locales/*.json, extensions/*.schema.json, theme/theme.json,
+ * and the assets/ listing (the same loader the AI tools use).
+ */
 export function loadProject(root: string): ProjectInput {
   return loadInput(new ProjectFs(root));
 }

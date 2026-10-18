@@ -3,6 +3,8 @@
 #include <stdio.h>
 #include <string.h>
 
+#include "hw_image.h"
+
 #define CACHE_SIZE 256
 
 typedef struct entry {
@@ -14,20 +16,21 @@ typedef struct entry {
 
 struct hw_assets {
     SDL_Renderer *ren;
-    char root[512];
+    hw_vfs *vfs;
     entry cache[CACHE_SIZE];
     uint64_t clock;
 };
 
-hw_assets *hw_assets_open(SDL_Renderer *ren, const char *root)
+hw_assets *hw_assets_open(SDL_Renderer *ren, hw_vfs *vfs)
 {
     hw_assets *a = SDL_calloc(1, sizeof *a);
     if (!a) return NULL;
     a->ren = ren;
-    size_t n = strlen(root);
-    snprintf(a->root, sizeof a->root, "%s%s", root, n > 0 && (root[n - 1] == '/' || root[n - 1] == '\\') ? "" : "/");
+    a->vfs = vfs;
     return a;
 }
+
+hw_vfs *hw_assets_vfs(const hw_assets *a) { return a->vfs; }
 
 void hw_assets_flush(hw_assets *a)
 {
@@ -47,14 +50,11 @@ void hw_assets_close(hw_assets *a)
 bool hw_assets_find(const hw_assets *a, const char *folder, const char *name, const char *const *exts, char *out, size_t cap)
 {
     for (int i = 0; exts[i]; i++) {
-        snprintf(out, cap, "%s%s/%s%s", a->root, folder, name, exts[i]);
-        if (SDL_GetPathInfo(out, NULL)) return true;
+        snprintf(out, cap, "assets/%s%s%s%s", folder, folder[0] ? "/" : "", name, exts[i]);
+        if (hw_vfs_exists(a->vfs, out)) return true;
     }
     return false;
 }
-
-static const char *const LOADABLE[] = { ".png", ".bmp", NULL };
-static const char *const NOT_YET[] = { ".jpg", ".jpeg", ".webp", NULL };
 
 SDL_Texture *hw_assets_image(hw_assets *a, const char *folder, const char *name, const char **why)
 {
@@ -79,8 +79,8 @@ SDL_Texture *hw_assets_image(hw_assets *a, const char *folder, const char *name,
     e->used = a->clock;
 
     char path[1024];
-    if (hw_assets_find(a, folder, name, LOADABLE, path, sizeof path)) {
-        SDL_Surface *s = SDL_LoadSurface(path);
+    if (hw_assets_find(a, folder, name, HW_IMAGE_EXTS, path, sizeof path)) {
+        SDL_Surface *s = hw_image_load(hw_vfs_open(a->vfs, path), strrchr(path, '.'));
         if (s) {
             e->tex = SDL_CreateTextureFromSurface(a->ren, s);
             SDL_DestroySurface(s);
@@ -89,9 +89,6 @@ SDL_Texture *hw_assets_image(hw_assets *a, const char *folder, const char *name,
             e->why = "can't be read";
             SDL_Log("assets: %s: %s", path, SDL_GetError());
         }
-    } else if (hw_assets_find(a, folder, name, NOT_YET, path, sizeof path)) {
-        e->why = "JPG/WebP aren't supported yet; use PNG";
-        SDL_Log("assets: %s: %s", path, e->why);
     } else {
         e->why = "missing";
     }

@@ -1,0 +1,244 @@
+{
+  "language": "ja",
+  "sourceLanguage": "en",
+  "lines": [
+    {
+      "id": "kedxwy",
+      "source": "From Hana's notebook:",
+      "text": "花のノートより：",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "hn7ndk",
+      "source": "{size=34}Lanterns: 40.{/size} Paper: enough. Glue: {color=#d04040}not enough{/color}.",
+      "text": "{size=34}提灯：40個。{/size}紙：足りてる。のり：{color=#d04040}足りない{/color}。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "rws0yk",
+      "source": "Reasons to smile tonight: [hana_heart], at least.",
+      "text": "今夜笑う理由：少なくとも[hana_heart]つ。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "fr8fvg",
+      "source": "The cicadas went quiet.{w=600} Then the bell rang.",
+      "text": "セミが鳴きやんだ。{w=600}そして、チャイムが鳴った。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "vtbh67",
+      "source": "Ah! The glue!",
+      "text": "あっ！のり！",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "n7berj",
+      "source": "I brought extra. Obviously.",
+      "text": "予備を持ってきた。当然だろ。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "yjny48",
+      "source": "I'll run to the shop. Wait here!",
+      "text": "お店まで走ってくる。ここで待ってて！",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "gs7s76",
+      "source": "Where do we watch the fireworks?",
+      "text": "花火はどこで見る？",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "7caqhh",
+      "source": "By the river.",
+      "text": "川べりで。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "1ar9ha",
+      "source": "In the sunflower field.",
+      "text": "ひまわり畑で。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "hfrrzr",
+      "source": "The lanterns look like stars that fell into the water.",
+      "text": "提灯が、水に落ちた星みたい。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "9e6s3k",
+      "source": "{speed=12}I'm glad it's you here.{/speed}",
+      "text": "{speed=12}ここにいるのが、あなたでよかった。{/speed}",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "0mg2hk",
+      "source": "{shake}Boom.{/shake} The sky opened up in colors.{alt=Fireworks burst over the river.}",
+      "text": "{shake}ドーン。{/shake}夜空がいろとりどりに開いた。{alt=川の上で花火がはじける。}",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "3w3fby",
+      "source": "For a moment, nobody said anything.",
+      "text": "しばらく、だれも何も言わなかった。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "d9bh32",
+      "source": "In the evening the sunflowers face west. Like they're waving goodbye.",
+      "text": "夕方になると、ひまわりは西を向くの。さよならって手を振ってるみたいに。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "7vaqn5",
+      "source": "The {select path: field=\"field\" other=\"river\"} glowed gold until the first firework.",
+      "text": "{select path: field=\"畑\" other=\"川\"}は、最初の花火まで金色に輝いていた。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "56mrze",
+      "source": "Same time next summer? Promise?",
+      "text": "来年の夏も、同じ時間に？約束だよ？",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "t0edzg",
+      "source": "I promised. It was the easiest promise I ever made.",
+      "text": "約束した。今までで一番かんたんな約束だった。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "1tfm7r",
+      "source": "Thanks for today. Really.",
+      "text": "今日はありがとう。本当に。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "w32g3v",
+      "source": "We walked home slowly, carrying the empty glue bottles.",
+      "text": "空になったのりのボトルを持って、ゆっくり歩いて帰った。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "jjdt5h",
+      "source": "Next year, I'm buying the food. You owe me.",
+      "text": "来年は、わたしが食べ物を買う。貸しだからね。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "vetkmd",
+      "source": "Somehow, that sounded like an invitation.",
+      "text": "なぜか、それは誘いのように聞こえた。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "cz1hef",
+      "source": "Thank you for playing Sunflower Days.",
+      "text": "『ひまわりの日々』を遊んでくれてありがとう。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "c1a2ng",
+      "source": "Summer vacation. The sunflowers are taller than I am.",
+      "text": "夏休み。{rb=ひまわり}向日葵{/rb}は、わたしより背が高い。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "07cgn7",
+      "source": "There you are! I {b}knew{/b} you'd come.",
+      "text": "いた！{b}来てくれる{/b}って思ってた。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "6sv56e",
+      "source": "The festival is tonight. Will you help me get ready?",
+      "text": "お祭りは今夜なの。準備、手伝ってくれる？",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "7qff7k",
+      "source": "What do you say?",
+      "text": "なんて答える？",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "g85k56",
+      "source": "Of course!",
+      "text": "もちろん！",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "v055rk",
+      "source": "I knew I could count on you.",
+      "text": "あなたなら、そう言ってくれると思った。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "b7ss6q",
+      "source": "Only if there's food.",
+      "text": "食べ物があるなら。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "g9gzae",
+      "source": "There's {i}always{/i} food.",
+      "text": "食べ物は{i}いつだって{/i}あるよ。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "b3jptz",
+      "source": "Who else is coming?",
+      "text": "ほかにだれが来るの？",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "hzhpwq",
+      "source": "See? It's a whole team now.",
+      "text": "ほらね？立派なチームでしょ。",
+      "status": "needs-review",
+      "provenance": "ai"
+    },
+    {
+      "id": "6q5we0",
+      "source": "Someone has to make sure the lanterns don't catch fire.",
+      "text": "提灯が燃えないように、だれかが見張らないとな。",
+      "status": "needs-review",
+      "provenance": "ai"
+    }
+  ]
+}

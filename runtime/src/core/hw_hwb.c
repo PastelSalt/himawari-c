@@ -274,7 +274,7 @@ static bool expected_argc(const uint32_t *code, uint32_t count, uint32_t pc, uin
     uint32_t have = count - pc - 1; /* words available after the op word */
     switch (op) {
     case HW_OP_SAY: case HW_OP_WAIT: case HW_OP_JMP: case HW_OP_JZ: case HW_OP_CALL:
-    case HW_OP_PUSH: case HW_OP_LOAD: case HW_OP_STORE:
+    case HW_OP_PUSH: case HW_OP_LOAD: case HW_OP_STORE: case HW_OP_TEXTBOX:
         *argc = 1; return true;
     case HW_OP_STOP: case HW_OP_EFFECT:
         *argc = 2; return true;
@@ -302,6 +302,13 @@ static bool expected_argc(const uint32_t *code, uint32_t count, uint32_t pc, uin
         *argc = (uint32_t)n;
         return true;
     }
+    case HW_OP_XCALL: {
+        if (have < 2) return false;
+        uint64_t n = 2u + (uint64_t)code[pc + 2];
+        if (n > 255) return false;
+        *argc = (uint32_t)n;
+        return true;
+    }
     default:
         return false;
     }
@@ -324,7 +331,9 @@ static void load_code(ctx *c, section *s, uint8_t **is_op_out)
     for (uint32_t pc = 0; pc < m->code_count;) {
         uint32_t want;
         uint32_t argc = hw_argc(m->code[pc]);
-        if (!expected_argc(m->code, m->code_count, pc, &want)) {
+        uint32_t op = hw_op(m->code[pc]);
+        bool newer = op == HW_OP_TEXTBOX || op == HW_OP_XCALL; /* 1.1 ops are unknown in a 1.0 file */
+        if ((newer && m->minor < 1) || !expected_argc(m->code, m->code_count, pc, &want)) {
             fail(c, "unknown opcode 0x%x at pc %u", (unsigned)hw_op(m->code[pc]), (unsigned)pc);
             return;
         }
@@ -401,6 +410,31 @@ static void check_code(ctx *c, const uint8_t *is_op)
         case HW_OP_LOAD: case HW_OP_STORE:
             if (a[0] >= m->var_count) fail(c, "pc %u: variable out of range", (unsigned)pc);
             break;
+        case HW_OP_TEXTBOX:
+            if (a[0] > HW_TEXTBOX_SHOW) fail(c, "pc %u: invalid textbox mode", (unsigned)pc);
+            break;
+        case HW_OP_XCALL: {
+            if (a[0] >= m->ext_count) {
+                fail(c, "XCALL at pc %u: extension out of range", (unsigned)pc);
+                break;
+            }
+            const hw_ext_info *e = &m->exts[a[0]];
+            if (a[1] != e->param_count) {
+                fail(c, "XCALL at pc %u: wrong number of values", (unsigned)pc);
+                break;
+            }
+            for (uint32_t i = 0; i < e->param_count && !c->failed; i++) {
+                uint32_t type = m->ext_params[e->param_first + i].type, v = a[2 + i];
+                if (type == HW_XP_TEXT) {
+                    if (v != HW_NONE && v >= m->line_count) fail(c, "XCALL at pc %u: text line out of range", (unsigned)pc);
+                } else if (type == HW_XP_BOOL) {
+                    if (v > 1) fail(c, "XCALL at pc %u: invalid bool", (unsigned)pc);
+                } else if (type != HW_XP_INT) {
+                    STR(2 + i);
+                }
+            }
+            break;
+        }
         default:
             break;
         }
@@ -571,6 +605,63 @@ static void load_sprites(ctx *c, section *s)
     if (!c->failed) check_sprites(c);
 }
 
+static void load_extensions(ctx *c, section *s)
+{
+    hw_module *m = c->m;
+    m->ext_count = next(c, s);
+    m->exts = take_array(c, s, m->ext_count, 4, sizeof(hw_ext_info));
+    for (uint32_t i = 0; i < m->ext_count && !c->failed; i++) {
+        hw_ext_info *e = &m->exts[i];
+        e->name = str_index(c, next(c, s), "XTNS name");
+        e->flags = next(c, s);
+        e->param_first = next(c, s);
+        e->param_count = next(c, s);
+    }
+    m->ext_param_count = next(c, s);
+    m->ext_params = take_array(c, s, m->ext_param_count, 2, sizeof(hw_ext_param));
+    for (uint32_t i = 0; i < m->ext_param_count && !c->failed; i++) {
+        m->ext_params[i].name = str_index(c, next(c, s), "XTNS parameter");
+        m->ext_params[i].type = next(c, s);
+        if (!c->failed && m->ext_params[i].type >= HW_XP_COUNT) fail(c, "XTNS parameter type out of range");
+    }
+    for (uint32_t i = 0; i < m->ext_count && !c->failed; i++) {
+        /* An XCALL carries one value per parameter in at most 253 words. */
+        if (!in_range(m->exts[i].param_first, m->exts[i].param_count, m->ext_param_count) || m->exts[i].param_count > 253) {
+            fail(c, "XTNS parameters out of range");
+        }
+    }
+}
+
+static void load_theme(ctx *c, section *s)
+{
+    hw_module *m = c->m;
+    m->theme_count = next(c, s);
+    m->theme = take_array(c, s, m->theme_count, 3, sizeof(hw_theme_entry));
+    for (uint32_t i = 0; i < m->theme_count && !c->failed; i++) {
+        hw_theme_entry *t = &m->theme[i];
+        t->key = str_index(c, next(c, s), "THEM key");
+        t->type = next(c, s);
+        t->value = (int32_t)next(c, s);
+        if (c->failed) break;
+        if (t->type > HW_THEME_STR) fail(c, "THEM entry type out of range");
+        else if (t->type == HW_THEME_STR) str_index(c, (uint32_t)t->value, "THEM value");
+        if (!c->failed && i > 0 && strcmp(m->strings[m->theme[i - 1].key], m->strings[t->key]) >= 0) fail(c, "THEM keys must be sorted and unique");
+    }
+}
+
+const hw_theme_entry *hw_module_theme(const hw_module *m, const char *key)
+{
+    uint32_t lo = 0, hi = m->theme_count;
+    while (lo < hi) {
+        uint32_t mid = lo + (hi - lo) / 2;
+        int cmp = strcmp(m->strings[m->theme[mid].key], key);
+        if (cmp == 0) return &m->theme[mid];
+        if (cmp < 0) lo = mid + 1;
+        else hi = mid;
+    }
+    return NULL;
+}
+
 const hw_sprite *hw_module_sprite_of(const hw_module *m, uint32_t char_id)
 {
     for (uint32_t i = 0; i < m->sprite_count; i++) {
@@ -579,8 +670,8 @@ const hw_sprite *hw_module_sprite_of(const hw_module *m, uint32_t char_id)
     return NULL;
 }
 
-enum { S_META, S_STRS, S_VARS, S_CHAR, S_SCNE, S_LINE, S_TEXT, S_CODE, S_LOCL, S_DBUG, S_SPRT, S_COUNT };
-static const char *const TAGS[S_COUNT] = { "META", "STRS", "VARS", "CHAR", "SCNE", "LINE", "TEXT", "CODE", "LOCL", "DBUG", "SPRT" };
+enum { S_META, S_STRS, S_VARS, S_CHAR, S_SCNE, S_LINE, S_TEXT, S_CODE, S_LOCL, S_DBUG, S_SPRT, S_XTNS, S_THEM, S_COUNT };
+static const char *const TAGS[S_COUNT] = { "META", "STRS", "VARS", "CHAR", "SCNE", "LINE", "TEXT", "CODE", "LOCL", "DBUG", "SPRT", "XTNS", "THEM" };
 #define REQUIRED_SECTIONS 8 /* META..CODE */
 
 bool hw_module_load(hw_module *m, const uint8_t *bytes, size_t size, char *err, size_t err_size)
@@ -665,12 +756,15 @@ bool hw_module_load(hw_module *m, const uint8_t *bytes, size_t size, char *err, 
     if (!c.failed) load_chars(&c, &secs[S_CHAR]);
     if (!c.failed) load_texts(&c, &secs[S_TEXT]);
     if (!c.failed) load_lines(&c, &secs[S_LINE]);
+    /* 1.1 sections; in a 1.0 file they are unknown tags and skipped (spec §1.2). */
+    if (!c.failed && m->minor >= 1 && secs[S_XTNS].present) load_extensions(&c, &secs[S_XTNS]);
     if (!c.failed) load_code(&c, &secs[S_CODE], &is_op);
     if (!c.failed) check_code(&c, is_op);
     if (!c.failed) load_scenes(&c, &secs[S_SCNE], is_op);
     if (!c.failed && secs[S_LOCL].present) load_locales(&c, &secs[S_LOCL]);
     if (!c.failed && secs[S_DBUG].present) load_debug(&c, &secs[S_DBUG]);
     if (!c.failed && secs[S_SPRT].present) load_sprites(&c, &secs[S_SPRT]);
+    if (!c.failed && m->minor >= 1 && secs[S_THEM].present) load_theme(&c, &secs[S_THEM]);
 
 done:
     free(is_op);
@@ -703,6 +797,9 @@ void hw_module_free(hw_module *m)
     free(m->sprite_presets);
     free(m->sprite_rules);
     free(m->sprite_pool);
+    free(m->exts);
+    free(m->ext_params);
+    free(m->theme);
     memset(m, 0, sizeof *m);
 }
 

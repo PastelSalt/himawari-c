@@ -6,7 +6,7 @@
 
 ---
 
-## Project at a Glance (as of 2026-10-17)
+## Project at a Glance (as of 2026-10-18)
 
 | | |
 |---|---|
@@ -18,7 +18,9 @@
 | **AI role** | Development assistant only. **No media generation** |
 | **Phase** | **Phase 1 done** (session 9): sanitizers; lexer, CST parser, AST + `ast.schema.json`, formatter, validator, edit API, bytecode spec + compiler, conformance (compile half), localization, templates + tutorial, `hwc check/fmt/build/disasm/init/l10n`. Next: Phase 2 |
 | **Phase 2** | **Done** (session 10): `himawari.exe` (loader, VM, saves, rollback, headless playtests, windowed player with layered sprites, rule wipes, EN/JA), bytecode 1.0 frozen, 2.38 MB release |
-| **Phase 3** | **Done** (session 11): `@himawari/tools` (22 tools) + `himawari-mcp` (spec 2026-07-28, SDK v2), agent guide, `hwc run/playtest/graph/report/ai setup`, `build --release` packaging; **M1 reached** (`examples/festival-eve`). Next: **Phase 4, Studio MVP** (waiting on your go-ahead) |
+| **Phase 3** | **Done** (session 11): `@himawari/tools` (22 tools) + `himawari-mcp` (spec 2026-07-28, SDK v2), agent guide, `hwc run/playtest/graph/report/ai setup`, `build --release` packaging; **M1 reached** (`examples/festival-eve`) |
+| **Phase 4** | **Built** (session 13): Himawari Studio (Electron), docked preview, Screenplay and Script views, panels, AI proposals, Mode A live sync, Mode B. M2 hallway test pending |
+| **Phase 5** | **Done** (session 14): macros, extension statements, NVL, themes (bytecode 1.1); config, accessibility, gamepad, gallery, music room; `.hwp` packs and patches; JPEG/WebP; crash reports; budgets met; `examples/sunflower-demo` in 3 languages; golden images |
 | **Owner** | Moesoft (GitHub: `PastelSalt`) |
 | **Repo** | **https://github.com/PastelSalt/himawari-c** (public) |
 
@@ -534,6 +536,59 @@ You then asked to commit and push: `0419238`.
   - **Docs:** `spec/debug-protocol.md` (version 1) and **RFC 0006** (Studio's docked preview, the debug protocol, the proposal gate, Mode A live sync), `spec/agent-guide.md` 1.1, `docs/ai-setup.md` (proposals while Studio is open), README, CLAUDE.md, and the plan's status lines.
 - ✅ **Phase 4 built** (plan §18): shell and first-run flow, Explorer, Screenplay and Script views, live preview with play-as-you-write and two-way line sync, story graph, characters, sprite composer with PSD/ORA import, assets with the placeholder maker, variables, localization table, build panel, AI Proposals with Mode A live sync, unified and selective history, double-Shift search, the Mode B assistant, EN + JA UI with the pseudo-locale, Windows packages, export verified. **Not done or not verified:** the **M2 hallway test** (a non-programmer, in either UI language, with an AI contributing through both modes) needs a person; Mode B has not talked to the API on this PC (no key); PSD/ORA import has only been exercised by code, not with a real artist's file; the Screenplay view has no block palette or multi-select yet (both "later" in §11.3); the agent loop runs in the main process, not a utility process.
 
+
+## Session 14: 2026-10-18 · Phase 5: runtime feature-complete
+**You asked:** continue with Phase 5. Phase 4 was committed and pushed first (`1a9d326`, CI green). This entry is updated after each milestone.
+
+**Work order (plan §18 Phase 5):** the language and bytecode contract in Core (macros, extension statements, `textbox`, themes; bytecode 1.1) → the runtime VM (NVL, themes, the extension registry, saves v2) → UI screens and accessibility (config, first-launch accessibility prompt, gallery, music room, backlog voice replay, save thumbnails, gamepad and remapping) → `.hwp` packs with patches, JPG/WebP → the Windows manifest, crash dumps, performance budgets → `sunflower-demo` in 3 languages, golden images, docs.
+
+- ✅ **Milestone 14a: the contract in Core** (rfcs/0007, rfcs/0008).
+  - **Macros** (`define statement enter(who: character, side: position = left):`): typed parameters, whole-token substitution, expanded by the checker (`ProjectCheck.expanded`) for flow checks, reachability, the story graph, and the compiler, while the AST and every editor keep the call as written. Arguments are checked as real references at the argument (`hanna` → "did you mean hana?" with a quick fix); problems inside a body are reported at the call with a "from a macro" note. No dialogue, narration, or menus in a body (each line needs its own ID); no recursion.
+  - **Extension statements:** `extensions/<name>.schema.json` declares a statement (typed parameters, defaults, word enums, `blocking`, at most one translatable `text`); calls use the macro syntax. A call with a quoted text gets a line ID (formatter, `addLineIds`, Studio autosave), appears in translation tables with kind `call`, and can be edited by line ID.
+  - **`textbox adv|nvl|clear|hide|show`** (new keyword `textbox`) and **themes** (`theme/theme.json`: colors, textbox with nine-slice, text size, fonts, title and menu art and music, default transition time, per-language UI strings; unknown settings are warnings with suggestions).
+  - **Bytecode 1.1:** `TEXTBOX`, `XCALL`, `XTNS`, `THEM`, and a `LINE` call flag; the reader validates all of it. Writers emit the **lowest minor that holds the module**, so every existing conformance file is byte-identical and games without the new features still load in 1.0 players. A new conformance case `extend` covers all of it (macro, NVL, two extensions, a theme, Japanese).
+  - Specs: language 0.3.0-draft (§2.6–§2.9), grammar, bytecode 1.1, AST schema 1.1, new `extension.schema.json` and `theme.schema.json` (checked against Core in tests), llm-reference. `project_info` lists macro and extension signatures for AI tools. CLI, MCP tools, and Studio load `extensions/` and `theme/`.
+  - **Diagnostics added:** HW0120 (bad extension schema), HW0130/HW0131 (theme), HW0220–HW0230 (calls and macros).
+  - `corepack pnpm check`: 286 tests (+1 skipped live test), lint, i18n pass. The C runtime doesn't read 1.1 yet (next milestone), so the `extend` case has no runtime transcript yet.
+
+- ✅ **Milestone 14b: the runtime reads bytecode 1.1.**
+  - **Loader:** `XTNS`, `THEM`, `TEXTBOX`, and `XCALL` with the same checks as the reference reader (a 1.0 file can't use 1.1 ops; its 1.1 sections are skipped as unknown). **VM:** textbox mode, the NVL page (line indices, kept in the saved state; a page too tall for the screen starts over with its newest line), and four saved state words per extension statement. Transcripts print `textbox nvl` and `phone(from=hana, message="…")`; the `extend` case's transcript matches in English and Japanese.
+  - **Saves v2:** a thumbnail blob, the textbox mode and NVL page (by line ID), and extension state (by statement name). Version-1 saves still load.
+  - **Extension statements** (`hw_ext.h`): `hw_register_statement()` with begin/update/click/finish/restore/draw callbacks, typed value accessors, and a registration list CMake generates from `HW_EXTENSIONS`. Blocking statements hold the story until they finish; skipping, rewinding, and loading end them. A missing handler is logged (and shown in dev builds) and the statement is skipped. Sample: `screen_tint` in `runtime/ext/`.
+  - **Themes** (`hw_theme.c`): palette, textbox opacity/height/padding, nine-slice textbox image (`SDL_RenderTexture9Grid`), text size, nameplate font, title background and music, menu background, default transition time, and per-language UI strings. A themed string that is a format (`Slot %d`) must keep its placeholder; the runtime ignores it otherwise, and Core reports it (HW0130).
+  - **The player was split:** `hw_game.c` (the story, saves, the Studio link, the main loop), `hw_screens.c` (drawing and input), `hw_game_int.h` (shared internals). No behavior change; done before Phase 5's screens land.
+  - Checked: debug, ASan/UBSan (all 9 ctest tests), new loader refusals and a save-v2 round trip in the C tests, and a windowed run of the `extend` case showing the NVL page in the theme's colors.
+
+- ✅ **Milestone 14c: the player's screens and the accessibility baseline** (plan §8.10, §13).
+  - **Config:** language, text speed, auto speed, text size (100–150 %), line spacing (1.0–1.5×), font (the game's, or "easy to read": Verdana with UD Digi Kyokasho for Japanese, both shipped with Windows), textbox opacity, high contrast, reduce motion and flashes, skip unread text, full screen, four volumes, and Controls. Every row works with the mouse, the keyboard, or a gamepad (left/right change the focused row).
+  - **First-launch accessibility prompt** ("Before you start"): language, text size, font, line spacing, high contrast, reduce motion, text speed. Never shown in unattended runs or Studio's preview.
+  - **Input:** 13 actions, each with a key and a gamepad button, remappable on the Controls screen (Esc or Start cancels; a key taken from another action moves). Fixed alternatives (Enter, Space, Z, arrows, Esc, Start) always work, so a bad remap can't lock a player out. Gamepads hot-plug. New: hide the textbox (Delete / Back).
+  - **Reduce motion** turns off shake and flash and makes every transition a gentle dissolve (≥ 0.3 s). **High contrast** is an opaque black textbox, white text, and a yellow accent. Toggle states in the quick bar are underlined, not shown by color alone.
+  - **Extras:** a CG gallery (unlocked when a CG is shown; full-screen view) and a music room (unlocked when a track plays; Stop). Unlocks live in global data by asset name and survive reloads.
+  - **History voice replay:** a ▶ button on lines that have a voice file.
+  - **Save thumbnails:** a 384-pixel PNG of the scene (without the textbox) in each save; the save screen shows them and reads the slots once instead of every frame.
+  - **Global data v2** (settings, bindings by action, unlocks); version 1 still loads.
+  - **UI strings:** 48 new, English and Japanese (Japanese written by the AI; needs review with the rest). `tests/theme-keys.test.ts` checks that Core's themable keys are exactly the runtime's, that every string has Japanese, and that translations keep their placeholders.
+  - **Dev flags** for smoke tests and golden images: `--screen NAME`, `--unlock-all` (in memory only), `--save-to FILE`.
+  - Checked: debug and ASan/UBSan ctest; every new screen and a play-through run under ASan; screenshots of Config, Controls, the prompt, Extras, the gallery, and the music room; a save written with `--save-to` holds a valid PNG thumbnail. **Not verified:** a real gamepad (none attached here; the code paths are SDL's standard ones), and the readable font on a PC without the optional Japanese UD fonts (it falls back to Yu Gothic).
+
+- ✅ **Milestone 14d: packs, images, Windows integration, budgets** (plan §8.1, §8.8, §8.13, rfcs/0009).
+  - **`.hwp` packs** (`spec/pack.md` 1.0): xxHash64-keyed TOC at the end of the file (CRC-checked), entries stored or LZ4, removed entries for patches, the game id's hash so patches stay with their game, optional obfuscation documented as not DRM. Core has the packer (`writePack`, `readPack`, `diffForPatch`, xxHash64, an LZ4 compressor); the runtime's TOC parser and LZ4 decoder are in `core/hw_pack.c`, tested against packs the TS packer wrote (`tests/packs/`, an obfuscated base and a patch) and fuzzed (`fuzz_pack`: 21.9 M inputs in 5 min, nothing found; in CI too).
+  - **Runtime file system** (`hw_vfs`): `data.hwp` and `patch*.hwp` by priority, else loose files in development; stored entries stream from the pack (music isn't loaded whole). Images, audio, fonts, and `game.hwb` all read through it; the player and headless playtests accept a `.hwp`, and a shipped game finds `data.hwp` beside its `.exe`.
+  - **Exports:** `<Game>.exe`, `data.hwp`, `CREDITS.txt` (third-party notices; FreeType requires the credit). `hwc build --release --patch` writes `patch<N>.hwp` with only what changed (and nothing when nothing did); `hwc disasm` lists a pack. Checked by hand: a patched line and a removed background show up in the shipped folder.
+  - **Images:** JPEG (stb_image) and WebP (libwebp's decoder), pinned by SHA-256 like the other dependencies, with a 16384-pixel limit. Release `.exe`: 2.58 MB (budget 4 MB).
+  - **Windows:** a manifest (per-monitor-v2 DPI, the UTF-8 code page, long paths) and version information via windres; `himawari --version` reports whether the UTF-8 code page is active. **Crash reports:** a minidump (`crash-<date>.dmp`, dbghelp loaded only on a crash) and `himawari.log` in the save folder; a message box tells the player where. Tested with the dev-only `--crash-test`.
+  - **Budgets** (`--perf FILE`, plan §8.1), release build on this PC: first frame **135 ms** (≤ 250), frame CPU p95 **0.2 ms** (≤ 2), peak memory **106 MB** with a 4K JPEG on screen, 35 MB for a plain scene (≤ 150), `.hwb` load **3.6 ms per MB** (≤ 5). Getting there: gamepads start after the first frame (enumerating them took 210 ms), fonts stream through FreeType instead of loading 20 MB of system fonts twice, and the GPU renderer (≈ 200 ms to create) is used only by games with rule wipes and in development. **Not met:** a shipped game that uses rule wipes starts in about 350 ms. CI checks the `.exe` size and memory as hard limits and reports startup and frame time (runners have no GPU).
+  - `corepack pnpm check` (296 tests), Studio e2e (export now checks `data.hwp`), debug and ASan ctest (10 tests each) pass.
+
+- ✅ **Milestone 14e: `sunflower-demo` and golden images** (the Phase 5 exit).
+  - **`examples/sunflower-demo` ("Sunflower Days")**: a short story that uses every feature in **English, Japanese, and Spanish**: layered sprites (presets, attribute removal, a `multiple` group, a rule, blink, lip-flap), two macros, the `screen_tint` extension statement, novel mode, every menu form, every flow statement, all variable kinds, every text tag (ruby in Japanese), every transition including two rule masks, shake/flash/wait, all audio channels (silent until the files exist), CGs and music for the gallery and music room, and a theme. The runtime ships English and Japanese UI text; **the Spanish UI (81 strings) comes from the demo's theme**, which shows what themed strings are for. Art from `make-art.mjs` (simple shapes, no AI images). The script and the ja/es translations are AI-written; translations are `needs-review`. Playtest: every ending reached, **27 of 27 lines, 5 of 5 options** (the first menu got its own scene so the `once` option can lead back to it).
+  - **Golden images** (`tests/golden/`, 11 moments: sprites, a menu, two characters, a CG under the sepia tint, the river under the night tint in Spanish, ruby and the NVL page in Japanese, the title, Config, the gallery, the Spanish accessibility prompt). The runtime's new `--compare FILE` scales the frame to 960 px and allows 0.5 % of pixels to differ by more than 24/255 (font antialiasing, GPU filtering); `HW_UPDATE_GOLDEN=1` rewrites the references. Unattended runs now ignore the real mouse pointer and the player's saved settings, so frames don't depend on the PC. Stable over repeated runs here; in CI (the Studio job, D3D11 on a GPU-less runner) **not yet verified**, and the Japanese cases skip where Yu Gothic is missing.
+  - **Fixed on the way: extension state after a warp.** The demo showed the river without its night tint when played from that line: warps rebuild state by running the VM headlessly, so the handler's saved state words were never written. Now the **VM remembers each extension statement's most recent call** (its first 8 values) in the display state, saves keep it by name with typed values, and `restore()` receives that call. Handlers keep no state of their own (rfcs/0007 updated; D37).
+  - Studio: the 14 new diagnostics in Japanese (473 UI messages in sync), Screenplay rows for `textbox` and macro/extension calls, and calls with text highlight and play from their line.
+  - `corepack pnpm check`: **311 tests** (+1 skipped live test), lint, i18n; Studio e2e; debug and ASan ctest (10 each); golden suite 12/12.
+- ✅ **Phase 5 done** (plan §18): backlog voice replay, auto/skip, config, gallery, music room, quick save; rule transitions, NVL, themes, gamepad and remapping; the accessibility baseline; `.hwp` packs and patches; JPEG and WebP; crash reports; extension statements; macros. **Exit criteria:** `sunflower-demo` covers every feature in 3 languages ✅; the golden-image suite is green ✅ (locally; CI pending); performance budgets met ✅ for games without rule wipes (a game with rule wipes starts in ≈ 350 ms, over the 250 ms budget, because the GPU renderer takes ≈ 200 ms to create). **Not verified:** a real gamepad, the golden suite and budgets on CI's GPU-less runners, Japanese UD fonts on PCs without them. Nothing from session 14 is committed.
+
 ---
 
 ## Decision Register
@@ -572,6 +627,12 @@ You then asked to commit and push: `0419238`.
 | D30 | The preview is the real runtime docked as a child window (`--parent-window`), driven over a JSON-lines pipe (`spec/debug-protocol.md` 1, rfcs/0006); autosave → rebuild → reload in place | session 13 | ✅ Active |
 | D31 | One gate for AI writes: `ToolContext.propose`; while Studio is open, Mode A writes are forwarded to Studio's localhost MCP endpoint (`.himawari/session.json`) and become proposals; write tools take a `rationale` (rfcs/0006) | session 13 | ✅ Active |
 | D32 | Mode B: Anthropic TypeScript SDK tool runner (streaming) over the same registry, Claude Opus 5.5 by default, refusal fallbacks on, prompt cache prefix as planned; BYOK key in `safeStorage`; runs in Studio's main process for now | session 13 | ✅ Active |
+| D33 | Macros are typed and expanded at compile time by whole-token substitution; bodies hold no lines (rfcs/0008) | session 14 | ✅ Active |
+| D34 | Extension statements: a JSON signature in `extensions/` plus a C handler in a custom runtime build; one call syntax with macros; a missing handler is skipped, never a crash (rfcs/0007) | session 14 | ✅ Active |
+| D35 | Bytecode 1.1 adds `TEXTBOX`, `XCALL`, `XTNS`, `THEM`; writers emit the lowest minor a module needs; themes are compiled by Core, never read as JSON by the runtime (rfcs/0007) | session 14 | ✅ Active |
+| D36 | Shipped games read `data.hwp` + `patch*.hwp` (spec/pack.md 1.0, rfcs/0009): xxHash64 TOC, store/LZ4, tombstones, game-id binding, obfuscation documented as not DRM; entries stream through `hw_vfs`; exports are `<Game>.exe`, `data.hwp`, `CREDITS.txt` | session 14 | ✅ Active |
+| D37 | The VM remembers each extension statement's most recent call as display state (saved by name); `restore()` receives it, so extensions survive loads, rewinds, reloads, and warps without state of their own | session 14 | ✅ Active |
+| D38 | The GPU renderer is created only for games that use rule wipes (and in development); others start on D3D11 to meet the 250 ms start budget. Gamepads start after the first frame | session 14 | ✅ Active |
 
 Also: **D13** (games export for Windows x64 only) stays active; its "internal Linux runtime" clause is superseded by D21.
 
@@ -582,11 +643,13 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 13)
+## Next Steps (after session 14)
 
-1. **Review Phase 4 and decide on committing it.** Nothing from session 13 is committed yet. Note: the release runtime and the Studio packages are build outputs (ignored); `packages/studio/release/` holds the installers if you want to try them.
-2. **The M2 hallway test** (plan §18): a non-programmer creates, writes, previews, localizes one scene, and exports, in English or Japanese, without docs, while an AI contributes through Mode A (a Claude app) and Mode B (the assistant, with your API key). Its findings decide the first Studio fixes.
-3. **Try Mode B with your key** (Settings → Built-in assistant), and add `ANTHROPIC_API_KEY` as a repository secret if you want CI's prompt-cache check to run (a few cents per run).
-4. Follow-ups: a real PSD/ORA from an artist through the importer; the Screenplay block palette and multi-select (§11.3 "later"); a pseudo-locale screenshot diff in CI; the agent loop in a utility process if long turns ever stutter the UI; watching for a hung preview (rfcs/0006 open question); app icon and code signing before v1.0. Earlier follow-ups stand: the MCP tasks extension, MCP Apps UI, runtime items from session 10.
-5. Human review of AI-written Japanese: `examples/tutorial` (30 lines), `examples/festival-eve` (45 lines), and Studio's own UI and diagnostic messages (`packages/studio/locales/ja.json`, 453 messages, written by the AI).
-6. **Phase 5: runtime feature-complete**, on your go-ahead.
+1. **Review Phase 5 and decide on committing it.** Nothing from session 14 is committed yet. Try `examples/sunflower-demo` (`hwc run`, or `hwc build --release` for a packed folder) and the new Config and accessibility screens.
+2. Watch the first CI run of Phase 5: the golden suite and the budget step run on GPU-less runners for the first time; if the golden tolerance is too tight there, regenerate references from CI's artifacts or widen it per case.
+3. Phase 5 follow-ups: a real gamepad test; the ≈ 200 ms GPU renderer start for games with rule wipes (create the GPU device in the background, or draw rule wipes on D3D11 without the GPU renderer); export icon and version patching (plan §14.4, `resedit`); async image decoding (a 4K JPEG costs one 67 ms frame); human review of the Spanish and Japanese demo text and the 48 new runtime UI strings in Japanese.
+4. **The M2 hallway test** (plan §18): a non-programmer creates, writes, previews, localizes one scene, and exports, in English or Japanese, without docs, while an AI contributes through Mode A (a Claude app) and Mode B (the assistant, with your API key). Its findings decide the first Studio fixes.
+5. **Try Mode B with your key** (Settings → Built-in assistant), and add `ANTHROPIC_API_KEY` as a repository secret if you want CI's prompt-cache check to run (a few cents per run).
+6. Follow-ups: a real PSD/ORA from an artist through the importer; the Screenplay block palette and multi-select (§11.3 "later"); a pseudo-locale screenshot diff in CI; the agent loop in a utility process if long turns ever stutter the UI; watching for a hung preview (rfcs/0006 open question); app icon and code signing before v1.0. Earlier follow-ups stand: the MCP tasks extension, MCP Apps UI, runtime items from session 10.
+7. Human review of AI-written Japanese: `examples/tutorial` (30 lines), `examples/festival-eve` (45 lines), and Studio's own UI and diagnostic messages (`packages/studio/locales/ja.json`, 453 messages, written by the AI).
+8. **Phase 6: AI depth and polish**, on your go-ahead.

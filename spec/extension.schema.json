@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://pastelsalt.github.io/himawari-c/spec/extension/1.0.json",
+  "title": "Himawari extension statement",
+  "description": "extensions/<name>.schema.json: the signature of an extension statement (rfcs/0007, spec/language.md §2.7). The game's runtime implements it in C with hw_register_statement(). Core enforces more than this schema: the name must match the file name and not be a keyword, and at most one parameter may be text.",
+  "type": "object",
+  "required": ["name", "params"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "name": { "type": "string", "pattern": "^[a-z_][a-z0-9_]*$", "description": "The statement's name, as written in scripts: name(args)." },
+    "description": { "type": "string", "description": "Shown on hover in Studio and to AI assistants." },
+    "blocking": { "type": "boolean", "default": false, "description": "The story waits until the extension says it's done." },
+    "params": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "type"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "pattern": "^[a-z_][a-z0-9_]*$" },
+          "type": { "enum": ["character", "position", "scene", "bg", "cg", "music", "sfx", "ambient", "voice", "transition", "word", "int", "bool", "text"] },
+          "default": { "anyOf": [{ "type": "integer" }, { "type": "boolean" }, { "type": "string" }], "description": "Makes the parameter optional." },
+          "enum": { "type": "array", "items": { "type": "string" }, "minItems": 1, "description": "For type word: the allowed words." },
+          "description": { "type": "string" }
+        }
+      }
+    }
+  }
+}

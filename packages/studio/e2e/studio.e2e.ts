@@ -88,7 +88,7 @@ describe("Himawari Studio", () => {
     await page.getByRole("button", { name: "Export the game" }).click();
     await page.getByText(/^Done:/).waitFor({ timeout: 60000 });
     const dir = join(projects, "Hallway Test", "build", "windows", "Hallway Test");
-    expect(readdirSync(dir)).toEqual(expect.arrayContaining(["Hallway Test.exe", "game.hwb"]));
+    expect(readdirSync(dir)).toEqual(expect.arrayContaining(["Hallway Test.exe", "data.hwp", "CREDITS.txt"]));
   }, 90000);
 
   test("the UI switches to Japanese", async () => {

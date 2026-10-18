@@ -1183,6 +1183,7 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 - Rule transitions, NVL mode, theming, gamepad and remapping.
 - **Accessibility baseline (§13)**, `.hwp` + patches, WebP, crash dumps, Tier B extension statements, macros.
 - ✅ **Exit:** `sunflower-demo` covers every feature in 3 languages. Golden-image suite green. Performance budgets met.
+- ✅ **Done** (2026-10-18, LOG session 14): bytecode 1.1 (macros rfcs/0008; extension statements, NVL, themes rfcs/0007), `.hwp` packs and patches (rfcs/0009), JPEG/WebP, config and accessibility screens, remapping, gallery, music room, crash reports, `examples/sunflower-demo` (EN/JA/ES), 11 golden images, budgets measured with `--perf` (first frame 135 ms, frame CPU p95 0.2 ms, peak memory ≤ 106 MB, `.hwb` load 3.6 ms/MB, 2.58 MB `.exe`). Open: games with rule wipes start in ≈ 350 ms.
 
 ### Phase 6: AI depth and polish (⏱ 2)
 - Continuity checks, route balance, coverage overlay on the graph, graph editing.

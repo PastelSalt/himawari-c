@@ -87,6 +87,17 @@ export function writeHwb(m: HwbModule): Uint8Array {
     sections.push(["SPRT", words(m.sprites.length, entries, groups.length / 6, groups, presets.length / 3, presets, rules.length / 4, rules,
       pool.length, pool)]);
   }
+  if (m.extensions.length > 0) {
+    const params = m.extensions.flatMap((e) => e.params.flatMap((p) => [p.name, p.type]));
+    let first = 0;
+    const entries = m.extensions.flatMap((e) => {
+      const entry = [e.name, e.flags, first, e.params.length];
+      first += e.params.length;
+      return entry;
+    });
+    sections.push(["XTNS", words(m.extensions.length, entries, params.length / 2, params)]);
+  }
+  if (m.theme.length > 0) sections.push(["THEM", words(m.theme.length, m.theme.flatMap((t) => [t.key, t.type, t.value]))]);
   if (m.debug) sections.push(["DBUG", words(m.debug.length, m.debug.flatMap((d) => [d.pc, d.file, d.line]))]);
 
   const tableSize = sections.length * 12;

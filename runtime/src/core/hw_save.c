@@ -14,6 +14,7 @@
  *   payload:
  *     game_id, module_crc
  *     time_lo, time_hi, playtime_s, scene, preview, language     (hw_save_info)
+ *     thumb_size, thumb bytes (padded to a word)                  (version 2)
  *     rng_lo, rng_hi
  *     pc, history_count, history_count × line_id                 (newest first; [0] is pc's line)
  *     scene_of_pc
@@ -22,6 +23,11 @@
  *     var_count, var_count × { name, type, value | str }
  *     spent_count, spent_count × line_id
  *     bg, cg, music, ambient, stage_count, stage_count × { id, at, attr_count, attr_count × attr }
+ *   version 2 adds:
+ *     textbox, textbox_hidden, page_count, page_count × line_id     (the NVL page)
+ *     ext_count, ext_count × { name, n, n × { type, value } }         (each extension statement's last call, by name;
+ *                                                                      values typed: ints and bools as words, texts
+ *                                                                      by line ID, everything else by name)
  */
 
 #define MAGIC "HWSV"
@@ -34,14 +40,15 @@ static void w32(hw_buf *b, uint32_t v)
     hw_buf_put(b, (const char *)p, 4);
 }
 
-static void wstr(hw_buf *b, const char *s)
+static void wblob(hw_buf *b, const void *data, size_t n)
 {
-    size_t n = strlen(s);
     w32(b, (uint32_t)n);
-    hw_buf_put(b, s, n);
+    if (n) hw_buf_put(b, data, n);
     static const char pad[4] = { 0, 0, 0, 0 };
     hw_buf_put(b, pad, (4 - n % 4) % 4);
 }
+
+static void wstr(hw_buf *b, const char *s) { wblob(b, s, strlen(s)); }
 
 /* The line ID a checkpoint instruction is known by: SAY's line, MENU's prompt or first option. */
 static uint32_t checkpoint_line_id(const hw_module *m, uint32_t pc)
@@ -114,6 +121,7 @@ bool hw_save_write(const hw_vm *vm, const void *snap, const uint32_t *history, u
     wstr(&b, info->scene);
     wstr(&b, info->preview);
     wstr(&b, info->language);
+    wblob(&b, info->thumb, info->thumb ? info->thumb_size : 0);
     w32(&b, (uint32_t)(core.rng & 0xFFFFFFFFu));
     w32(&b, (uint32_t)(core.rng >> 32));
 
@@ -185,6 +193,33 @@ bool hw_save_write(const hw_vm *vm, const void *snap, const uint32_t *history, u
         }
     }
 
+    /* Version 2: the textbox, the NVL page by line ID, and extension state by statement name. */
+    w32(&b, d->textbox);
+    w32(&b, d->textbox_hidden);
+    uint32_t page = 0;
+    for (uint32_t i = 0; i < d->page_count && i < HW_VM_MAX_PAGE; i++) page += m->lines[d->page[i]].line_id != HW_NONE;
+    w32(&b, page);
+    for (uint32_t i = 0; i < d->page_count && i < HW_VM_MAX_PAGE; i++) {
+        if (m->lines[d->page[i]].line_id != HW_NONE) w32(&b, m->lines[d->page[i]].line_id);
+    }
+    uint32_t exts = 0;
+    for (uint32_t i = 0; i < m->ext_count && i < HW_VM_MAX_EXT; i++) exts += (d->ext_called >> i) & 1u;
+    w32(&b, exts);
+    for (uint32_t i = 0; i < m->ext_count && i < HW_VM_MAX_EXT; i++) {
+        if (!((d->ext_called >> i) & 1u)) continue;
+        const hw_ext_info *e = &m->exts[i];
+        uint32_t values = e->param_count < HW_VM_EXT_VALUES ? e->param_count : HW_VM_EXT_VALUES;
+        wstr(&b, hw_str(m, e->name));
+        w32(&b, values);
+        for (uint32_t k = 0; k < values; k++) {
+            uint32_t type = m->ext_params[e->param_first + k].type, v = d->ext_last[i][k];
+            w32(&b, type);
+            if (type == HW_XP_INT || type == HW_XP_BOOL) w32(&b, v);
+            else if (type == HW_XP_TEXT) w32(&b, v < m->line_count ? m->lines[v].line_id : HW_NONE);
+            else wstr(&b, hw_str(m, v));
+        }
+    }
+
     if (b.oom) {
         hw_buf_free(&b);
         return false;
@@ -204,6 +239,7 @@ typedef struct rd {
     const uint8_t *p;
     size_t n, pos;
     bool bad;
+    uint32_t version;
     char str[256]; /* the last string read (longer strings are cut) */
 } rd;
 
@@ -246,7 +282,8 @@ static bool open_save(const uint8_t *data, size_t size, rd *r)
     r->n = size;
     r->pos = 4;
     uint32_t version = r32(r), len = r32(r), crc = r32(r);
-    if (version != HW_SAVE_VERSION || len != size - 16 || hw_crc32(0, data + 16, len) != crc) return false;
+    if (version < 1 || version > HW_SAVE_VERSION || len != size - 16 || hw_crc32(0, data + 16, len) != crc) return false;
+    r->version = version;
     return true;
 }
 
@@ -258,6 +295,21 @@ static void read_info(rd *r, hw_save_info *info)
     copy_str(info->scene, sizeof info->scene, rstr(r));
     copy_str(info->preview, sizeof info->preview, rstr(r));
     copy_str(info->language, sizeof info->language, rstr(r));
+    info->thumb = NULL;
+    info->thumb_size = 0;
+    if (r->version >= 2) {
+        uint32_t len = r32(r);
+        size_t padded = (size_t)len + (4 - len % 4) % 4;
+        if (r->bad || r->n - r->pos < padded) {
+            r->bad = true;
+            return;
+        }
+        if (len) {
+            info->thumb = r->p + r->pos;
+            info->thumb_size = len;
+        }
+        r->pos += padded;
+    }
 }
 
 bool hw_save_peek(const uint8_t *data, size_t size, hw_save_info *info)
@@ -473,6 +525,45 @@ hw_save_result hw_save_load(hw_vm *vm, const uint8_t *data, size_t size, hw_save
             }
         }
         if (c.id && d->stage_count < HW_VM_MAX_STAGE) d->stage[d->stage_count++] = c;
+    }
+    if (r.version >= 2) {
+        uint32_t textbox = r32(&r), hidden = r32(&r);
+        d->textbox = textbox == HW_TEXTBOX_NVL ? HW_TEXTBOX_NVL : HW_TEXTBOX_ADV;
+        d->textbox_hidden = hidden != 0;
+        uint32_t page = r32(&r);
+        for (uint32_t i = 0; i < page && !r.bad; i++) {
+            uint32_t line = find_line(m, r32(&r));
+            if (line == HW_NONE) continue; /* a line deleted since: the page shows the rest */
+            if (d->page_count == HW_VM_MAX_PAGE) {
+                memmove(&d->page[0], &d->page[1], (HW_VM_MAX_PAGE - 1) * sizeof d->page[0]);
+                d->page_count--;
+            }
+            d->page[d->page_count++] = line;
+        }
+        uint32_t exts = r32(&r);
+        for (uint32_t i = 0; i < exts && !r.bad; i++) {
+            char name[256];
+            copy_str(name, sizeof name, rstr(&r));
+            uint32_t ext = HW_NONE;
+            for (uint32_t e = 0; e < m->ext_count && e < HW_VM_MAX_EXT; e++) {
+                if (strcmp(hw_str(m, m->exts[e].name), name) == 0) ext = e;
+            }
+            uint32_t n = r32(&r), values[HW_VM_EXT_VALUES] = { 0 };
+            bool fits = ext != HW_NONE && n <= HW_VM_EXT_VALUES && n == (m->exts[ext].param_count < HW_VM_EXT_VALUES ? m->exts[ext].param_count : HW_VM_EXT_VALUES);
+            for (uint32_t k = 0; k < n && !r.bad && k < 64; k++) {
+                uint32_t type = r32(&r), v;
+                if (type == HW_XP_INT || type == HW_XP_BOOL) v = r32(&r);
+                else if (type == HW_XP_TEXT) v = find_line(m, r32(&r));
+                else v = string_or_none(m, rstr(&r));
+                /* The statement changed its parameters since: it starts over (as if it hadn't run). */
+                if (!fits || k >= HW_VM_EXT_VALUES || m->ext_params[m->exts[ext].param_first + k].type != type) fits = false;
+                else values[k] = v;
+            }
+            if (fits) {
+                d->ext_called |= 1u << ext;
+                memcpy(d->ext_last[ext], values, sizeof values);
+            }
+        }
     }
     if (r.bad || r.pos != r.n) {
         free(vars);

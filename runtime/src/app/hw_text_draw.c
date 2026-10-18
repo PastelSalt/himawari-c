@@ -54,25 +54,68 @@ struct hw_fonts {
 
 hw_fonts *hw_fonts_open(SDL_Renderer *ren, const char *const *paths, int count)
 {
+    hw_font_source src[MAX_FACES];
+    int n = 0;
+    for (int i = 0; i < count && n < MAX_FACES; i++) src[n++] = (hw_font_source){ paths[i], NULL };
+    return hw_fonts_open_sources(ren, src, n);
+}
+
+/* FreeType reads faces through SDL streams: UTF-8 paths, packs, and no whole-file loads. */
+static unsigned long stream_read(FT_Stream s, unsigned long offset, unsigned char *buffer, unsigned long count)
+{
+    SDL_IOStream *io = s->descriptor.pointer;
+    if (SDL_SeekIO(io, (Sint64)offset, SDL_IO_SEEK_SET) < 0) return count ? 0 : 1; /* a seek-only call reports failure as non-zero */
+    if (count == 0) return 0;
+    return (unsigned long)SDL_ReadIO(io, buffer, count);
+}
+
+static void stream_close(FT_Stream s)
+{
+    SDL_CloseIO(s->descriptor.pointer);
+    SDL_free(s);
+}
+
+static bool open_face(hw_fonts *f, SDL_IOStream *io, FT_Face *face)
+{
+    Sint64 size = SDL_GetIOSize(io);
+    FT_Stream s = SDL_calloc(1, sizeof *s);
+    if (!s || size <= 0) {
+        SDL_free(s);
+        SDL_CloseIO(io);
+        return false;
+    }
+    s->size = (unsigned long)size;
+    s->descriptor.pointer = io;
+    s->read = stream_read;
+    s->close = stream_close;
+    FT_Open_Args args;
+    memset(&args, 0, sizeof args);
+    args.flags = FT_OPEN_STREAM;
+    args.stream = s;
+    /* FreeType calls close (and so frees the stream) when the face is done, or when opening fails. */
+    return FT_Open_Face(f->lib, &args, 0, face) == 0;
+}
+
+hw_fonts *hw_fonts_open_sources(SDL_Renderer *ren, const hw_font_source *sources, int count)
+{
     hw_fonts *f = SDL_calloc(1, sizeof *f);
-    if (!f) return NULL;
-    f->ren = ren;
-    if (FT_Init_FreeType(&f->lib) != 0) {
+    if (!f || FT_Init_FreeType(&f->lib) != 0) {
+        for (int i = 0; i < count; i++) {
+            if (sources[i].io) SDL_CloseIO(sources[i].io);
+        }
         SDL_free(f);
         return NULL;
     }
-    for (int i = 0; i < count && f->face_count < MAX_FACES; i++) {
-        /* FreeType wants a native path; load the bytes through SDL (UTF-8 paths) instead. */
-        size_t size = 0;
-        void *data = SDL_LoadFile(paths[i], &size);
-        if (!data) continue;
-        FT_Face face;
-        if (FT_New_Memory_Face(f->lib, data, (FT_Long)size, 0, &face) != 0) {
-            SDL_free(data);
+    f->ren = ren;
+    for (int i = 0; i < count; i++) {
+        SDL_IOStream *io = sources[i].io ? sources[i].io : SDL_IOFromFile(sources[i].path, "rb");
+        if (!io) continue;
+        if (f->face_count >= MAX_FACES) {
+            SDL_CloseIO(io);
             continue;
         }
-        face->generic.data = data; /* freed with the face */
-        f->faces[f->face_count++] = face;
+        FT_Face face;
+        if (open_face(f, io, &face)) f->faces[f->face_count++] = face;
     }
     if (f->face_count == 0 || FT_Stroker_New(f->lib, &f->stroker) != 0) {
         hw_fonts_close(f);
@@ -86,11 +129,7 @@ void hw_fonts_close(hw_fonts *f)
     if (!f) return;
     for (int i = 0; i < f->page_count; i++) SDL_DestroyTexture(f->pages[i]);
     if (f->stroker) FT_Stroker_Done(f->stroker);
-    for (int i = 0; i < f->face_count; i++) {
-        void *data = f->faces[i]->generic.data;
-        FT_Done_Face(f->faces[i]);
-        SDL_free(data);
-    }
+    for (int i = 0; i < f->face_count; i++) FT_Done_Face(f->faces[i]); /* closes its stream */
     if (f->lib) FT_Done_FreeType(f->lib);
     SDL_free(f->rgba);
     SDL_free(f);
@@ -495,12 +534,16 @@ static float layout_advance(void *user, uint32_t cp, HwFontRole role, uint32_t r
     return hw_fonts_advance(c->f, cp, role == HW_FONT_RUBY ? px * 0.5f : px, flags);
 }
 
+static float line_spacing = 1.0f;
+
+void hw_rich_set_line_spacing(float spacing) { line_spacing = spacing >= 0.5f && spacing <= 3.0f ? spacing : 1.0f; }
+
 bool hw_rich_layout(hw_rich_text *rt, hw_fonts *f, float max_width, float base_px, const char *lang)
 {
     rt->base_px = base_px;
     HwLayoutParams p = {
         max_width,
-        base_px * 1.45f + base_px * 0.5f, /* line pitch includes the ruby band */
+        base_px * 1.45f * line_spacing + base_px * 0.5f, /* line pitch includes the ruby band */
         base_px * 1.0f,                   /* base ascent below the ruby band */
         base_px * 0.5f,                   /* ruby band */
         base_px * 0.45f,                  /* ruby baseline */
