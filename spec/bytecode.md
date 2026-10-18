@@ -185,7 +185,7 @@ Transitions use three words `ttype, targ0, targ1`: `ttype` is the string index o
 | AND OR | 0x30, 0x31 | | a b → 0/1 (both sides are always evaluated; expressions have no side effects except `rand`) |
 | RAND | 0x32 | | n → `(u32 × n) >> 32` where u32 is the next PCG32 output; 0 if n ≤ 0 |
 
-Integer overflow wraps (two's complement); language.md open question 3 tracks whether release builds should clamp instead.
+Integer overflow wraps (two's complement), in every build (`spec/language.md` §5).
 
 **RNG.** PCG32 (XSH-RR, 64-bit state, multiplier 6364136223846793005, increment 1442695040888963407). Seeding with `s`: state = 0, step, state += s, step. The RNG state is part of the saved game state, so rollback and loading replay the same values. Playtests and conformance transcripts seed with 1 unless told otherwise.
 

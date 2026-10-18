@@ -473,6 +473,22 @@ You then asked to commit and push: `0419238`.
 
 ---
 
+## Session 12: 2026-10-18 · Cleanup audit of Phases 0–3
+**You asked:** double-check and clean up any mess left in the previous phases before Phase 4.
+
+- **CI:** the run on `a8d7a17` (`39033367836`) is green in every job, ASan/UBSan and fuzzing included. Its only annotation was the Node 20 deprecation for `actions/upload-artifact@v4`; now `@v7` (same zip-by-default behavior).
+- **Docs that had fallen behind the code:**
+  - `spec/language.md`: the status line, and §5 rewritten from "open questions" into the decisions made: grammar in `grammar.ebnf`; `return` with no caller is warning `HW0310` and ends the story; int overflow wraps in every build; speaker attributes persist; macros get their own RFC in Phase 5. The int type note and the `return` row now say the same. `spec/bytecode.md` states that overflow wraps in every build.
+  - `DETAILED_PLAN.md`: the status line says Phases 0–3 are done; §5.4 (the pre-spec bytecode outline: fixed-width ISA, per-language `LOCx`, separate `MUSIC`/`SFX`/`VOICE` ops) gets an "as built" note pointing to `spec/bytecode.md` 1.0.
+  - RFC 0001: the asan/fuzz and size checkboxes are ticked (verified in sessions 9 and 10). RFC 0002: the self-test points to `runtime/src/app/hw_rulewipe.c`, plus a note that Vulkan is off on Windows (D26).
+  - `runtime/CMakeLists.txt`: the `HW_SANITIZE`/`HW_FUZZ` descriptions no longer say "to verify".
+  - New `spec/README.md`: an index of the spec documents and their versions.
+- **TypeScript:** the CLI had its own project loader that duplicated `@himawari/tools` `loadInput` (and an unused `scripts` parameter); `loadProject` now delegates to it, so the CLI, MCP, and the coming Studio read projects the same way. Removed `stmtSource` from Core (never called). An export scan found no other dead values; the remaining unreferenced exports are public API types.
+- **Runtime:** removed an empty `if` block left in `render()` and two UI strings nothing shows (`UI_QUICK_SAVE`/`UI_QUICK_LOAD`: quick save and load are keys only; the slot list uses `UI_QUICK_SLOT`). Functions declared in headers but only used in their own module (`hw_rng_*`, `hw_history_pop`, `hw_fonts_*`, `hw_write_file`) stay public.
+- **Checks:** `corepack pnpm check` (typecheck, lint, 241 tests, i18n) passes; runtime `win64-debug` and `win64-release` build with all 8 ctest tests passing. ASan was not rerun locally (the C changes are removals only); CI runs it on the next push.
+
+---
+
 ## Decision Register
 
 | ID | Decision | Since | Status |
@@ -515,9 +531,9 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 11)
+## Next Steps (after session 12)
 
-1. ~~Commit and push Phase 3~~ ✅ `694aef7`. **CI on the Phase 2 push (`55a0744`) failed** in the fuzz step, and the Phase 3 push will too: the script copied every conformance `expected.hwb` into one file name and `cp` refused to overwrite a file it had just created. Not a code problem (ASan/UBSan tests and the UTF-8 fuzzing passed); `.github/workflows/ci.yml` now names each corpus file after its case. That fix isn't committed yet. Check CI on that push (the MCP end-to-end tests run in the `ts` job; exec-tool tests skip there because it has no runtime).
+1. ~~Commit and push Phase 3~~ ✅ `694aef7`. **CI on the Phase 2 push (`55a0744`) failed** in the fuzz step, and the Phase 3 push will too: the script copied every conformance `expected.hwb` into one file name and `cp` refused to overwrite a file it had just created. Not a code problem (ASan/UBSan tests and the UTF-8 fuzzing passed); `.github/workflows/ci.yml` now names each corpus file after its case (`a8d7a17`, pushed). CI on that push is green (session 12). The session 12 cleanup is not committed yet.
 2. **Phase 4: Studio MVP**, on your go-ahead (plan §18): the Electron shell, Screenplay and Script views (CodeMirror 6), live preview, story graph, characters panel and sprite composer, the embedded MCP with a proposals panel (Mode A live sync), and the built-in assistant panel (Mode B).
 3. Follow-ups any time: the MCP tasks extension once the SDK supports it; MCP Apps UI; runtime items from session 10 (JPG/WebP, side portraits, `theme.json`, `.hwp` packs, gamepad remapping, manifest/minidumps, budget measurements).
 4. Human review of AI-written Japanese in `examples/tutorial` (30 lines) and `examples/festival-eve` (45 lines), both marked `needs-review`.

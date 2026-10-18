@@ -1,6 +1,6 @@
 # Himawari Script (`.hws`) Language Specification
 
-> **Version:** 0.2.0-draft · **Status:** Phase 0 draft. Not stable; changes do not need an RFC until 1.0.
+> **Version:** 0.2.0-draft · **Status:** draft, implemented by `@himawari/core` and the runtime (Phases 1–3). Not stable yet; changes don't need an RFC until 1.0.
 > **License:** CC-BY-4.0 · **Source of truth for semantics:** `@himawari/core` (D03). Where this document and Core disagree before 1.0, file an issue; one of them is a bug.
 > Plan references: DETAILED_PLAN.md §5.1–5.2, §6, §7, §12.
 
@@ -37,7 +37,7 @@ scene ch1_intro:
 | Scene | `scene <id>:` | Scene IDs are global across the project. |
 | Jump | `jump <scene>` | Transfers control. Does not return. |
 | Call | `call <scene>` | Runs a scene and comes back after its `return`. |
-| Return | `return` | Returns from a `call`. In a scene that was jumped to, `return` is an error (`HW0310`). |
+| Return | `return` | Returns from a `call`. In a scene nothing calls, `return` is a warning (`HW0310`) and ends the story at runtime (§5). |
 | End | `end` | Ends the game (to the title screen). |
 | Conditional | `if <expr>:` / `elif <expr>:` / `else:` | Blocks are indented. |
 | Menu | `menu ["prompt"]:` | See §2.3. |
@@ -105,7 +105,7 @@ If control reaches the end of a scene's body without `jump`, `call`, `return`, o
 
 - `$ <var> = <expr>` and the compound forms `+=`, `-=`, `*=`.
 - Variables must be declared in `himawari.json` (plan §5.5) with a type and a scope (`save` or `global`).
-- Types: `int` (32-bit signed; overflow behavior is open question 3), `bool`, `str` (string enums only; free-text strings can only be set by the engine, e.g. a name-entry screen).
+- Types: `int` (32-bit signed; arithmetic wraps on overflow, §5), `bool`, `str` (string enums only; free-text strings can only be set by the engine, e.g. a name-entry screen).
 - **Expressions:** integer and boolean literals, string-enum literals, variables, `+ - * / %` (integer division truncates toward zero), `== != < <= > >=`, `and or not`, parentheses, and `rand(n)` (seeded, `0 ≤ r < n`). **No floats in logic.**
 
 ### 2.6 Macros (Tier A extensibility)
@@ -130,10 +130,10 @@ Macros are expanded at compile time with typed parameters, so every expansion is
 
 Floats in story logic, user-defined functions, embedded general-purpose code (except opt-in sandboxed Lua in v1.x), and file or network access. These are what make the language safe to analyze and safe for AI edits.
 
-## 5. Open questions (resolve in Phase 1)
+## 5. Decisions on the Phase 0 open questions
 
-1. Exact grammar in `grammar.ebnf`, including how `once` and `if` combine on one option line.
-2. Whether `return` from a jumped-to scene should be a compile error or end the game.
-3. Overflow behavior of `int` in release builds (clamp vs wrap).
-4. Whether `speaker` attributes before text persist after the line (current draft: yes, like `show`).
-5. How macro parameter types are declared.
+1. **Grammar:** written in [`grammar.ebnf`](grammar.ebnf). An option line is `[once] "text" [if expr]:`, in that order.
+2. **`return` in a scene nothing calls:** a warning (`HW0310`), not an error. At runtime, `return` with no caller ends the story, like `end` (`spec/bytecode.md` §2.7).
+3. **`int` overflow:** wraps (two's complement) in every build, so a story behaves the same in development and release. Division by zero gives 0 and is reported in dev builds and playtests.
+4. **Speaker attributes persist:** `hana happy "…"` changes Hana's sprite exactly like `show hana happy`, and it stays changed after the line.
+5. **Macros** (`define statement`): still open; they get their own RFC in Phase 5.

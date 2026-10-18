@@ -1163,9 +1163,6 @@ static void render(game *g)
         default: break;
         }
     }
-    if (g->scr == SCR_CONFIRM_QUIT && g->back_to == SCR_TITLE) {
-        /* reached from the title screen: the card above was drawn over the scene; fine */
-    }
     if (g->overlay && g->dev && g->scr != SCR_TITLE) draw_overlay(g);
     if (g->now < g->notice_until) {
         float w = hw_text_width(g->fonts, g->notice, sc(g, 26), 0) + sc(g, 48);

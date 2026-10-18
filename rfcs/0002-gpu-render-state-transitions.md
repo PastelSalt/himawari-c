@@ -47,8 +47,9 @@ Spike B's release `.exe` (SDL only) is **4.14 MB**, so SDL alone is about the wh
 ## Still to verify
 - [x] CI `windows-latest` (no physical GPU, run 38997022400): SDL created the D3D12 GPU renderer (presumably the WARP software adapter) and the DXIL render state; exit 0. **Pixels were not checked on CI**, so a silent pipeline failure (finding 2) can't be ruled out there. The Phase 2 startup self-test covers this.
 - [ ] An Intel or NVIDIA GPU.
-- [ ] The startup self-test from finding 2, written as part of `render/` in Phase 2.
+- [x] The startup self-test from finding 2: `runtime/src/app/hw_rulewipe.c` (Phase 2) wipes a white texture over black through a dark mask and reads the pixel back; if it isn't white, rule wipes fall back to dissolves.
 - Deferred with Linux (plan §18.9): a Linux Vulkan build and Proton checks.
+- **Vulkan on Windows was switched off** for the size budget at the end of Phase 2 (`SDL_VULKAN OFF`, LOG D26): the GPU renderer uses D3D12, and the D3D11 renderer is the fallback. The committed SPIR-V header stays for the future Linux port. `spike_b --driver vulkan` no longer applies.
 
 ## Note on upstream
 Finding 1 looks like a documentation gap in SDL. SDL's contribution policy (its `CLAUDE.md`) says generative AI must not be used for contributions to SDL, so any upstream report or PR has to be written by a human.

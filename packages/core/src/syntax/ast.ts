@@ -444,8 +444,3 @@ export function endsFlow(body: Stmt[]): boolean {
   }
   return false;
 }
-
-/** Source text of a statement's line(s), for previews. */
-export function stmtSource(source: string, s: { span: Span }): string {
-  return source.slice(s.span.start, s.span.end);
-}

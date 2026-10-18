@@ -39,8 +39,8 @@ Can Himawari-C ship as **one fully static Windows x64 `.exe`** built natively wi
 
 ## Still to verify
 - [x] CI: `runtime-win` passed on `windows-latest` (run 38997022400): static release build, `ctest`, the DLL-import check (same system-only list as locally), and Spike A with `SDL_AUDIO_DRIVER=dummy`. The runner has Yu Gothic.
-- [ ] `win64-asan` / `win64-fuzz` with MSYS2 CLANG64 (Phase 1 start, plan §14.3).
-- [ ] Size trimming to reach ≤ 4 MB (Phase 2).
+- [x] `win64-asan` / `win64-fuzz` with MSYS2 CLANG64: verified at the start of Phase 1 (LOG session 9); CI runs both.
+- [x] Size trimming to reach ≤ 4 MB: **2.38 MB** at the end of Phase 2 (SDL subsystems and FreeType modules trimmed, `-Os`; LOG session 10, D26).
 - Deferred with Linux (plan §18.9): Linux builds and the Ubuntu cross-build check. The `win64-cross` preset and its toolchain file were removed in v0.5.
 
 ## Decision (accepted)
