@@ -3,8 +3,11 @@
  *
  * - Transcripts: play with a fixed list of choices and describe every event
  *   as text. The conformance suite compares them with expected.transcript.
- * - Playtests: explore every menu choice (depth-first, merging states that
- *   were already explored) and report endings, errors, and line coverage.
+ * - Playtests: first a coverage pass (every menu once, every option no path
+ *   chose yet), which reaches every route of a big game in about one
+ *   read-through; then every combination of choices (depth-first, merging
+ *   states already explored) with the rest of the step budget. Reports
+ *   endings, errors, and line coverage.
  */
 #ifndef HW_PLAY_H
 #define HW_PLAY_H
@@ -47,7 +50,7 @@ void hw_describe_event(const hw_vm *vm, const hw_event *ev, hw_buf *out);
 
 typedef struct hw_playtest_options {
     uint64_t seed;
-    uint32_t max_steps; /* events across all paths; 0 = 50000 */
+    uint32_t max_steps; /* events across all paths; 0 = 40 per line of the story (50 000 to 20 000 000) */
     const char *language;
 } hw_playtest_options;
 
@@ -65,6 +68,7 @@ typedef struct hw_playtest_report {
     uint32_t paths;         /* paths that finished (an ending, an error, or the step limit) */
     uint32_t steps;         /* events played */
     bool step_limit;        /* exploration stopped early */
+    bool covered;           /* the coverage pass finished: every menu and every option was tried at least once */
     uint32_t menus;         /* distinct menu states explored */
     uint32_t ending_count;  /* endings reached (END, or a top-level RET) */
     uint32_t ending_total;  /* reached endings plus reachable END instructions never reached */

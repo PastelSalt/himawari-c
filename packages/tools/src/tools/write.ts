@@ -11,7 +11,6 @@ import {
   type ProjectInput,
   applyEdits,
   applyTranslations,
-  checkProject,
   collectLines,
   format,
   lex,
@@ -29,6 +28,7 @@ import {
   type Changes,
   type DiagnosticJson,
   check,
+  checkInput,
   describeDiagnostics,
   diagnosticsJson,
   findScene,
@@ -63,11 +63,11 @@ const errorKey = (d: DiagnosticJson) => `${d.code} ${d.file} ${d.message}`;
  */
 async function commit(ctx: ToolContext, input: ProjectInput, changes: Changes, dryRun: boolean, summary: string): Promise<CommitResult> {
   const before = new Map<string, number>();
-  for (const d of diagnosticsJson(checkProject(input))) {
+  for (const d of diagnosticsJson(checkInput(input))) {
     if (d.severity === "error") before.set(errorKey(d), (before.get(errorKey(d)) ?? 0) + 1);
   }
   const next = withChanges(input, changes);
-  const all = diagnosticsJson(checkProject(next));
+  const all = diagnosticsJson(checkInput(next));
   const touched = new Set([...changes.keys()]);
   const added: DiagnosticJson[] = [];
   for (const d of all) {
@@ -123,7 +123,7 @@ async function commit(ctx: ToolContext, input: ProjectInput, changes: Changes, d
 /** Line texts by ID after a change, for provenance stamps. */
 function lineTexts(input: ProjectInput, ids: Iterable<string>): Map<string, string> {
   const wanted = new Set(ids);
-  const c = checkProject(input);
+  const c = checkInput(input);
   const out = new Map<string, string>();
   for (const l of collectLines(c.parsed)) if (wanted.has(l.id)) out.set(l.id, l.text);
   return out;
@@ -213,7 +213,7 @@ export const updateScene = defineTool({
       stampAi(ctx.fs, "lines", added);
       stampAi(ctx.fs, "lines", changed, true);
     }
-    const now = findScene(checkProject(r.input), args.scene);
+    const now = findScene(checkInput(r.input), args.scene);
     if (now) r.ok.data["revision"] = revisionOf(now.text);
     return r.ok;
   },
@@ -263,7 +263,7 @@ export const patchScene = defineTool({
       const replaced = args.ops.filter((o) => o.op === "replace_text").map((o) => (o as { lineId: string }).lineId);
       stampAi(ctx.fs, "lines", lineTexts(r.input, replaced), true);
     }
-    const now = findScene(checkProject(r.input), args.scene);
+    const now = findScene(checkInput(r.input), args.scene);
     if (now) {
       r.ok.data["revision"] = revisionOf(now.text);
       if (!r.ok.isError) r.ok.text += `\n${now.text}`;

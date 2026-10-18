@@ -14,20 +14,25 @@ const STATEMENT: Record<string, string> = { bg: "bg", cg: "cg", music: "music", 
 
 /** Assets (plan §11.3): thumbnails, audio preview, unused and missing flags, drag into the editor, placeholders. */
 export function Assets() {
+  const intl = useIntl();
   const assets = useStudio((s) => s.assets);
   const model = useStudio((s) => s.model);
   const [making, setMaking] = useState<{ kind: PlaceholderKind; name: string } | null>(null);
   const [adding, setAdding] = useState(false);
+  const [filter, setFilter] = useState("");
+  const q = filter.trim().toLowerCase();
 
   // References from the scripts: which assets are used, which are missing.
   const { used, missing } = useMemo(() => {
     const usedSet = new Set<string>();
+    // Each asset under its name without the extension ("bg/park"), so a project with hundreds is looked up at once.
+    const byStem = new Map(assets.map((a) => [a.replace(/\.[^./]+$/, ""), a]));
     const missingMap = new Map<string, { channel: string; name: string }>();
     for (const r of model?.check.parsed.values() ?? []) {
       for (const ref of r.refs) {
         if (ref.kind !== "asset" || !ref.channel) continue;
         const folder = CHANNEL_FOLDER[ref.channel] ?? ref.channel;
-        const hit = assets.find((a) => a.startsWith(`${folder}/${ref.name}.`));
+        const hit = byStem.get(`${folder}/${ref.name}`);
         if (hit) usedSet.add(hit);
         else missingMap.set(`${folder}/${ref.name}`, { channel: ref.channel, name: ref.name });
       }
@@ -35,8 +40,9 @@ export function Assets() {
     return { used: usedSet, missing: [...missingMap.values()] };
   }, [model, assets]);
 
-  const byFolder = (f: string) => assets.filter((a) => a.startsWith(`${f}/`));
-  const other = assets.filter((a) => !FOLDERS.some((f) => a.startsWith(`${f}/`)));
+  const shown = q ? assets.filter((a) => a.toLowerCase().includes(q)) : assets;
+  const byFolder = (f: string) => shown.filter((a) => a.startsWith(`${f}/`));
+  const other = shown.filter((a) => !FOLDERS.some((f) => a.startsWith(`${f}/`)));
 
   return (
     <div className="tool-page">
@@ -56,6 +62,16 @@ export function Assets() {
       <p className="muted small">
         <FormattedMessage id="assets.hint" />
       </p>
+      {assets.length > 24 && (
+        <input
+          type="search"
+          className="asset-search"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder={intl.formatMessage({ id: "assets.search" })}
+          aria-label={intl.formatMessage({ id: "assets.search" })}
+        />
+      )}
 
       {missing.length > 0 && (
         <section className="card">
@@ -84,17 +100,18 @@ export function Assets() {
         const files = byFolder(f);
         if (files.length === 0) return null;
         return (
-          <section key={f} className="asset-section">
-            <h3>
+          // A folder with many files starts folded (unless searching): hundreds of thumbnails are a lot to scroll past.
+          <details key={`${f}${q ? "?" : ""}`} className="asset-section" open={!!q || files.length <= 60}>
+            <summary>
               <FormattedMessage id={`assets.folder.${f}`} />
               <span className="muted small">{` ${f}/ · ${files.length}`}</span>
-            </h3>
+            </summary>
             <div className="asset-grid">
               {files.map((a) => (
                 <AssetTile key={a} path={a} unused={f !== "voice" && f !== "sprites" && f !== "rules" && !used.has(a)} statement={STATEMENT[f]} />
               ))}
             </div>
-          </section>
+          </details>
         );
       })}
       {other.length > 0 && (

@@ -1,5 +1,5 @@
 /** Read tools (plan §10.3): nothing here writes. Scenes come back as .hws text. */
-import { CORE_VERSION, SPEC_VERSIONS, collectLines, graphToMermaid, storyGraph } from "@himawari/core";
+import { CORE_VERSION, SPEC_VERSIONS, collectLines, fileFilterGraph, fileGraph, focusGraph, graphToMermaid, storyGraph } from "@himawari/core";
 import { z } from "zod";
 import { check, describeDiagnostics, diagnosticsJson, findScene, revisionOf } from "../project.js";
 import { ToolError, defineTool } from "../registry.js";
@@ -52,21 +52,36 @@ export const projectInfo = defineTool({
 export const listScenes = defineTool({
   name: "list_scenes",
   title: "List scenes",
-  description: "Every scene with its file, line count, revision, and whether it is reachable from the entry scene or can end the story.",
+  description:
+    "Scenes with their file, line count, revision, and whether each is reachable from the entry scene or can end the story. A big project (over 200 scenes) without a filter gets one line per file instead: then pass `file` (a path prefix such as script/route_03) or `query` (part of a scene name).",
   kind: "read",
-  input: z.object({}),
-  output: z.object({ scenes: z.array(z.looseObject({ scene: z.string(), file: z.string(), revision: z.string() })) }),
-  async run(ctx) {
+  input: z.object({
+    file: z.string().optional().describe("Only scenes in files whose path starts with this, e.g. script/route_03"),
+    query: z.string().optional().describe("Only scenes whose name contains this"),
+  }),
+  output: z.looseObject({ scenes: z.array(z.looseObject({ scene: z.string(), file: z.string(), revision: z.string() })) }),
+  async run(ctx, args) {
     const { check: c } = check(ctx.fs);
     const g = storyGraph(c);
-    const scenes = g.nodes.map((n) => {
+    const nodes = g.nodes.filter((n) => (!args.file || n.file.startsWith(args.file)) && (!args.query || n.scene.includes(args.query)));
+    if (!args.file && !args.query && nodes.length > 200) {
+      // Too many to read at once: one line per file, so the next call can narrow down.
+      const files = new Map<string, string[]>();
+      for (const n of nodes) files.set(n.file, [...(files.get(n.file) ?? []), n.scene]);
+      const text = [
+        `${nodes.length} scenes in ${files.size} files. Pass file (a path prefix) or query to list scenes:`,
+        ...[...files].map(([f, sc]) => `${f}  ${sc.length} scene(s): ${sc.length > 3 ? `${sc[0]} … ${sc[sc.length - 1]}` : sc.join(", ")}`),
+      ].join("\n");
+      return { text, data: { scenes: [], files: [...files].map(([file, sc]) => ({ file, scenes: sc.length })) } };
+    }
+    const scenes = nodes.map((n) => {
       const loc = findScene(c, n.scene);
       return { scene: n.scene, file: n.file, lines: n.lines, revision: loc ? revisionOf(loc.text) : "", reachable: n.reachable, ending: n.ending, entry: n.entry };
     });
     const text = scenes
       .map((s) => `${s.scene}  ${s.file}  ${s.lines} lines${s.entry ? "  (entry)" : ""}${s.ending ? "  (can end)" : ""}${s.reachable ? "" : "  (unreachable)"}`)
       .join("\n");
-    return { text, data: { scenes } };
+    return { text: text || "No scenes match.", data: { scenes } };
   },
 });
 
@@ -130,21 +145,38 @@ export const getStoryGraph = defineTool({
   name: "get_story_graph",
   title: "Story graph",
   description:
-    "Scenes and the jumps and calls between them, each labeled with the menu choice and conditions that lead there; unreachable scenes and endings are marked. format: mermaid returns a flowchart.",
+    "Scenes and the jumps and calls between them, each labeled with the menu choice and conditions that lead there; unreachable scenes and endings are marked. format: mermaid returns a flowchart. For a big story pass `scene` (that scene and its neighbors within `depth`) or `file` (a path prefix); without them, a story of over 150 scenes is summarized as files (or folders, when there are many files) and the links between them.",
   kind: "read",
-  input: z.object({ format: z.enum(["json", "mermaid"]).default("json") }),
+  input: z.object({
+    format: z.enum(["json", "mermaid"]).default("json"),
+    scene: SceneName.optional().describe("Only this scene and the scenes near it"),
+    depth: z.number().int().min(1).max(10).default(2),
+    file: z.string().optional().describe("Only scenes in files whose path starts with this"),
+  }),
   output: z.looseObject({ entry: z.string().nullable() }),
   async run(ctx, args) {
     const { check: c } = check(ctx.fs);
-    const g = storyGraph(c);
+    let g = storyGraph(c);
+    if (args.scene) {
+      if (!g.nodes.some((n) => n.scene === args.scene)) throw new ToolError(`there's no scene called "${args.scene}"`);
+      g = focusGraph(g, args.scene, args.depth);
+    }
+    if (args.file) g = fileFilterGraph(g, args.file);
+    const overview = !args.scene && !args.file && g.nodes.length > 150;
+    // Many files: one node per folder (usually a route) instead.
+    if (overview) g = fileGraph(g, new Set(g.nodes.map((n) => n.file)).size > 40 ? (f) => `${f.split("/").slice(0, -1).join("/")}/` : undefined);
     if (args.format === "mermaid") {
       const mermaid = graphToMermaid(g);
-      return { text: mermaid, data: { entry: g.entry, mermaid } };
+      return { text: `${overview ? "%% A big story: one node per file. Pass scene or file for scenes.\n" : ""}${mermaid}`, data: { entry: g.entry, mermaid, overview } };
     }
     const text = g.edges
       .map((e) => `${e.from} ${e.kind === "call" ? "calls" : "→"} ${e.to}${e.choice ? ` via "${e.choice}"` : ""}${e.when ? ` if ${e.when}` : ""}`)
       .join("\n");
-    return { text, data: { entry: g.entry, nodes: g.nodes, edges: g.edges } };
+    const listed = text || g.nodes.map((n) => `${n.scene}${n.ending ? " (can end)" : ""}${n.reachable ? "" : " (unreachable)"}`).join("\n") || "No scenes match.";
+    return {
+      text: `${overview ? "A big story: files and the links between them. Pass scene or file for scenes.\n" : ""}${listed}`,
+      data: { entry: g.entry, nodes: g.nodes, edges: g.edges, overview },
+    };
   },
 });
 

@@ -1,4 +1,5 @@
 /** Serializes an HwbModule to .hwb bytes (spec/bytecode.md §1–2). */
+import { pushAll } from "../arrays.js";
 import { crc32 } from "./crc32.js";
 import { FLAG_DEBUG, HEADER_SIZE, type HwbModule, MAGIC } from "./format.js";
 
@@ -7,7 +8,7 @@ function words(...parts: (number | readonly number[])[]): Uint8Array {
   const flat: number[] = [];
   for (const p of parts) {
     if (typeof p === "number") flat.push(p);
-    else flat.push(...p);
+    else pushAll(flat, p);
   }
   const out = new Uint8Array(flat.length * 4);
   const view = new DataView(out.buffer);
@@ -36,14 +37,14 @@ export function writeHwb(m: HwbModule): Uint8Array {
   const varEntries: number[] = [];
   for (const v of m.vars) {
     varEntries.push(v.name, v.type | (v.scope << 8), v.default, v.enumValues.length > 0 ? enumValues.length : 0, v.enumValues.length);
-    enumValues.push(...v.enumValues);
+    pushAll(enumValues, v.enumValues);
   }
 
   const textOffsets: number[] = [];
   const textWords: number[] = [];
   for (const t of m.texts) {
     textOffsets.push(textWords.length);
-    textWords.push(...t);
+    pushAll(textWords, t);
   }
 
   const mt = m.meta;
@@ -63,7 +64,7 @@ export function writeHwb(m: HwbModule): Uint8Array {
     const entries: number[] = [];
     for (const l of m.locales) {
       entries.push(l.language, table.length);
-      table.push(...l.lineTexts, ...l.charNames);
+      pushAll(pushAll(table, l.lineTexts), l.charNames);
     }
     sections.push(["LOCL", words(m.locales.length, entries, table.length, table)]);
   }
@@ -74,7 +75,7 @@ export function writeHwb(m: HwbModule): Uint8Array {
     const rules: number[] = [];
     const pool: number[] = [];
     const list = (xs: readonly number[]) => {
-      pool.push(...xs);
+      pushAll(pool, xs);
       return [pool.length - xs.length, xs.length];
     };
     for (const s of m.sprites) {

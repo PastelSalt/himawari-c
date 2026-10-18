@@ -142,7 +142,41 @@ export function describeDiagnostics(ds: readonly DiagnosticJson[], max = 20): st
   return lines.join("\n");
 }
 
+/** The last check per project folder: reading a big project is quick, checking it isn't (≈ 0.7 s for 35 000 lines). */
+const lastCheck = new Map<string, { input: ProjectInput; check: ProjectCheck }>();
+
+/** True when two inputs have the same files with the same text (and the same assets). */
+function sameInput(a: ProjectInput, b: ProjectInput): boolean {
+  const files = (i: ProjectInput) => [i.manifest, i.theme, ...(i.characters ?? []), ...(i.scripts ?? []), ...(i.locales ?? []), ...(i.extensions ?? [])];
+  const fa = files(a);
+  const fb = files(b);
+  if (fa.length !== fb.length || (a.assets ?? []).length !== (b.assets ?? []).length) return false;
+  for (let i = 0; i < fa.length; i++) {
+    if (fa[i]?.file !== fb[i]?.file || fa[i]?.text !== fb[i]?.text) return false;
+  }
+  const assets = new Set(a.assets ?? []);
+  return (b.assets ?? []).every((x) => assets.has(x));
+}
+
+/** Checks of inputs already checked (a write checks the project before and after; provenance reads the after again). */
+const checked = new WeakMap<ProjectInput, ProjectCheck>();
+
+/** checkProject, once per input object. */
+export function checkInput(input: ProjectInput): ProjectCheck {
+  let c = checked.get(input);
+  if (!c) {
+    c = checkProject(input);
+    checked.set(input, c);
+  }
+  return c;
+}
+
+/** Loads and checks the project, reusing the last check while no file changed (compared by content, so it's never stale). */
 export function check(fs: ProjectFs): { input: ProjectInput; check: ProjectCheck } {
   const input = loadInput(fs);
-  return { input, check: checkProject(input) };
+  const last = lastCheck.get(fs.root);
+  if (last && sameInput(last.input, input)) return last;
+  const result = { input, check: checkInput(input) };
+  lastCheck.set(fs.root, result);
+  return result;
 }

@@ -337,7 +337,8 @@ export const useStudio = create<State>((set, get) => {
         root: s.root,
         files,
         assets: s.assets,
-        model: buildModel(files, s.assets),
+        // Checked right after the workspace first paints: a big project takes most of a second to check.
+        model: null,
         center: first ? { kind: "file", file: first } : null,
         history: [],
         proposals: [],
@@ -346,6 +347,7 @@ export const useStudio = create<State>((set, get) => {
       });
       void studio.proposals.list().then((proposals) => set({ proposals }));
       void studio.preview.start();
+      requestAnimationFrame(() => requestAnimationFrame(() => recompute(0)));
     },
 
     async closeProject() {

@@ -155,7 +155,8 @@ export function parseTable(json: string): L10nTable {
     sourceLanguage: typeof raw.sourceLanguage === "string" ? raw.sourceLanguage : "",
     lines: raw.lines.map((e) => ({
       id: String(e.id), source: String(e.source ?? ""), text: String(e.text ?? ""),
-      status: (["ok", "needs-review", "missing"].includes(e.status as string) ? e.status : "missing") as L10nStatus,
+      // An unknown status ("done", "translated", …) from a hand-edited file: a line with text needs review, never "missing".
+      status: (["ok", "needs-review", "missing"].includes(e.status as string) ? e.status : e.text ? "needs-review" : "missing") as L10nStatus,
       provenance: (["human", "ai", "ai-edited"].includes(e.provenance as string) ? e.provenance : "human") as L10nEntry["provenance"],
     })),
   };

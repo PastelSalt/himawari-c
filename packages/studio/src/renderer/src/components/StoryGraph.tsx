@@ -1,4 +1,4 @@
-import { storyGraph } from "@himawari/core";
+import { type StoryGraph as Graph, fileFilterGraph, fileGraph, focusGraph, storyGraph } from "@himawari/core";
 import { Background, Controls, type Edge, Handle, MarkerType, type Node, type NodeProps, Position, ReactFlow } from "@xyflow/react";
 import ELK from "elkjs/lib/elk.bundled.js";
 import { useEffect, useMemo, useState } from "react";
@@ -6,7 +6,13 @@ import { FormattedMessage, useIntl } from "react-intl";
 import { useStudio } from "../store";
 import { token, useTheme } from "../theme";
 
-type SceneData = { scene: string; file: string; lines: number; entry: boolean; ending: boolean; reachable: boolean; playing: boolean };
+type SceneData = { scene: string; label: string; file: string; lines: number; entry: boolean; ending: boolean; reachable: boolean; playing: boolean };
+
+/** Above this many scenes the graph opens as an overview of files: laying out a thousand scenes takes seconds and shows nothing readable. */
+const BIG = 150;
+type View = { kind: "all" } | { kind: "overview" } | { kind: "file"; file: string } | { kind: "scene"; scene: string };
+/** A script's folder with a trailing slash ("script/route_03/"), the group in a folder overview. */
+const folderOf = (file: string) => `${file.split("/").slice(0, -1).join("/")}/`;
 
 const elk = new ELK();
 const W = 200;
@@ -18,7 +24,28 @@ export function StoryGraph() {
   const model = useStudio((s) => s.model);
   const playingLine = useStudio((s) => s.preview.line);
   const playingScene = playingLine ? model?.lines.get(playingLine)?.scene : undefined;
-  const graph = useMemo(() => (model ? storyGraph(model.check) : null), [model]);
+  const full = useMemo(() => (model ? storyGraph(model.check) : null), [model]);
+  const big = (full?.nodes.length ?? 0) > BIG;
+  // Many files: one box per folder (a route), and a folder opens to its scenes.
+  const byFolder = new Set(full?.nodes.map((n) => n.file)).size > 40;
+  const [view, setView] = useState<View | null>(null);
+  const [find, setFind] = useState("");
+  const shownView: View = view ?? (big ? { kind: "overview" } : { kind: "all" });
+  const graph: Graph | null = useMemo(() => {
+    if (!full) return null;
+    switch (shownView.kind) {
+      case "overview":
+        return fileGraph(full, byFolder ? folderOf : undefined);
+      case "file":
+        return fileFilterGraph(full, shownView.file);
+      case "scene":
+        return full.nodes.some((n) => n.scene === shownView.scene) ? focusGraph(full, shownView.scene, 2) : full;
+      default:
+        return full;
+    }
+  }, [full, JSON.stringify(shownView)]);
+  const overview = shownView.kind === "overview";
+  const playingFile = playingScene ? full?.nodes.find((n) => n.scene === playingScene)?.file : undefined;
   const theme = useTheme();
   // React Flow draws edges and the grid as SVG attributes, which can't use var(): read the tokens.
   const colors = useMemo(
@@ -75,7 +102,11 @@ export function StoryGraph() {
     id: n.scene,
     type: "scene",
     position: positions.get(n.scene) ?? { x: 0, y: 0 },
-    data: { ...n, playing: n.scene === playingScene },
+    data: {
+      ...n,
+      label: overview ? n.scene.replace(/^script\//, "") || "script/" : n.scene,
+      playing: overview ? playingFile !== undefined && (byFolder ? folderOf(playingFile) : playingFile) === n.scene : n.scene === playingScene,
+    },
   }));
   const edges: Edge[] = graph.edges.map((e, i) => {
     const label = [e.choice ? `“${e.choice}”` : null, e.when ? `if ${e.when}` : null, e.kind === "call" ? intl.formatMessage({ id: "graph.call" }) : null].filter(Boolean).join(" · ");
@@ -99,8 +130,50 @@ export function StoryGraph() {
           <FormattedMessage id="tool.graph" />
         </span>
         <span className="muted small">
-          <FormattedMessage id="graph.summary" values={{ scenes: graph.nodes.length, endings: graph.nodes.filter((n) => n.ending).length, unreachable: graph.nodes.filter((n) => !n.reachable).length }} />
+          <FormattedMessage id="graph.summary" values={{ scenes: full!.nodes.length, endings: full!.nodes.filter((n) => n.ending).length, unreachable: full!.nodes.filter((n) => !n.reachable).length }} />
         </span>
+        {big && (
+          <>
+            <div className="segmented">
+              <button className={overview ? "active" : ""} onClick={() => setView({ kind: "overview" })}>
+                <FormattedMessage id="graph.view.overview" />
+              </button>
+              <button className={shownView.kind === "all" ? "active" : ""} onClick={() => setView({ kind: "all" })} title={intl.formatMessage({ id: "graph.view.allHint" })}>
+                <FormattedMessage id="graph.view.all" />
+              </button>
+            </div>
+            <form
+              className="row"
+              onSubmit={(e) => {
+                e.preventDefault();
+                const name = find.trim();
+                if (full!.nodes.some((n) => n.scene === name)) setView({ kind: "scene", scene: name });
+              }}
+            >
+              <input
+                className="graph-find"
+                list="graph-scenes"
+                value={find}
+                onChange={(e) => {
+                  setFind(e.target.value);
+                  if (full!.nodes.some((n) => n.scene === e.target.value)) setView({ kind: "scene", scene: e.target.value });
+                }}
+                placeholder={intl.formatMessage({ id: "graph.find" })}
+                aria-label={intl.formatMessage({ id: "graph.find" })}
+              />
+              <datalist id="graph-scenes">
+                {full!.nodes.map((n) => (
+                  <option key={n.scene} value={n.scene} />
+                ))}
+              </datalist>
+            </form>
+            {(shownView.kind === "file" || shownView.kind === "scene") && (
+              <span className="muted small">
+                <FormattedMessage id={shownView.kind === "file" ? "graph.showingFile" : "graph.showingScene"} values={{ name: shownView.kind === "file" ? shownView.file : shownView.scene }} />
+              </span>
+            )}
+          </>
+        )}
         <div className="grow" />
         <span className="legend small muted">
           <span className="legend-line" /> <FormattedMessage id="graph.legend.jump" />
@@ -122,6 +195,10 @@ export function StoryGraph() {
           nodesConnectable={false}
           proOptions={{ hideAttribution: true }}
           onNodeClick={(_e, n) => {
+            if (overview) {
+              setView({ kind: "file", file: n.id }); // a file: its scenes
+              return;
+            }
             const s = useStudio.getState();
             const scene = s.model?.scenes.find((x) => x.id === n.id);
             if (scene) s.revealAt(scene.file, scene.start);
@@ -140,7 +217,9 @@ function SceneNode({ data }: NodeProps<Node<SceneData>>) {
   return (
     <div className={`graph-node${data.entry ? " entry" : ""}${!data.reachable ? " unreachable" : ""}${data.playing ? " playing" : ""}`}>
       <Handle type="target" position={Position.Left} />
-      <div className="graph-node-title">{data.scene}</div>
+      <div className="graph-node-title ellipsis" title={data.label}>
+        {data.label}
+      </div>
       <div className="graph-node-meta muted small">
         <FormattedMessage id="graph.lines" values={{ count: data.lines }} />
         {data.entry && (

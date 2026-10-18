@@ -128,7 +128,7 @@ export function storyGraph(check: ProjectCheck): StoryGraph {
 
 /** Mermaid flowchart source for a story graph. */
 export function graphToMermaid(g: StoryGraph): string {
-  const id = (s: string) => `s_${s}`;
+  const id = (s: string) => `s_${s.replace(/\W/g, "_")}`; // file paths too (fileGraph)
   const esc = (s: string) => s.replaceAll('"', "'").replaceAll("\n", " ");
   const out = ["flowchart TD"];
   for (const n of g.nodes) {
@@ -143,4 +143,73 @@ export function graphToMermaid(g: StoryGraph): string {
   for (const n of g.nodes) if (!n.reachable) out.push(`  style ${id(n.scene)} stroke-dasharray: 5 5`);
   if (g.entry) out.push(`  style ${id(g.entry)} stroke-width: 3px`);
   return `${out.join("\n")}\n`;
+}
+
+/**
+ * A scene and the scenes within `depth` jumps of it, either way, plus the scenes it calls (a big story's graph,
+ * one place at a time). Calls are only followed forward: a shared scene many others call doesn't pull them all in.
+ */
+export function focusGraph(g: StoryGraph, scene: string, depth = 2): StoryGraph {
+  const keep = new Set([scene]);
+  let frontier = new Set([scene]);
+  for (let d = 0; d < depth && frontier.size; d++) {
+    const next = new Set<string>();
+    for (const e of g.edges) {
+      const ways: (readonly [string, string])[] = e.kind === "call" ? [[e.from, e.to]] : [[e.from, e.to], [e.to, e.from]];
+      for (const [a, b] of ways) {
+        if (frontier.has(a) && !keep.has(b)) {
+          keep.add(b);
+          next.add(b);
+        }
+      }
+    }
+    frontier = next;
+  }
+  return subgraph(g, (n) => keep.has(n));
+}
+
+/** The scenes in files whose path starts with `prefix` ("script/route_03"), and the links between them. */
+export function fileFilterGraph(g: StoryGraph, prefix: string): StoryGraph {
+  const files = new Map(g.nodes.map((n) => [n.scene, n.file]));
+  return subgraph(g, (n) => (files.get(n) ?? "").startsWith(prefix));
+}
+
+function subgraph(g: StoryGraph, keep: (scene: string) => boolean): StoryGraph {
+  return { entry: g.entry && keep(g.entry) ? g.entry : null, nodes: g.nodes.filter((n) => keep(n.scene)), edges: g.edges.filter((e) => keep(e.from) && keep(e.to)) };
+}
+
+/**
+ * One node per file (or per group of files: `groupOf` maps a file to its group, such as its folder) and one edge
+ * per pair of linked groups, labeled with how many links: an overview of a big story.
+ */
+export function fileGraph(g: StoryGraph, groupOf: (file: string) => string = (f) => f): StoryGraph {
+  const byFile = new Map<string, GraphNode>();
+  const fileOf = new Map<string, string>();
+  for (const n of g.nodes) {
+    const group = groupOf(n.file);
+    fileOf.set(n.scene, group);
+    const f = byFile.get(group);
+    if (!f) byFile.set(group, { scene: group, file: group, lines: n.lines, ending: n.ending, entry: n.entry, reachable: n.reachable });
+    else {
+      f.lines += n.lines;
+      f.ending ||= n.ending;
+      f.entry ||= n.entry;
+      f.reachable ||= n.reachable;
+    }
+  }
+  const links = new Map<string, { from: string; to: string; kind: GraphEdge["kind"]; count: number }>();
+  for (const e of g.edges) {
+    const from = fileOf.get(e.from);
+    const to = fileOf.get(e.to);
+    if (!from || !to || from === to) continue;
+    const key = `${from} ${to} ${e.kind}`;
+    const l = links.get(key);
+    if (l) l.count++;
+    else links.set(key, { from, to, kind: e.kind, count: 1 });
+  }
+  return {
+    entry: g.entry ? (fileOf.get(g.entry) ?? null) : null,
+    nodes: [...byFile.values()],
+    edges: [...links.values()].map((l) => ({ from: l.from, to: l.to, kind: l.kind, ...(l.count > 1 ? { choice: `${l.count} links` } : {}) })),
+  };
 }

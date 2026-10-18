@@ -100,7 +100,9 @@ static int playtest(const hw_module *m, int argc, char **argv, const char *game)
     printf("Playtest of %s \"%s\" (seed %llu%s%s)\n", game, hw_str(m, m->title), (unsigned long long)o.seed,
            o.language ? ", language " : "", o.language ? o.language : "");
     printf("  %u path(s), %u menu state(s), %u event(s)%s\n", (unsigned)r.paths, (unsigned)r.menus, (unsigned)r.steps,
-           r.step_limit ? " - stopped at the step limit, raise max_steps to explore everything" : "");
+           !r.step_limit ? ""
+           : r.covered ? " - every menu and option was tried; not every combination (raise max_steps for more)"
+                       : " - stopped at the step limit before trying every option, raise max_steps");
     printf("  endings: %u of %u reached\n", (unsigned)r.ending_count, (unsigned)r.ending_total);
     for (uint32_t i = 0; i < r.ending_count; i++) {
         printf("    reached   ");
@@ -108,7 +110,7 @@ static int playtest(const hw_module *m, int argc, char **argv, const char *game)
         printf(", %u path(s)\n", (unsigned)r.endings[i].hits);
     }
     for (uint32_t i = 0; i < r.unreached_count; i++) {
-        printf("    UNREACHED ");
+        printf(r.step_limit && !r.covered ? "    not reached yet (step limit) " : "    UNREACHED ");
         print_place(m, r.unreached_endings[i]);
         printf("\n");
     }
@@ -116,7 +118,8 @@ static int playtest(const hw_module *m, int argc, char **argv, const char *game)
            (unsigned)r.options_chosen, (unsigned)r.options_total);
     if (r.div_by_zero) printf("  note: %u division(s) by zero (the result was 0)\n", (unsigned)r.div_by_zero);
     for (uint32_t i = 0; i < r.error_count; i++) printf("  ERROR (%u path(s)): %s\n", (unsigned)r.errors[i].hits, r.errors[i].message);
-    bool problems = r.error_count > 0 || r.unreached_count > 0 || r.step_limit;
+    /* A big story has too many combinations to try them all: once every option was tried, the step limit isn't a problem. */
+    bool problems = r.error_count > 0 || r.unreached_count > 0 || (r.step_limit && !r.covered);
     printf("%s\n", problems ? "Problems found." : "OK: every ending reached, no errors.");
 
     int code = problems ? 1 : 0;

@@ -193,6 +193,12 @@ function StatusBar() {
           <FormattedMessage id="status.proposals" values={{ count: proposals }} />
         </button>
       )}
+      {!model && (
+        <span className="status-item muted">
+          <span className="spinner" />
+          <FormattedMessage id="status.checking" />
+        </span>
+      )}
       <span className="status-item muted">{built && (built.ok ? <FormattedMessage id="status.built" values={{ ms: Math.round(built.ms) }} /> : <FormattedMessage id="status.notBuilt" />)}</span>
       <div className="grow" />
       <span className="status-item muted" title={root ?? ""}>

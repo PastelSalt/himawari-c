@@ -6,6 +6,7 @@ import {
   type Diagnostic,
   SPEC_VERSIONS,
   HwbError,
+  LineIndex,
   PackError,
   checkProject,
   compile,
@@ -31,8 +32,9 @@ const HELP = `hwc ${CORE_VERSION}
 Usage: hwc <command> [options] [files or folders]
 
 Commands:
-  check [paths]          Validate the project (scripts, himawari.json, characters,
-                         assets); exit 1 on errors
+  check [--all] [paths]  Validate the project (scripts, himawari.json, characters,
+                         assets); exit 1 on errors. Shows the first 20 of each
+                         kind of problem (--all: every one)
   fmt [--check] [paths]  Format files in place and add missing #line: IDs
                          (--check: only report files that need formatting)
   init <folder> [--template adv|blank] [--name "Title"] [--lang en]
@@ -88,12 +90,28 @@ class UsageError extends Error {}
 
 const display = (file: string) => relative(process.cwd(), file).replaceAll("\\", "/") || file;
 
-function check(paths: readonly string[]): number {
+/** Diagnostics of one kind shown before "… and N more" (a big project can have thousands). */
+const SHOWN_PER_CODE = 20;
+
+function check(args: readonly string[]): number {
+  const all = args.includes("--all");
+  const paths = args.filter((a) => a !== "--all");
   const counts = { error: 0, warning: 0, info: 0 };
+  const shown = new Map<string, number>();
+  const hidden = new Map<string, number>();
+  const out: string[] = [];
   const print = (file: string, source: string, diagnostics: Diagnostic[]) => {
+    if (diagnostics.length === 0) return;
+    const index = new LineIndex(source); // one per file: thousands of diagnostics still render fast
     for (const d of diagnostics) {
-      console.log(renderDiagnostic(d, file, source) + "\n");
       counts[d.severity]++;
+      const n = shown.get(d.code) ?? 0;
+      if (!all && n >= SHOWN_PER_CODE) {
+        hidden.set(d.code, (hidden.get(d.code) ?? 0) + 1);
+        continue;
+      }
+      shown.set(d.code, n + 1);
+      out.push(`${renderDiagnostic(d, file, source, index)}\n`);
     }
   };
 
@@ -115,6 +133,8 @@ function check(paths: readonly string[]): number {
     }
     checked = files.length;
   }
+  for (const [code, n] of hidden) out.push(`… and ${n} more ${code} (hwc check --all shows every one)\n`);
+  if (out.length) process.stdout.write(`${out.join("\n")}\n`);
 
   const files_ = `${checked} file${checked === 1 ? "" : "s"}`;
   const total = counts.error + counts.warning + counts.info;

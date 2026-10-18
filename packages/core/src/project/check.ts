@@ -3,6 +3,7 @@
  * contents and the asset list; Core does no I/O, so the CLI, Studio, and MCP
  * all get identical results.
  */
+import { pushAll } from "../arrays.js";
 import { type AstResult, type Expr, type MenuOption, type Ref, type Stmt, endsFlow, parseAst } from "../syntax/ast.js";
 import { type Diagnostic, type DiagnosticCode, type Span, diagnostic } from "../syntax/diagnostics.js";
 import { lex } from "../syntax/lexer.js";
@@ -79,6 +80,22 @@ const ASSET_FOLDERS: Readonly<Record<string, string>> = {
 /** The player character; always a valid speaker. */
 const PLAYER = "me";
 
+/**
+ * The last parse of each file, reused while its text is the same: Studio checks the whole project after
+ * every pause in typing, and a big project has a hundred files that didn't change (parsing is most of the work).
+ * Callers get their own `refs` and `diagnostics` arrays, because checking adds to them.
+ */
+const parses = new Map<string, { text: string; result: AstResult }>();
+function parseCached(text: string, file: string): AstResult {
+  let hit = parses.get(file);
+  if (!hit || hit.text !== text) {
+    hit = { text, result: parseAst(text, file) };
+    parses.set(file, hit);
+    if (parses.size > 4000) parses.delete(parses.keys().next().value as string); // projects come and go; keep it bounded
+  }
+  return { ...hit.result, refs: [...hit.result.refs], diagnostics: [...hit.result.diagnostics] };
+}
+
 export function checkProject(input: ProjectInput): ProjectCheck {
   const reports = new Map<string, FileReport>();
   const report = (file: string, source: string) => {
@@ -92,34 +109,34 @@ export function checkProject(input: ProjectInput): ProjectCheck {
   if (input.manifest) {
     const m = readManifest(input.manifest.text);
     manifest = m.manifest;
-    report(input.manifest.file, input.manifest.text).diagnostics.push(...m.diagnostics);
+    pushAll(report(input.manifest.file, input.manifest.text).diagnostics, m.diagnostics);
   }
   const characters = new Map<string, Character>();
   for (const cf of input.characters ?? []) {
     const c = readCharacter(cf.file, cf.text, input.assets ?? []);
-    report(cf.file, cf.text).diagnostics.push(...c.diagnostics);
+    pushAll(report(cf.file, cf.text).diagnostics, c.diagnostics);
     if (c.character) characters.set(c.character.id, c.character);
   }
 
   const extensions = new Map<string, ExtensionDef>();
   for (const ef of input.extensions ?? []) {
     const e = readExtension(ef.file, ef.text);
-    report(ef.file, ef.text).diagnostics.push(...e.diagnostics);
+    pushAll(report(ef.file, ef.text).diagnostics, e.diagnostics);
     if (e.ext) extensions.set(e.ext.name, e.ext);
   }
   let theme: ThemeEntries | null = null;
   if (input.theme) {
     const t = readTheme(input.theme.text, manifest ? { aspect: manifest.resolution[0] / manifest.resolution[1] } : {});
-    report(input.theme.file, input.theme.text).diagnostics.push(...t.diagnostics);
+    pushAll(report(input.theme.file, input.theme.text).diagnostics, t.diagnostics);
     theme = t.entries;
   }
 
   // Parse every script, then build the project-wide index.
   const parsed = new Map<string, AstResult>();
   for (const s of input.scripts) {
-    const r = parseAst(s.text, s.file);
+    const r = parseCached(s.text, s.file);
     parsed.set(s.file, r);
-    report(s.file, s.text).diagnostics.push(...r.diagnostics);
+    pushAll(report(s.file, s.text).diagnostics, r.diagnostics);
   }
 
   // Macros and extension statements: check every call, expand macros (rfcs/0007, rfcs/0008).
@@ -171,7 +188,7 @@ export function checkProject(input: ProjectInput): ProjectCheck {
     // Names that came from a macro body: reported at the call, without quick fixes (they'd edit the wrong text).
     const fromMacros: Diagnostic[] = [];
     checkRefs(expansion.expandedRefs.get(s.file) ?? [], ctx, fromMacros);
-    out.push(...fromMacros.map((d) => ({ ...d, fixes: [], note: d.note ? `${d.note} (from a macro)` : "from a macro" })));
+    pushAll(out, fromMacros.map((d) => ({ ...d, fixes: [], note: d.note ? `${d.note} (from a macro)` : "from a macro" })));
     checkTypesAndFlow({ ...r, ast: expansion.asts.get(s.file) ?? r.ast }, s.text, ctx, out);
   }
 
@@ -206,17 +223,43 @@ export function checkProject(input: ProjectInput): ProjectCheck {
   return { files: [...reports.values()], manifest, characters, parsed, locales, expanded: expansion.asts, macros, extensions: extensions, theme };
 }
 
-function checkLocale(lf: SourceFile, lines: ReadonlyMap<string, SourceLine>, out: Diagnostic[]): L10nTable | null {
-  let table: L10nTable;
-  try {
-    table = parseTable(lf.text);
-  } catch (e) {
-    out.push(diagnostic("HW0406", { start: 0, end: 0 }, { reason: (e as Error).message }));
-    return null;
+/** String tables as last read, per file, reused while the text is the same (a big game's table is megabytes). */
+const tables = new Map<string, { text: string; table: L10nTable; ids: Map<string, number> | null }>();
+/** Placeholder checks of (source, translation) pairs already done: most lines don't change between checks. */
+const parity = new Map<string, readonly string[]>();
+
+function parityCached(source: string, text: string): readonly string[] {
+  const key = `${source}\u0000${text}`;
+  let p = parity.get(key);
+  if (!p) {
+    p = parityProblems(source, text);
+    if (parity.size > 400000) parity.clear();
+    parity.set(key, p);
   }
+  return p;
+}
+
+function checkLocale(lf: SourceFile, lines: ReadonlyMap<string, SourceLine>, out: Diagnostic[]): L10nTable | null {
+  let cached = tables.get(lf.file);
+  if (!cached || cached.text !== lf.text) {
+    try {
+      cached = { text: lf.text, table: parseTable(lf.text), ids: null };
+    } catch (e) {
+      out.push(diagnostic("HW0406", { start: 0, end: 0 }, { reason: (e as Error).message }));
+      return null;
+    }
+    tables.set(lf.file, cached);
+  }
+  const entry = cached;
+  const table = entry.table;
   const lang = table.language;
+  // Where each line's entry is: found once per file (a search per diagnostic is slow when thousands of lines changed).
   const at = (id: string): Span => {
-    const i = lf.text.indexOf(`"${id}"`);
+    if (!entry.ids) {
+      entry.ids = new Map();
+      for (const m of lf.text.matchAll(/"id"\s*:\s*"([^"]+)"/g)) entry.ids.set(m[1] ?? "", (m.index ?? 0) + m[0].length - (m[1] ?? "").length - 2);
+    }
+    const i = entry.ids.get(id) ?? -1;
     return i < 0 ? { start: 0, end: 0 } : { start: i, end: i + id.length + 2 };
   };
   let missing = 0;
@@ -227,10 +270,15 @@ function checkLocale(lf: SourceFile, lines: ReadonlyMap<string, SourceLine>, out
       out.push(diagnostic("HW0405", at(e.id), { id: e.id, lang }, { help: "run hwc l10n sync" }));
       continue;
     }
-    if (src.text !== e.source) out.push(diagnostic("HW0403", at(e.id), { id: e.id, lang }, { help: "run hwc l10n sync" }));
     if (e.text === "") missing++;
     else if (e.status === "needs-review") review++;
-    for (const problem of parityProblems(src.text, e.text)) out.push(diagnostic("HW0401", at(e.id), { lang, id: e.id, problem }));
+    if (src.text !== e.source) {
+      // The writer changed the line since it was translated: the translation needs review, and its markup is
+      // checked again then. Never an error, so editing a translated line is never refused.
+      out.push(diagnostic("HW0403", at(e.id), { id: e.id, lang }, { help: "run hwc l10n sync" }));
+      continue;
+    }
+    for (const problem of parityCached(src.text, e.text)) out.push(diagnostic("HW0401", at(e.id), { lang, id: e.id, problem }));
   }
   const inTable = new Set(table.lines.map((e) => e.id));
   missing += [...lines.keys()].filter((id) => !inTable.has(id)).length;

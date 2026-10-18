@@ -50,6 +50,9 @@ describe("sync", () => {
 
   test("tables round-trip through JSON", () => {
     expect(parseTable(stringifyTable(first.table))).toEqual(first.table);
+    // A hand-edited status the format doesn't know keeps its text and needs review, never "missing".
+    const odd = parseTable(JSON.stringify({ language: "ja", lines: [{ id: "aaaaaa", source: "Hi", text: "やあ", status: "done" }, { id: "bbbbbb", source: "Yo", text: "", status: "?" }] }));
+    expect(odd.lines.map((l) => l.status)).toEqual(["needs-review", "missing"]);
   });
 });
 
@@ -152,5 +155,15 @@ describe("hwc check integration", () => {
     const codes = check(stringifyTable(t));
     expect(codes).toEqual(expect.arrayContaining(["HW0401", "HW0403", "HW0405", "HW0404", "HW0402"]));
     expect(check("{ nope")).toEqual(["HW0406"]);
+  });
+
+  test("a translated line whose source changed needs review; its old markup is never an error (the edit isn't refused)", () => {
+    const t = structuredClone(base);
+    const e = t.lines[0] as { source: string; text: string; status: string };
+    e.text = `${e.source.replace(/\{[^}]*\}/g, "")} {b}old{/b}`;
+    e.source = `${e.source} (before the edit)`;
+    e.status = "ok";
+    expect(check(stringifyTable(t))).not.toContain("HW0401");
+    expect(check(stringifyTable(t))).toContain("HW0403");
   });
 });

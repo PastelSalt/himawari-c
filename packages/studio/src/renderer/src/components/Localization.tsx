@@ -17,6 +17,7 @@ import { studio } from "../api";
 import { LANGUAGE_NAMES } from "../i18n";
 import { useStudio } from "../store";
 import { Icon } from "./Icon";
+import { PAGE_SIZE, Pager, pathChoices } from "./Pager";
 import { playFrom } from "./ScriptEditor";
 
 type Filter = "all" | "missing" | "needs-review" | "changed";
@@ -33,6 +34,10 @@ export function Localization({ initial }: { initial?: string | undefined }) {
   const [message, setMessage] = useState<string | null>(null);
   const [problems, setProblems] = useState<Record<string, string[]>>({});
   const [adding, setAdding] = useState("");
+  // A big game has tens of thousands of lines: narrow by route (a folder or file) and words, a page at a time.
+  const [where, setWhere] = useState("");
+  const [query, setQuery] = useState("");
+  const [page, setPage] = useState(0);
   useEffect(() => {
     if (initial && initial !== manifest?.sourceLanguage) setLang(initial);
   }, [initial, manifest?.sourceLanguage]);
@@ -49,7 +54,9 @@ export function Localization({ initial }: { initial?: string | undefined }) {
     }
   }, [file, files]);
   const synced = useMemo(() => (lang && manifest ? syncTable(existing, lines, lang, manifest.sourceLanguage) : null), [existing, lines, lang, manifest]);
-  const stored = new Map((existing?.lines ?? []).map((e) => [e.id, e]));
+  const stored = useMemo(() => new Map((existing?.lines ?? []).map((e) => [e.id, e])), [existing]);
+  const entries = useMemo(() => new Map((synced?.table.lines ?? []).map((e) => [e.id, e])), [synced]);
+  const places = useMemo(() => pathChoices(new Set(lines.map((l) => l.file))), [lines]);
 
   const write = (table: L10nTable, label: string, values: Record<string, string> = {}) => {
     if (!file || !lang) return;
@@ -111,15 +118,26 @@ export function Localization({ initial }: { initial?: string | undefined }) {
     }
   };
 
-  const rows = lines.filter((l) => {
-    const e = synced?.table.lines.find((x) => x.id === l.id);
-    const s = stored.get(l.id);
-    if (filter === "missing") return !e || e.status === "missing";
-    if (filter === "needs-review") return e?.status === "needs-review";
-    if (filter === "changed") return s !== undefined && s.source !== l.text;
-    return true;
-  });
-  const count = (st: string) => synced?.table.lines.filter((e) => e.status === st).length ?? 0;
+  const rows = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return lines.filter((l) => {
+      if (where && !(where.endsWith("/") ? l.file.startsWith(where) : l.file === where)) return false;
+      const e = entries.get(l.id);
+      const s = stored.get(l.id);
+      if (filter === "missing" && !(!e || e.status === "missing")) return false;
+      if (filter === "needs-review" && e?.status !== "needs-review") return false;
+      if (filter === "changed" && !(s !== undefined && s.source !== l.text)) return false;
+      return !q || l.text.toLowerCase().includes(q) || (e?.text ?? "").toLowerCase().includes(q) || l.scene.includes(q) || l.id === q.replace(/^#/, "");
+    });
+  }, [lines, where, query, filter, entries, stored]);
+  useEffect(() => setPage(0), [where, query, filter, lang]);
+  const counts = useMemo(() => {
+    const c: Record<string, number> = {};
+    for (const e of synced?.table.lines ?? []) c[e.status] = (c[e.status] ?? 0) + 1;
+    return c;
+  }, [synced]);
+  const count = (st: string) => counts[st] ?? 0;
+  const shown = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const pending = synced && (synced.added > 0 || synced.changed > 0 || synced.removed > 0 || !existing);
 
   return (
@@ -176,6 +194,29 @@ export function Localization({ initial }: { initial?: string | undefined }) {
             <span className="muted small">
               <FormattedMessage id="l10n.summary" values={{ total: lines.length, ok: count("ok"), review: count("needs-review"), missing: lines.length - count("ok") - count("needs-review") }} />
             </span>
+          </div>
+          <div className="row wrap l10n-bar">
+            <select className="small-select" value={where} onChange={(e) => setWhere(e.target.value)} aria-label={intl.formatMessage({ id: "l10n.where" })}>
+              <option value="">{intl.formatMessage({ id: "l10n.everywhere" })}</option>
+              {places.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+            <input
+              type="search"
+              className="l10n-search"
+              value={query}
+              placeholder={intl.formatMessage({ id: "l10n.search" })}
+              aria-label={intl.formatMessage({ id: "l10n.search" })}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+            {(where || query.trim()) && (
+              <span className="muted small">
+                <FormattedMessage id="l10n.matching" values={{ count: rows.length }} />
+              </span>
+            )}
             <div className="grow" />
             {pending && (
               <button className="primary" onClick={() => write(synced.table, "history.synced")}>
@@ -209,8 +250,8 @@ export function Localization({ initial }: { initial?: string | undefined }) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((l) => {
-                const e = synced.table.lines.find((x) => x.id === l.id);
+              {shown.map((l) => {
+                const e = entries.get(l.id);
                 const s = stored.get(l.id);
                 const changed = s !== undefined && s.source !== l.text;
                 return (
@@ -263,6 +304,7 @@ export function Localization({ initial }: { initial?: string | undefined }) {
               })}
             </tbody>
           </table>
+          <Pager page={page} total={rows.length} onPage={setPage} />
         </>
       )}
     </div>

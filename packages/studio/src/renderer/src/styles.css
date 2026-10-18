@@ -2237,3 +2237,72 @@ button.big {
   border: 1px solid var(--border-strong);
   box-shadow: none;
 }
+
+/* The Screenplay's "go to a scene" bar (long files) */
+.sp-jump {
+  position: sticky;
+  top: -14px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -14px -18px 10px;
+  padding: 8px 18px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+.sp-jump select {
+  max-width: 360px;
+}
+
+/* Long lists, a page at a time */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 8px 0 16px;
+}
+.l10n-search {
+  flex: 1;
+  min-width: 200px;
+  max-width: 420px;
+}
+
+/* Explorer: folders and folding (big projects) */
+.tree-label.folder {
+  font-weight: 600;
+  color: var(--text);
+  gap: 5px;
+}
+.in-folder .tree-label {
+  padding-left: 26px;
+}
+.in-folder .tree-label.nested {
+  padding-left: 46px;
+}
+.twisty {
+  display: inline-flex;
+  margin-left: -14px;
+  color: var(--faint);
+}
+.twisty:hover {
+  color: var(--text);
+}
+.graph-find {
+  width: 180px;
+}
+.graph-page .pane-head {
+  flex-wrap: wrap;
+}
+.asset-search {
+  width: min(420px, 100%);
+  margin: 4px 0 6px;
+}
+details.asset-section > summary {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 16px 0 8px;
+  cursor: pointer;
+}

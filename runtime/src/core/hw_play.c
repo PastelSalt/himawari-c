@@ -276,6 +276,7 @@ bool hw_transcript(const hw_module *m, const hw_transcript_options *o, hw_buf *o
 typedef struct node {
     uint8_t *snap;
     uint32_t next, count;
+    bool expanded; /* coverage pass: an option of this menu was taken */
 } node;
 
 typedef struct explorer {
@@ -293,6 +294,8 @@ typedef struct explorer {
     bool oom;
     uint32_t target; /* warp: stop at this SAY/MENU pc (HW_NONE = explore everything) */
     bool found;
+    bool coverage;      /* the coverage pass is running */
+    uint8_t *menu_seen; /* coverage pass: per pc, 1 once that menu was explored */
 } explorer;
 
 static void on_checkpoint(void *user, const hw_vm *vm)
@@ -426,16 +429,102 @@ static bool push_node(explorer *x, uint32_t count)
     uint8_t *snap = malloc(x->snap_size);
     if (!snap) return false;
     memcpy(snap, x->checkpoint, x->snap_size);
-    x->stack[x->stack_len++] = (node){ snap, 0, count };
+    x->stack[x->stack_len++] = (node){ snap, 0, count, false };
     return true;
 }
 
-/* A menu was reached: explore it later unless this exact state was explored already. */
+/*
+ * A menu was reached: explore it later unless this exact state was explored already.
+ * The coverage pass explores each menu once more only while it has an option no path chose yet,
+ * so a long route is walked about once instead of once per earlier choice.
+ */
 static void reached_menu(explorer *x, const hw_event *ev)
 {
+    if (x->coverage && ev->pc < x->m->code_count) {
+        bool novel = !x->menu_seen[ev->pc];
+        for (uint32_t i = 0; i < ev->option_count && !novel; i++) novel = !x->r->line_seen[ev->options[i]];
+        if (!novel) {
+            x->r->paths++;
+            return;
+        }
+        x->menu_seen[ev->pc] = 1;
+    }
     if (!seen_add(x, hash_bytes(x->checkpoint, x->snap_size))) return;
     x->r->menus++;
     if (!push_node(x, ev->option_count)) x->oom = true;
+}
+
+/*
+ * Takes the menus on the stack depth-first. The coverage pass takes only options no path chose
+ * yet, and one option at a menu whose options were all chosen already (so the story goes on).
+ */
+static void explore(explorer *x)
+{
+    hw_playtest_report *r = x->r;
+    hw_event ev;
+    while (x->stack_len > 0 && !r->step_limit && !x->oom && !x->found) {
+        node *top = &x->stack[x->stack_len - 1];
+        if (top->next >= top->count) {
+            free(top->snap);
+            x->stack_len--;
+            continue;
+        }
+        uint32_t k = top->next++;
+        hw_vm_restore(&x->vm, top->snap);
+        if (!hw_vm_next(&x->vm, &ev) || ev.kind != HW_EV_MENU || k >= ev.option_count) {
+            add_error(x, "replaying a menu gave a different result (non-deterministic state)");
+            continue;
+        }
+        if (x->coverage && r->line_seen[ev.options[k]] && (top->expanded || top->next < top->count)) continue;
+        top->expanded = true; /* before run(): pushing a node may move the stack */
+        if (!hw_vm_choose(&x->vm, k)) {
+            add_error(x, "replaying a menu gave a different result (non-deterministic state)");
+            continue;
+        }
+        r->line_seen[ev.options[k]] = 1;
+        int res = run(x, &ev);
+        if (res == RUN_MENU) reached_menu(x, &ev);
+        else if (res != RUN_FOUND) r->paths++;
+    }
+}
+
+/* Plays from the start to the first menu, then the coverage pass, then every combination with what's left of the budget. */
+static void explore_all(explorer *x)
+{
+    hw_playtest_report *r = x->r;
+    hw_event ev;
+    if (!hw_vm_start(&x->vm, HW_NONE)) {
+        add_error(x, x->vm.error);
+        return;
+    }
+    x->coverage = x->menu_seen != NULL;
+    int res = run(x, &ev);
+    if (res != RUN_MENU) {
+        if (res != RUN_FOUND) r->paths++;
+        r->covered = res == RUN_DONE;
+        return;
+    }
+    uint8_t *root = malloc(x->snap_size);
+    if (!root) {
+        x->oom = true;
+        return;
+    }
+    memcpy(root, x->checkpoint, x->snap_size);
+    reached_menu(x, &ev);
+    explore(x);
+    r->covered = x->coverage && !r->step_limit && !x->oom;
+    if (x->coverage && !r->step_limit && !x->oom && !x->found) {
+        /* Every combination of choices, from the first menu again, with a fresh set of explored states. */
+        x->coverage = false;
+        memset(x->seen, 0, x->seen_cap * sizeof *x->seen);
+        x->seen_len = 0;
+        r->paths = 0;
+        r->menus = 0;
+        memcpy(x->checkpoint, root, x->snap_size);
+        reached_menu(x, &ev);
+        explore(x);
+    }
+    free(root);
 }
 
 /* Instructions reachable from the entry scene, following every branch. */
@@ -481,6 +570,13 @@ static uint8_t *static_reach(const hw_module *m)
     return reach;
 }
 
+/* The default step budget grows with the story: about 40 events per line, so a big game's coverage pass finishes. */
+static uint32_t default_steps(const hw_module *m)
+{
+    uint64_t n = (uint64_t)m->line_count * 40u;
+    return n < 50000u ? 50000u : n > 20000000u ? 20000000u : (uint32_t)n;
+}
+
 bool hw_playtest(const hw_module *m, const hw_playtest_options *o, hw_playtest_report *r)
 {
     memset(r, 0, sizeof *r);
@@ -489,7 +585,7 @@ bool hw_playtest(const hw_module *m, const hw_playtest_options *o, hw_playtest_r
     x.target = HW_NONE;
     x.m = m;
     x.r = r;
-    x.max_steps = o->max_steps ? o->max_steps : 50000;
+    x.max_steps = o->max_steps ? o->max_steps : default_steps(m);
     r->line_seen = calloc(m->line_count > 0 ? m->line_count : 1, 1);
     if (!r->line_seen || !hw_vm_init(&x.vm, m, o->seed)) {
         hw_playtest_report_free(r);
@@ -502,32 +598,9 @@ bool hw_playtest(const hw_module *m, const hw_playtest_options *o, hw_playtest_r
     x.vm.checkpoint_user = &x;
     bool ok = x.checkpoint != NULL;
 
-    hw_event ev;
-    if (ok && hw_vm_start(&x.vm, HW_NONE)) {
-        int res = run(&x, &ev);
-        if (res == RUN_MENU) reached_menu(&x, &ev);
-        else r->paths++;
-        while (x.stack_len > 0 && !r->step_limit && !x.oom) {
-            node *top = &x.stack[x.stack_len - 1];
-            if (top->next >= top->count) {
-                free(top->snap);
-                x.stack_len--;
-                continue;
-            }
-            uint32_t k = top->next++;
-            hw_vm_restore(&x.vm, top->snap);
-            if (!hw_vm_next(&x.vm, &ev) || ev.kind != HW_EV_MENU || !hw_vm_choose(&x.vm, k)) {
-                add_error(&x, "replaying a menu gave a different result (non-deterministic state)");
-                continue;
-            }
-            r->line_seen[ev.options[k]] = 1;
-            res = run(&x, &ev);
-            if (res == RUN_MENU) reached_menu(&x, &ev);
-            else r->paths++;
-        }
-    } else if (ok) {
-        add_error(&x, x.vm.error);
-    }
+    x.menu_seen = calloc(m->code_count > 0 ? m->code_count : 1, 1);
+    ok = ok && x.menu_seen != NULL;
+    if (ok) explore_all(&x);
     ok = ok && !x.oom;
 
     /* Coverage and endings. */
@@ -567,6 +640,7 @@ bool hw_playtest(const hw_module *m, const hw_playtest_options *o, hw_playtest_r
     for (size_t i = 0; i < x.stack_len; i++) free(x.stack[i].snap);
     free(x.stack);
     free(x.seen);
+    free(x.menu_seen);
     free(x.checkpoint);
     hw_vm_free(&x.vm);
     if (!ok) hw_playtest_report_free(r);
@@ -611,8 +685,8 @@ static void json_place(const hw_module *m, uint32_t pc, hw_buf *b)
 
 void hw_playtest_report_json(const hw_module *m, const hw_playtest_report *r, hw_buf *b)
 {
-    hw_buf_printf(b, "{\n  \"paths\": %u,\n  \"steps\": %u,\n  \"stepLimit\": %s,\n  \"menus\": %u,\n", (unsigned)r->paths,
-                  (unsigned)r->steps, r->step_limit ? "true" : "false", (unsigned)r->menus);
+    hw_buf_printf(b, "{\n  \"paths\": %u,\n  \"steps\": %u,\n  \"stepLimit\": %s,\n  \"covered\": %s,\n  \"menus\": %u,\n",
+                  (unsigned)r->paths, (unsigned)r->steps, r->step_limit ? "true" : "false", r->covered ? "true" : "false", (unsigned)r->menus);
     hw_buf_printf(b, "  \"endings\": {\n    \"reached\": %u,\n    \"total\": %u,\n    \"list\": [", (unsigned)r->ending_count,
                   (unsigned)r->ending_total);
     for (uint32_t i = 0; i < r->ending_count; i++) {
@@ -722,7 +796,7 @@ bool hw_warp(const hw_module *m, uint32_t target, uint64_t seed, uint32_t max_st
     x.m = m;
     x.r = &r;
     x.target = target;
-    x.max_steps = max_steps ? max_steps : 50000;
+    x.max_steps = max_steps ? max_steps : default_steps(m);
     r.line_seen = calloc(m->line_count > 0 ? m->line_count : 1, 1);
     if (!r.line_seen || !hw_vm_init(&x.vm, m, seed)) {
         free(r.line_seen);
@@ -732,29 +806,15 @@ bool hw_warp(const hw_module *m, uint32_t target, uint64_t seed, uint32_t max_st
     x.checkpoint = calloc(1, x.snap_size);
     x.vm.checkpoint = on_checkpoint;
     x.vm.checkpoint_user = &x;
-    hw_event ev;
-    if (x.checkpoint && hw_vm_start(&x.vm, HW_NONE)) {
-        int res = run(&x, &ev);
-        if (res == RUN_MENU) reached_menu(&x, &ev);
-        while (!x.found && x.stack_len > 0 && !r.step_limit && !x.oom) {
-            node *top = &x.stack[x.stack_len - 1];
-            if (top->next >= top->count) {
-                free(top->snap);
-                x.stack_len--;
-                continue;
-            }
-            uint32_t k = top->next++;
-            hw_vm_restore(&x.vm, top->snap);
-            if (!hw_vm_next(&x.vm, &ev) || ev.kind != HW_EV_MENU || !hw_vm_choose(&x.vm, k)) continue;
-            res = run(&x, &ev);
-            if (res == RUN_MENU) reached_menu(&x, &ev);
-        }
-    }
+    /* The coverage pass first: a line deep in the last route of a big game is found in about one read-through. */
+    x.menu_seen = calloc(m->code_count > 0 ? m->code_count : 1, 1);
+    if (x.checkpoint && x.menu_seen) explore_all(&x);
     bool ok = x.found;
     if (ok) memcpy(snapshot, x.checkpoint, x.snap_size); /* the checkpoint right before the target */
     for (size_t i = 0; i < x.stack_len; i++) free(x.stack[i].snap);
     free(x.stack);
     free(x.seen);
+    free(x.menu_seen);
     free(x.checkpoint);
     free(r.line_seen);
     free(r.endings);

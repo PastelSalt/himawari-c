@@ -26,6 +26,7 @@ interface PlaytestReport {
   paths: number;
   steps: number;
   stepLimit: boolean;
+  covered?: boolean;
   menus: number;
   endings: { reached: number; total: number; list: { scene: string; file?: string; line?: number; hits: number }[]; unreached: { scene: string; file?: string; line?: number }[] };
   errors: { message: string; hits: number }[];
@@ -43,7 +44,7 @@ export const playtest = defineTool({
     choices: z.array(z.number().int().min(0)).optional(),
     seed: z.number().int().min(0).default(1),
     lang: z.string().optional(),
-    max_steps: z.number().int().min(100).max(1000000).default(50000),
+    max_steps: z.number().int().min(100).max(20000000).optional().describe("Events to play across all paths; by default about 40 per line of the story"),
   }),
   output: z.looseObject({ ok: z.boolean() }),
   annotations: { readOnlyHint: true, idempotentHint: true },
@@ -57,12 +58,12 @@ export const playtest = defineTool({
       return { text: r.stdout, data: { ok: !/^error:/m.test(r.stdout), transcript: r.stdout } };
     }
     const out = ctx.fs.path(`${CACHE}/playtest.json`);
-    const r = await runRuntime(exe, ["--headless", hwb, "--playtest", `max_steps=${args.max_steps}`, ...extra, "--out", out], 300000);
+    const r = await runRuntime(exe, ["--headless", hwb, "--playtest", ...(args.max_steps ? [`max_steps=${args.max_steps}`] : []), ...extra, "--out", out], 300000);
     if (r.code === 2) throw new ToolError(`the runtime failed: ${r.stderr.trim() || r.stdout.trim()}`);
     const report = JSON.parse(ctx.fs.read(`${CACHE}/playtest.json`)) as PlaytestReport;
     const unreached = report.endings.unreached.map((e) => `${e.scene}${e.file ? ` (${e.file}:${e.line})` : ""}`);
     const lines = [
-      `${report.paths} path(s), ${report.menus} menu state(s), ${report.steps} event(s)${report.stepLimit ? "; stopped at the step limit (raise max_steps)" : ""}`,
+      `${report.paths} path(s), ${report.menus} menu state(s), ${report.steps} event(s)${!report.stepLimit ? "" : report.covered ? "; every menu and choice was tried, not every combination (raise max_steps for more)" : "; stopped at the step limit before trying every choice (raise max_steps)"}`,
       `Endings: ${report.endings.reached} of ${report.endings.total} reached${unreached.length ? `; never reached: ${unreached.join(", ")}` : ""}`,
       `Coverage: ${report.coverage.lines.seen}/${report.coverage.lines.total} lines, ${report.coverage.options.chosen}/${report.coverage.options.total} choices${report.coverage.unseen.length ? `; never shown: ${report.coverage.unseen.slice(0, 20).map((id) => `#${id}`).join(" ")}` : ""}`,
       ...report.errors.map((e) => `ERROR on ${e.hits} path(s): ${e.message}`),

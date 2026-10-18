@@ -1,4 +1,4 @@
-import { type MenuOption, type Stmt, characterWords, parseAst } from "@himawari/core";
+import { type MenuOption, type Scene, type Stmt, characterWords, parseAst } from "@himawari/core";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import {
@@ -36,9 +36,30 @@ type Ctx = {
  * open as text when clicked (P7). It edits the same text as the Script view.
  */
 export function Screenplay({ file, onPlay }: { file: string; onPlay: (lineId: string) => void }) {
+  const intl = useIntl();
   const text = useStudio((s) => s.files[file] ?? "");
+  const reveal = useStudio((s) => s.reveal);
+  const previewLine = useStudio((s) => s.preview.line);
+  const model = useStudio((s) => s.model);
   const parsed = useMemo(() => parseAst(text, file), [text, file]);
   const hasErrors = parsed.diagnostics.some((d) => d.severity === "error");
+  const root = useRef<HTMLDivElement>(null);
+  // Scenes that must be drawn even when off screen: the one being revealed, and the one the game is playing.
+  const [goTo, setGoTo] = useState<{ scene: string; seq: number } | null>(null);
+  const sceneAt = (offset: number) => parsed.ast.scenes.find((sc) => offset >= sc.span.start && offset <= sc.span.end)?.id ?? null;
+  const playing = previewLine ? model?.lines.get(previewLine) : undefined;
+  const playingScene = playing && playing.file === file ? sceneAt(playing.start) : null;
+
+  // Explorer, search, the story graph, and "go to definition" reveal a place: scroll to its scene.
+  useEffect(() => {
+    if (!reveal || reveal.file !== file) return;
+    const id = sceneAt(reveal.offset);
+    if (id) setGoTo({ scene: id, seq: reveal.seq });
+  }, [reveal]);
+  useEffect(() => {
+    if (!goTo) return;
+    root.current?.querySelector(`[data-scene="${CSS.escape(goTo.scene)}"]`)?.scrollIntoView({ block: "start" });
+  }, [goTo]);
   const ctx: Ctx = {
     file,
     text,
@@ -46,8 +67,26 @@ export function Screenplay({ file, onPlay }: { file: string; onPlay: (lineId: st
     play: onPlay,
     lastSpeaker: null,
   };
+  const big = parsed.ast.scenes.length > 3;
   return (
-    <div className="screenplay">
+    <div className="screenplay" ref={root}>
+      {big && (
+        <div className="sp-jump">
+          <Icon name="scene" />
+          <select
+            value={goTo?.scene ?? ""}
+            aria-label={intl.formatMessage({ id: "screenplay.goToScene" })}
+            onChange={(e) => e.target.value && setGoTo({ scene: e.target.value, seq: Date.now() })}
+          >
+            <option value="">{intl.formatMessage({ id: "screenplay.goToScene" }, { count: parsed.ast.scenes.length })}</option>
+            {parsed.ast.scenes.map((sc) => (
+              <option key={sc.id} value={sc.id}>
+                {sc.id}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {hasErrors && (
         <div className="screenplay-warning">
           <Icon name="warning" />
@@ -63,16 +102,58 @@ export function Screenplay({ file, onPlay }: { file: string; onPlay: (lineId: st
         </p>
       )}
       {parsed.ast.scenes.map((scene) => (
-        <section key={scene.id} className="sp-scene">
+        <LazyScene key={scene.id} scene={scene} root={root} force={scene.id === goTo?.scene || scene.id === playingScene}>
           <header className="sp-scene-head">
             <Icon name="scene" />
             <span>{scene.id}</span>
           </header>
           <Body stmts={scene.body} ctx={ctx} depth={0} />
           <AddBar ctx={ctx} after={scene.body[scene.body.length - 1] ?? null} sceneSpanEnd={scene.span.end} indent="    " />
-        </section>
+        </LazyScene>
       ))}
     </div>
+  );
+}
+
+/** Rows a scene shows, for the height of its placeholder. */
+function countRows(stmts: readonly Stmt[]): number {
+  let n = 0;
+  for (const s of stmts) {
+    n++;
+    if (s.kind === "Menu") for (const o of s.options) n += 1 + countRows(o.body);
+    if (s.kind === "If") for (const c of s.clauses) n += 1 + countRows(c.body);
+  }
+  return n;
+}
+
+/**
+ * A scene drawn only while it's near the visible part of the Screenplay (a file with
+ * thousands of lines would otherwise build thousands of rows at once); elsewhere, an
+ * empty box of the same height keeps the scrollbar honest.
+ */
+function LazyScene({ scene, root, force, children }: { scene: Scene; root: React.RefObject<HTMLDivElement | null>; force: boolean; children: React.ReactNode }) {
+  const ref = useRef<HTMLElement>(null);
+  const [near, setNear] = useState(false);
+  const height = useRef(56 + countRows(scene.body) * 40);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([e]) => {
+        if (!e) return;
+        if (!e.isIntersecting && el.offsetHeight > 0) height.current = el.offsetHeight; // remember the real height
+        setNear(e.isIntersecting);
+      },
+      { root: root.current, rootMargin: "1500px 0px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [root]);
+  const shown = near || force;
+  return (
+    <section ref={ref} className="sp-scene" data-scene={scene.id} style={shown ? undefined : { height: height.current }}>
+      {shown ? children : null}
+    </section>
   );
 }
 

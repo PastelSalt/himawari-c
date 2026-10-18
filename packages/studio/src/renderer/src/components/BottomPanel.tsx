@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { LineIndex } from "@himawari/core";
+import { useMemo, useState } from "react";
 import { FormattedMessage, FormattedTime, useIntl } from "react-intl";
 import { applyFix, useDiagnosticText } from "../diagnostics";
-import { positionOf } from "../model";
 import { type BottomTab, type HistoryEntry, useStudio } from "../store";
 import { Icon } from "./Icon";
+import { PAGE_SIZE, Pager } from "./Pager";
 import { Proposals } from "./Proposals";
 
 /** Problems · AI Proposals · Output · History (plan §11.2). */
@@ -45,9 +46,22 @@ function Problems() {
   const files = useStudio((s) => s.files);
   const text = useDiagnosticText();
   const intl = useIntl();
-  const rows = (model?.check.files ?? []).flatMap((f) => f.diagnostics.map((d) => ({ file: f.file, d })));
-  const order = { error: 0, warning: 1, info: 2 } as const;
-  rows.sort((a, b) => order[a.d.severity] - order[b.d.severity] || a.file.localeCompare(b.file) || a.d.span.start - b.d.span.start);
+  const [page, setPage] = useState(0);
+  const rows = useMemo(() => {
+    const all = (model?.check.files ?? []).flatMap((f) => f.diagnostics.map((d) => ({ file: f.file, d })));
+    const order = { error: 0, warning: 1, info: 2 } as const;
+    return all.sort((a, b) => order[a.d.severity] - order[b.d.severity] || a.file.localeCompare(b.file) || a.d.span.start - b.d.span.start);
+  }, [model]);
+  // One line index per file: a big translation table can have thousands of problems.
+  const indexes = useMemo(() => new Map<string, LineIndex>(), [files]);
+  const indexOf = (file: string) => {
+    let i = indexes.get(file);
+    if (!i) {
+      i = new LineIndex(files[file] ?? "");
+      indexes.set(file, i);
+    }
+    return i;
+  };
   if (rows.length === 0) {
     return (
       <p className="muted empty">
@@ -56,11 +70,12 @@ function Problems() {
     );
   }
   return (
+    <>
     <ul className="problem-list">
-      {rows.map(({ file, d }, i) => {
+      {rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(({ file, d }, i) => {
         const t = text(d);
         const source = files[file] ?? "";
-        const pos = positionOf(source, d.span.start);
+        const pos = indexOf(file).at(d.span.start);
         const fix = d.fixes?.[0];
         return (
           <li key={i} className={`problem ${d.severity}`}>
@@ -79,6 +94,8 @@ function Problems() {
         );
       })}
     </ul>
+    <Pager page={page} total={rows.length} onPage={setPage} />
+    </>
   );
 }
 

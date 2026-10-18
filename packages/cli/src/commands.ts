@@ -55,7 +55,10 @@ export function playtest(root: string, args: readonly string[]): number {
   const pass = ["--headless", fs.path(".himawari/cache/game.hwb")];
   const choices = option(args, "--choices");
   if (choices !== undefined) pass.push("--transcript", choices);
-  else pass.push("--playtest", `max_steps=${option(args, "--max-steps") ?? "50000"}`);
+  else {
+    const max = option(args, "--max-steps");
+    pass.push("--playtest", ...(max ? [`max_steps=${max}`] : [])); // by default the runtime scales the budget with the story
+  }
   pass.push(`seed=${option(args, "--seed") ?? "1"}`);
   const lang = option(args, "--lang");
   if (lang) pass.push(`lang=${lang}`);

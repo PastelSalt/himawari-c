@@ -732,6 +732,68 @@ You then asked to commit and push: `0419238`.
 
 ---
 
+## Session 16: 2026-10-19 · Stress test: big projects
+**You asked:** to stress test the whole app the way real games grow (tens of thousands of lines, hundreds of assets), fix what breaks, and make sure a big project stays easy to work in: no endless scrolling to reach another route.
+
+**The test project.** `scripts/stress/make-project.mjs` generates a realistic big game:
+- 36,655 lines in 134 files: 12 routes of 10 chapters, a common folder, and one 6,000-line file.
+- 1,123 scenes, a menu in every scene, and 52 variables.
+- 368 procedural images: layered sprites for 12 characters, 200 backgrounds, and 60 CGs.
+- A Japanese table with 33,300 translations.
+
+`scripts/stress/tools.mjs` and `scripts/stress/studio.mjs` time the AI tools and Studio on it. `tests/scale.test.ts` keeps the fixes in place.
+
+**Broken at this size, now fixed:**
+- **`hwc build` crashed** with "Maximum call stack size exceeded": the bytecode writer spread arrays of over a million words into function arguments. Big arrays are now appended in loops (`pushAll`) in the writer and the checker.
+- **The playtest called 11 of 12 endings unreachable.** Its depth-first search spent the whole 50,000-step budget inside route 0.
+  - A **coverage pass** now runs first: every menu once, then every option no path has chosen yet. It reaches every route in about one read-through.
+  - The exhaustive search then uses the rest of the budget, which now grows with the story (40 events per line, 50,000 to 20 million).
+  - A step limit after full coverage is no longer reported as a problem.
+  - The stress game: 12 of 12 endings, all 32,202 lines and 3,342 choices, in 2.4 s.
+- **"Play from here" on a late route failed** for the same reason (warps used the same search). It now finds any line in under a second.
+- **Editing a translated line was refused** ("would add errors") when its old translation's markup no longer matched. A stale translation is now flagged as needing review (HW0403), and its markup is checked again after review.
+- **Translations with an unknown status** (a hand-edited "done" or "translated") counted as not translated. With text, they now count as needing review.
+- **`hwc check` took 10 minutes 26 seconds** when there were thousands of problems. Every diagnostic re-indexed its whole file.
+  - Now: one index per file. It also shows the first 20 of each kind of problem, then "and N more" (`--all` shows everything).
+  - The same 3,840 problems take 1.2 s.
+- **Renaming a script inside a folder** moved it to `script/`. It stays in its folder now.
+
+**Faster:**
+- Core caches each file's parse and each translation table, keyed by their exact text. The first check of the stress project takes 0.65 s; a check after an edit takes 0.12 s.
+- The AI tools reuse the last check while no file changed: read tools take 0.08–0.13 s instead of 0.7 s.
+
+**Studio with the big project** (longest freeze, before → after):
+
+| Action | Before | After |
+|---|---|---|
+| Opening the 6,000-line file (Screenplay) | 27 s | 0.04 s |
+| Localization | froze | 0.1 s |
+| Story graph | 6.2 s | 0.07 s |
+| Opening the project | 1.9 s | 1.1 s (after the workspace is on screen, with "Checking the project…") |
+| Typing (Script or Screenplay) | — | ≤ 0.17 s |
+
+Renderer memory went from 562 to 197 MB.
+
+How each surface handles size now:
+- **Screenplay:** only scenes near the screen are drawn. A **"Go to a scene" bar** appears in files with more than 3 scenes. Revealing a place (Explorer, search, story graph, go to definition) now scrolls the Screenplay too; only the Script view used to.
+- **Explorer:** scripts are grouped by **folder** (one per route). With more than 20 scripts, folders start closed and files show their scenes when opened (except files with over 30 scenes, which have the "go to" bar). There's a **find box** for files and scenes, and **Fold everything**.
+- **Localization:** pages of 100, a **"which lines" filter** (a route folder or a file), and a **search** over both languages. Lookups by ID instead of a scan; it had been comparing 36,655 × 36,655 entries.
+- **Story graph:** a big story opens as an **overview**: one box per folder (route), or per file in smaller projects. Click a box for its scenes. **Find a scene** shows it and its neighbors. "Every scene" is still there.
+- **Problems:** pages of 100. **Assets:** a search box, and big folders start folded.
+- **AI tools:**
+  - `list_scenes` lists one line per file past 200 scenes, with `file` and `query` filters (60,000 → 9,000 characters).
+  - `get_story_graph` has `scene` (and `depth`) and `file`, and an overview past 150 scenes (121,000 → 1,300 characters).
+
+**Measured and fine already:**
+- Runtime: loads 4.4 MB of bytecode in 14 ms, peaks at 113 MB, and starts in 0.65 s from a 2.2 MB `data.hwp` (369 files).
+- Release export: 3.3 s.
+- CSV and XLIFF export of 36,655 lines: 1.2 s each.
+- Search (Ctrl+P): 0.06 s.
+
+**Checked:** `corepack pnpm check` (364 tests, 643 messages in both languages), Studio e2e 5/5, runtime debug 10/10 and ASan 10/10, golden images 19/19.
+
+---
+
 ## Decision Register
 
 | ID | Decision | Since | Status |
@@ -779,6 +841,8 @@ You then asked to commit and push: `0419238`.
 | D41 | Theme 2.0 (rfcs/0010): layout, shapes, motion, sounds, presets, and palettes in `theme/theme.json`, compiled into new `THEM` keys (bytecode stays 1.1); the runtime falls back to the himawari look; contrast (HW0133) and edge (HW0132) warnings | session 15 | ✅ Active |
 | D42 | Studio has light (default), dark, and match-Windows themes; colors are CSS tokens per theme and components never use raw colors; the main process mirrors the choice in `nativeTheme.themeSource` | session 15 | ✅ Active |
 | D43 | The UI Designer edits a mock of each screen beside the real docked game (HTML can't draw over the native preview window); changes are ordinary edits of theme.json, one undo step per drag | session 15 | ✅ Active |
+| D44 | Playtests and warps run a coverage pass first (every menu once, every unchosen option), then every combination with the rest of the budget, which scales with the story (40 events per line, 50 000–20 000 000); a step limit after full coverage isn't a problem | session 16 | ✅ Active |
+| D45 | Big projects in Studio: the Screenplay draws only nearby scenes, the Explorer folds folders, long lists page by 100, the story graph opens as a folder or file overview past 150 scenes; Core caches parses and tables by exact text; the AI tools summarize past 200 scenes or 150 graph nodes | session 16 | ✅ Active |
 
 Also: **D13** (games export for Windows x64 only) stays active; its "internal Linux runtime" clause is superseded by D21.
 
@@ -789,9 +853,9 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 15)
+## Next Steps (after session 16)
 
-1. **Review Phase 6 and decide on committing it** (nothing from session 15 is committed). Try Studio in light and dark (Settings → Studio → Appearance), and the UI Designer (the palette icon) on Sunflower Days: a preset, a palette, dragging the textbox, the color wheel.
+1. **Review session 16 and decide on committing it** (Phase 6 is committed as `49bd3c7`). Try a big project: `node scripts/stress/make-project.mjs <folder>`, then open it in Studio. Try Studio in light and dark (Settings → Studio → Appearance), and the UI Designer (the palette icon) on Sunflower Days: a preset, a palette, dragging the textbox, the color wheel.
 2. Watch the first CI run of Phase 5: the golden suite and the budget step run on GPU-less runners for the first time; if the golden tolerance is too tight there, regenerate references from CI's artifacts or widen it per case.
 3. Phase 5 follow-ups: a real gamepad test; the ≈ 200 ms GPU renderer start for games with rule wipes (create the GPU device in the background, or draw rule wipes on D3D11 without the GPU renderer); export icon and version patching (plan §14.4, `resedit`); async image decoding (a 4K JPEG costs one 67 ms frame); human review of the Chinese and Japanese demo text (and its 81 Chinese UI strings) and the 48 new runtime UI strings in Japanese.
 4. **The M2 hallway test** (plan §18): a non-programmer creates, writes, previews, localizes one scene, and exports, in English or Japanese, without docs, while an AI contributes through Mode A (a Claude app) and Mode B (the assistant, with your API key). Its findings decide the first Studio fixes.
