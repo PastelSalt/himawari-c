@@ -1,6 +1,6 @@
 # Sunflower Days (feature showcase)
 
-A short summer story that uses every Himawari feature, in English, Japanese, and Spanish. It is Phase 5's exit demo (DETAILED_PLAN.md §18) and the source of the golden-image tests (`tests/golden/`).
+A short summer story that uses every Himawari feature, in English, Japanese, and Mandarin Chinese (written in Simplified Chinese, `zh-Hans`). It is Phase 5's exit demo (DETAILED_PLAN.md §18) and the source of the golden-image tests (`tests/golden/`).
 
 ## What it shows
 | Feature | Where |
@@ -17,12 +17,12 @@ A short summer story that uses every Himawari feature, in English, Japanese, and
 | Effects: `shake`, `flash`, `wait` | `classroom`, `river_night` |
 | Audio: music, ambience, a sound effect, a voice (the files don't exist yet, so they're silent, P5) | `start`, `classroom` |
 | CGs (and so the gallery), music (and so the music room) | `river_night`, `field_evening` |
-| A theme: colors, the textbox, the default transition time, and UI strings; **the whole Spanish UI comes from the theme** (the runtime ships English and Japanese) | `theme/theme.json` |
-| Three languages: AI-written translations, marked `needs-review` | `locales/` |
+| A theme: colors, the textbox, the default transition time, and UI strings; **the whole Chinese UI comes from the theme** (the runtime ships English and Japanese) | `theme/theme.json` |
+| Three languages: AI-written translations, marked `needs-review`; Chinese text uses Microsoft YaHei, which the player puts first for Chinese (Japanese fonts lack many simplified characters) | `locales/` |
 
 ## How it was made
 - `make-art.mjs` draws every picture from simple shapes: two layered characters, three backgrounds, two CGs, and two rule masks. No AI images (plan §1.5). Run `node make-art.mjs` to redraw them.
-- The script, the theme, and the Japanese and Spanish translations were written by an AI (Claude) during Phase 5. The translations need a human review.
+- The script, the theme, and the Japanese and Chinese translations were written by an AI (Claude) during Phase 5. The translations need a human review.
 
 ## Play it
 From this folder, with Himawari built:

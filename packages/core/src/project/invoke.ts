@@ -64,12 +64,19 @@ export function readExtension(file: string, text: string): { ext: ExtensionDef |
     if (!PARAM_TYPES.includes(q["type"] as ParamType)) return fail(`params[${i}].type must be one of ${PARAM_TYPES.join(", ")}`);
     if (q["type"] === "text") texts++;
     const param: ExtensionParam = { name: q["name"], type: q["type"] as ParamType };
-    if (q["default"] !== undefined) param.default = q["default"] as number | boolean | string;
     if (Array.isArray(q["enum"])) param.enum = q["enum"].filter((x): x is string => typeof x === "string");
+    const d = q["default"];
+    if (d !== undefined) {
+      const why = defaultProblem(param.type, d, param.enum);
+      if (why) return fail(`params[${i}].default ${why}`);
+      param.default = d as number | boolean | string;
+    }
     if (typeof q["description"] === "string") param.description = q["description"];
     params.push(param);
   }
   if (texts > 1) return fail("at most one parameter can be of type text (it gets the line's ID)");
+  // XCALL carries 2 + one value per parameter in an 8-bit count (spec/bytecode.md §2.7).
+  if (params.length > 253) return fail("a statement can have at most 253 parameters");
   if (o["params"] !== undefined && !Array.isArray(o["params"])) return fail("\"params\" must be a list");
   return {
     ext: {
@@ -81,6 +88,16 @@ export function readExtension(file: string, text: string): { ext: ExtensionDef |
     },
     diagnostics: [],
   };
+}
+
+/** Why a schema default can't be a `type` value, or null. */
+function defaultProblem(type: ParamType, d: unknown, allowed?: string[]): string | null {
+  if (type === "text") return "isn't allowed: a text has a line ID, so it must be written in the call";
+  if (type === "int") return typeof d === "number" && Number.isInteger(d) && d >= -2147483648 && d <= 2147483647 ? null : "must be a whole number";
+  if (type === "bool") return typeof d === "boolean" ? null : "must be true or false";
+  if (typeof d !== "string" || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(d) || KEYWORDS.has(d)) return "must be a name, like the ones written in scripts";
+  if (allowed && !allowed.includes(d)) return `must be one of ${allowed.join(", ")}`;
+  return null;
 }
 
 export interface MacroEntry {
@@ -115,6 +132,10 @@ export function collectMacros(
         }
         if (seen.has(p.name)) out.push(diagnostic("HW0221", p.span, { name: def.name, param: p.name }));
         seen.add(p.name);
+        const wrong = p.default && PARAM_TYPES.includes(p.type as ParamType) ? typeProblem(p.type as ParamType, p.default) : null;
+        if (p.default && wrong) {
+          out.push(diagnostic("HW0223", p.span, { param: p.name, name: def.name, expected: wrong, value: valueText(p.default) }));
+        }
       }
       walkStmts(def.body, (s) => {
         const what = NOT_IN_MACROS[s.kind];
@@ -261,15 +282,23 @@ export function expandInvokes(
     const out = report(f.file);
     const extraRefs: Ref[] = [];
     const synthetic: Ref[] = [];
-    const visit = (body: Stmt[], chain: string[], top: boolean): Stmt[] => {
+    /**
+     * `chain`: the macros being expanded (empty for the script itself). Inside an expansion, statements are
+     * already placed at the outermost call, so problems are reported there with a note; `passed` holds the
+     * names the outermost call passed in, which were checked at their arguments already.
+     */
+    const visit = (body: Stmt[], chain: string[], passed: ReadonlySet<string>): Stmt[] => {
+      const top = chain.length === 0;
+      const note = top ? null : `inside the macro ${chain[chain.length - 1]}`;
+      const report = (d: Diagnostic) => out.push(note ? { ...d, note: d.note ? `${d.note} (${note})` : note, fixes: [] } : d);
       const result: Stmt[] = [];
       for (const s of body) {
         if (s.kind === "If") {
-          result.push({ ...s, clauses: s.clauses.map((c) => ({ ...c, body: visit(c.body, chain, top) })) });
+          result.push({ ...s, clauses: s.clauses.map((c) => ({ ...c, body: visit(c.body, chain, passed) })) });
           continue;
         }
         if (s.kind === "Menu") {
-          result.push({ ...s, options: s.options.map((o) => ({ ...o, body: visit(o.body, chain, top) })) });
+          result.push({ ...s, options: s.options.map((o) => ({ ...o, body: visit(o.body, chain, passed) })) });
           continue;
         }
         if (s.kind !== "Invoke") {
@@ -280,24 +309,21 @@ export function expandInvokes(
         const e = extensions.get(s.name);
         const sig = signatureOf(m, e);
         if (!sig) {
-          if (top) {
-            const close = suggest(s.name, [...macros.keys(), ...extensions.keys()]);
-            out.push(diagnostic("HW0220", s.span, { name: s.name }, close ? { help: `did you mean "${close}"?` } : {}));
-          }
+          const close = suggest(s.name, [...macros.keys(), ...extensions.keys()]);
+          report(diagnostic("HW0220", s.span, { name: s.name }, close ? { help: `did you mean "${close}"?` } : {}));
           result.push(s);
           continue;
         }
         const diags: Diagnostic[] = [];
         const bound = bindArgs(sig, s.args, s.span, diags);
-        if (top) {
-          out.push(...diags);
-          for (const p of sig.params) {
-            const b = bound.get(p.name);
-            if (b?.span) {
-              const r = argRef(p.type, b.value, b.span);
-              if (r) extraRefs.push(r);
-            }
-          }
+        for (const d of diags) report(d);
+        for (const p of sig.params) {
+          const b = bound.get(p.name);
+          if (!b?.span) continue;
+          const r = argRef(p.type, b.value, top ? b.span : s.span);
+          // A name written in the script is checked (and renamed) at its argument; one written in a macro body, at the call.
+          if (r && top) extraRefs.push(r);
+          else if (r && !passed.has(r.name)) synthetic.push(r);
         }
         if (!m) {
           result.push(s); // an extension: compiled to XCALL
@@ -310,14 +336,16 @@ export function expandInvokes(
         if (diags.some((d) => d.severity === "error")) continue;
         const exp = expandMacro(m, bound, s.span, out);
         // Names passed as arguments were checked at the argument (with a precise quick fix); skip them here.
-        const passed = new Set([...bound.values()].filter((b) => b.span).map((b) => valueText(b.value)));
-        synthetic.push(...exp.refs.filter((r) => !passed.has(r.name)));
-        result.push(...visit(exp.stmts, [...chain, s.name], false));
+        // (and names a nested call passes on were just checked at that call).
+        const given = [...bound.values()].filter((b) => b.span).map((b) => valueText(b.value));
+        const names = new Set([...passed, ...given]);
+        synthetic.push(...exp.refs.filter((r) => r.kind !== "invoke" && !names.has(r.name)));
+        result.push(...visit(exp.stmts, [...chain, s.name], names));
       }
       return result;
     };
     const ast = f.parsed.ast;
-    asts.set(f.file, { ...ast, scenes: ast.scenes.map((sc) => ({ ...sc, body: visit(sc.body, [], true) })) });
+    asts.set(f.file, { ...ast, scenes: ast.scenes.map((sc) => ({ ...sc, body: visit(sc.body, [], new Set()) })) });
     f.parsed.refs.push(...extraRefs);
     f.parsed.refs.sort((a, b) => a.span.start - b.span.start);
     expandedRefs.set(f.file, synthetic);

@@ -24,3 +24,6 @@ packages/studio/release/
 
 # Compiled example projects (hwc build output)
 examples/*/build/
+
+# Golden images that didn't match (runtime --compare)
+tests/golden/*.actual.png

@@ -98,11 +98,11 @@ static void draw_page(game *g)
 static void draw_textbox(game *g)
 {
     const hw_display *d = &g->vm.s.display;
+    if (d->textbox_hidden && g->blk != B_MENU) return; /* `textbox hide`, in both modes */
     if (d->textbox == HW_TEXTBOX_NVL) {
         draw_page(g);
         return;
     }
-    if (d->textbox_hidden && g->blk != B_MENU) return;
     float h = g->H * g->tb_height;
     SDL_FRect box = { g->W * 0.08f, g->H * 0.97f - h, g->W * 0.84f, h };
     textbox_panel(g, box, g->tb_alpha);
@@ -382,6 +382,12 @@ static bool compare_golden(SDL_Surface *frame, const char *path)
         }
         double share = 100.0 * (double)differ / ((double)a->w * a->h);
         ok = share <= 0.5;
+        if (!ok) {
+            /* Keep the frame that didn't match beside the reference (git-ignored; CI uploads them). */
+            char actual[1100];
+            snprintf(actual, sizeof actual, "%.*s.actual.png", (int)(strlen(path) > 4 ? strlen(path) - 4 : strlen(path)), path);
+            SDL_SavePNG(a, actual);
+        }
         SDL_Log("golden: %s: %.3f %% of pixels differ, mean difference %.2f: %s", path, share, (double)total / ((double)a->w * a->h),
                 ok ? "match" : "MISMATCH");
     }
@@ -394,6 +400,7 @@ static bool compare_golden(SDL_Surface *frame, const char *path)
 void render(game *g)
 {
     g->hit_count = 0;
+    if (g->canvas_tex) SDL_SetRenderTarget(g->ren, g->canvas_tex);
     SDL_SetRenderDrawColor(g->ren, 0, 0, 0, 255);
     SDL_RenderClear(g->ren);
     /* Screens over the story draw the scene behind them; the others draw over the title screen. */
@@ -457,7 +464,7 @@ void render(game *g)
         label(g, g->notice, 26, g->W / 2, r.y + sc(g, 37), 1, col(g->pal.text));
     }
     if (g->shot) {
-        SDL_Surface *shot = SDL_RenderReadPixels(g->ren, NULL);
+        SDL_Surface *shot = SDL_RenderReadPixels(g->ren, NULL); /* the canvas with --compare, else the window */
         if (g->compare && shot) {
             /* A fixed size, whatever the display's size and scaling. */
             SDL_Surface *fixed = SDL_ScaleSurface(shot, 960, (int)(960.0f * g->H / g->W), SDL_SCALEMODE_LINEAR);
@@ -471,6 +478,11 @@ void render(game *g)
         }
         SDL_DestroySurface(shot);
         g->shot = NULL;
+    }
+    if (g->canvas_tex) {
+        SDL_SetRenderTarget(g->ren, NULL);
+        SDL_FRect all = { 0, 0, g->W, g->H };
+        SDL_RenderTexture(g->ren, g->canvas_tex, NULL, &all);
     }
     g->present_at = SDL_GetTicksNS(); /* everything up to here is CPU work; presenting waits for vsync */
     SDL_RenderPresent(g->ren);
@@ -653,7 +665,10 @@ void on_event(game *g, SDL_Event *e)
         }
         break;
     case SDL_EVENT_MOUSE_BUTTON_UP: {
-        if (g->rebind >= 0) break;
+        if (g->rebind >= 0) {
+            g->rebind = -1; /* a click cancels waiting for a key, so mouse-only players never get stuck */
+            break;
+        }
         if (e->button.button == SDL_BUTTON_RIGHT) {
             escape(g);
             break;
@@ -676,6 +691,9 @@ void on_event(game *g, SDL_Event *e)
             }
             break;
         }
+        /* A held key repeats only moving on and moving around; toggles, saves, and menus fire once per press. */
+        hw_action act = hw_action_for_key(&g->settings.bindings, k);
+        if (e->key.repeat && act != ACT_ADVANCE && act != ACT_UP && act != ACT_DOWN && act != ACT_LEFT && act != ACT_RIGHT) break;
         if (k == SDLK_F11 || (k == SDLK_RETURN && (e->key.mod & SDL_KMOD_ALT))) {
             g->settings.fullscreen = !g->settings.fullscreen;
             SDL_SetWindowFullscreen(g->win, g->settings.fullscreen);
@@ -686,7 +704,7 @@ void on_event(game *g, SDL_Event *e)
         } else if (k >= SDLK_1 && k <= SDLK_9 && g->scr == SCR_PLAY && g->blk == B_MENU) {
             choose(g, (uint32_t)(k - SDLK_1));
         } else {
-            do_action(g, hw_action_for_key(&g->settings.bindings, k));
+            do_action(g, act);
         }
         break;
     }

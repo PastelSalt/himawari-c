@@ -435,6 +435,14 @@ function checkTypesAndFlow(r: AstResult, source: string, ctx: Ctx, out: Diagnost
       } else if (s.kind === "Menu") {
         for (const o of s.options) condition(o.cond, o.span.start);
         if (s.options.length > 0 && s.options.every((o: MenuOption) => o.once)) out.push(diagnostic("HW0331", lineAt(s.span.start)));
+        // MENU carries 2 + 2 × options arguments in an 8-bit count (spec/bytecode.md §2.7).
+        if (s.options.length > MAX_MENU_OPTIONS) {
+          out.push(diagnostic("HW0332", lineAt(s.span.start), { max: String(MAX_MENU_OPTIONS), count: String(s.options.length) }));
+        }
+      } else if (s.kind === "Show" || s.kind === "Say") {
+        // SHOW carries 7 + attribute words arguments in an 8-bit count.
+        const words = s.kind === "Show" ? s.add.length + s.remove.length : s.attrs.add.length + s.attrs.remove.length;
+        if (words > MAX_ATTR_WORDS) out.push(diagnostic("HW0333", lineAt(s.span.start), { max: String(MAX_ATTR_WORDS), count: String(words) }));
       } else if (s.kind === "Return" && !ctx.calls.has(scene.id)) {
         out.push(diagnostic("HW0310", s.span, { scene: scene.id }));
       }
@@ -445,6 +453,10 @@ function checkTypesAndFlow(r: AstResult, source: string, ctx: Ctx, out: Diagnost
     }
   }
 }
+
+/** Bytecode limits: an instruction has at most 255 arguments (spec/bytecode.md §2.7). */
+const MAX_MENU_OPTIONS = 126;
+const MAX_ATTR_WORDS = 248;
 
 /** Visits every statement, including inside if branches and menu options. */
 function walk(body: readonly Stmt[], fn: (s: Stmt) => void): void {

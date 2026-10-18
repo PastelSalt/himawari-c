@@ -12,7 +12,7 @@
 
 #include "hw_utf8.h"
 
-#define MAX_FACES 4
+#define MAX_FACES 10
 #define CACHE_SLOTS 8192u /* power of two */
 #define PAGE_SIZE 2048
 #define MAX_PAGES 4

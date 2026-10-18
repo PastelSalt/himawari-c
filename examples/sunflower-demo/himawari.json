@@ -6,7 +6,7 @@
   "engine": "^1.1.0",
   "resolution": [1920, 1080],
   "sourceLanguage": "en",
-  "languages": ["en", "ja", "es"],
+  "languages": ["en", "ja", "zh-Hans"],
   "entry": "start",
   "variables": {
     "hana_heart": { "type": "int", "default": 0, "scope": "save" },

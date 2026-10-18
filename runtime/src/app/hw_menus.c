@@ -200,7 +200,7 @@ void draw_controls(game *g)
         y += h + gap;
     }
     if (g->rebind >= 0) {
-        label(g, ui(g, UI_PRESS_KEY), 26, g->W / 2, y + sc(g, 30), 1, col(g->pal.accent));
+        label(g, ui(g, UI_PRESS_KEY), 26, g->W / 2, y + sc(g, 30), 1, col(g->pal.accent)); /* a click cancels too */
     } else {
         button(g, (SDL_FRect){ g->W / 2 - sc(g, 520), g->H - sc(g, 110), sc(g, 340), sc(g, 64) }, ui(g, UI_RESET_CONTROLS), BTN_RESET_CONTROLS, 26, false);
     }

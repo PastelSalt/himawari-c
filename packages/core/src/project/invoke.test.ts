@@ -55,6 +55,21 @@ describe("macros (rfcs/0008)", () => {
     expect(codes(c).sort()).toEqual(["HW0225", "HW0227", "HW0228", "HW0230"].sort());
   });
 
+  it("reports problems of calls inside a macro body at the call (none are dropped)", () => {
+    const c = check(
+      `define statement inner(who: character):\n    show who\n\ndefine statement outer(who: character):\n    inner(who)\n    inner(hanna)\n    screen_tint(blue)\n    nothing()\n\nscene start:\n    outer(hana)\n    end\n`,
+    );
+    const all = c.files.find((f) => f.file === "script/start.hws")!.diagnostics.filter((d) => d.severity === "error");
+    expect(all.map((d) => d.code).sort()).toEqual(["HW0202", "HW0220", "HW0223"]);
+    for (const d of all) expect(d.note).toMatch(/macro/); // pointed at the call, with a note
+    expect(all.every((d) => !d.fixes?.length)).toBe(true);
+  });
+
+  it("checks macro parameter defaults where they're written", () => {
+    const c = check("define statement m(ms: int = fast, side: position = left):\n    wait(ms)\n\nscene start:\n    m()\n    end\n");
+    expect(codes(c)).toEqual(["HW0223"]);
+  });
+
   it("a jump in a macro counts for flow and reachability", () => {
     const c = check(`define statement go_on():\n    jump next\n\nscene start:\n    go_on()\n\nscene next:\n    end\n`);
     expect(codes(c)).toEqual([]);
@@ -72,6 +87,21 @@ describe("extension statements (rfcs/0007)", () => {
     const bad = { file: "extensions/x.schema.json", text: JSON.stringify({ name: "y" }) };
     const c = check("scene start:\n    end\n", { extensions: [bad] });
     expect(codes(c)).toEqual(["HW0120"]);
+  });
+
+  it("checks each default against its parameter's type", () => {
+    const ext = (param: object) => ({ file: "extensions/x.schema.json", text: JSON.stringify({ name: "x", params: [param] }) });
+    const cases: [object, boolean][] = [
+      [{ name: "ms", type: "int", default: 300 }, true],
+      [{ name: "ms", type: "int", default: "fast" }, false],
+      [{ name: "ms", type: "int", default: 1.5 }, false],
+      [{ name: "on", type: "bool", default: "yes" }, false],
+      [{ name: "c", type: "word", enum: ["a", "b"], default: "c" }, false],
+      [{ name: "t", type: "text", default: "hi" }, false],
+    ];
+    for (const [param, ok] of cases) {
+      expect(codes(check("scene start:\n    end\n", { extensions: [ext(param)] })), JSON.stringify(param)).toEqual(ok ? [] : ["HW0120"]);
+    }
   });
 });
 

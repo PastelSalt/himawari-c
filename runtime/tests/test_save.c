@@ -272,6 +272,13 @@ int main(void)
               y.s.display.ext_last[1][0] == night && y.s.display.ext_last[1][1] == 250);
         CHECK(hw_vm_next(&y, &ev) && ev.kind == HW_EV_SAY && y.s.display.page_count == 2);
         hw_vm_free(&y);
+
+        /* Rewinding inside the NVL page: the page goes back to what it was before that line, then fills again. */
+        CHECK(hw_rollback(&x, &xh));
+        CHECK(x.s.display.textbox == HW_TEXTBOX_NVL && x.s.display.page_count == 0);
+        CHECK(hw_vm_next(&x, &ev) && ev.kind == HW_EV_SAY && x.s.display.page_count == 1);
+        CHECK(hw_rollback(&x, &xh)); /* back before "textbox nvl": an ordinary textbox */
+        CHECK(x.s.display.textbox == HW_TEXTBOX_ADV && x.s.display.page_count == 0);
         hw_buf_free(&xf);
         free(snap);
         hw_history_free(&xh);

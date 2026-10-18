@@ -1,242 +1,242 @@
 {
-  "language": "es",
+  "language": "zh-Hans",
   "sourceLanguage": "en",
   "lines": [
     {
       "id": "kedxwy",
       "source": "From Hana's notebook:",
-      "text": "Del cuaderno de Hana:",
+      "text": "摘自小花的笔记本：",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "hn7ndk",
       "source": "{size=34}Lanterns: 40.{/size} Paper: enough. Glue: {color=#d04040}not enough{/color}.",
-      "text": "{size=34}Farolillos: 40.{/size} Papel: suficiente. Pegamento: {color=#d04040}no alcanza{/color}.",
+      "text": "{size=34}灯笼：40个。{/size}纸：够了。胶水：{color=#d04040}不够{/color}。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "rws0yk",
       "source": "Reasons to smile tonight: [hana_heart], at least.",
-      "text": "Motivos para sonreír esta noche: [hana_heart], por lo menos.",
+      "text": "今晚微笑的理由：至少[hana_heart]个。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "fr8fvg",
       "source": "The cicadas went quiet.{w=600} Then the bell rang.",
-      "text": "Las cigarras se callaron.{w=600} Entonces sonó el timbre.",
+      "text": "蝉声停了。{w=600}接着，铃声响了。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "vtbh67",
       "source": "Ah! The glue!",
-      "text": "¡Ay! ¡El pegamento!",
+      "text": "啊！胶水！",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "n7berj",
       "source": "I brought extra. Obviously.",
-      "text": "Traje de más. Obviamente.",
+      "text": "我多带了一些。理所当然。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "yjny48",
       "source": "I'll run to the shop. Wait here!",
-      "text": "Voy corriendo a la tienda. ¡Espérame aquí!",
+      "text": "我去商店跑一趟。在这儿等我！",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "gs7s76",
       "source": "Where do we watch the fireworks?",
-      "text": "¿Dónde vemos los fuegos artificiales?",
+      "text": "我们在哪里看烟花？",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "7caqhh",
       "source": "By the river.",
-      "text": "Junto al río.",
+      "text": "在河边。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "1ar9ha",
       "source": "In the sunflower field.",
-      "text": "En el campo de girasoles.",
+      "text": "在向日葵田里。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "hfrrzr",
       "source": "The lanterns look like stars that fell into the water.",
-      "text": "Los farolillos parecen estrellas que cayeron al agua.",
+      "text": "灯笼就像落进水里的星星。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "9e6s3k",
       "source": "{speed=12}I'm glad it's you here.{/speed}",
-      "text": "{speed=12}Me alegra que seas tú quien está aquí.{/speed}",
+      "text": "{speed=12}还好在这里的人是你。{/speed}",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "0mg2hk",
       "source": "{shake}Boom.{/shake} The sky opened up in colors.{alt=Fireworks burst over the river.}",
-      "text": "{shake}¡Bum!{/shake} El cielo se abrió en colores.{alt=Fuegos artificiales estallan sobre el río.}",
+      "text": "{shake}砰！{/shake}夜空绽放出缤纷的色彩。{alt=烟花在河面上空绽放。}",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "3w3fby",
       "source": "For a moment, nobody said anything.",
-      "text": "Por un momento, nadie dijo nada.",
+      "text": "有那么一会儿，谁都没有说话。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "d9bh32",
       "source": "In the evening the sunflowers face west. Like they're waving goodbye.",
-      "text": "Al atardecer los girasoles miran al oeste. Como si dijeran adiós.",
+      "text": "傍晚的时候，向日葵会朝向西边。就像在挥手告别。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "7vaqn5",
       "source": "The {select path: field=\"field\" other=\"river\"} glowed gold until the first firework.",
-      "text": "{select path: field=\"El campo\" other=\"El río\"} brilló dorado hasta el primer fuego artificial.",
+      "text": "{select path: field=\"田野\" other=\"河边\"}一直闪着金光，直到第一朵烟花升起。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "56mrze",
       "source": "Same time next summer? Promise?",
-      "text": "¿El próximo verano, a la misma hora? ¿Lo prometes?",
+      "text": "明年夏天，还是这个时候？说好了哦？",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "t0edzg",
       "source": "I promised. It was the easiest promise I ever made.",
-      "text": "Lo prometí. Fue la promesa más fácil de mi vida.",
+      "text": "我答应了。那是我做过最容易的承诺。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "1tfm7r",
       "source": "Thanks for today. Really.",
-      "text": "Gracias por lo de hoy. De verdad.",
+      "text": "今天谢谢你。真的。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "w32g3v",
       "source": "We walked home slowly, carrying the empty glue bottles.",
-      "text": "Volvimos a casa despacio, cargando los frascos de pegamento vacíos.",
+      "text": "我们拿着空胶水瓶，慢慢走回家。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "jjdt5h",
       "source": "Next year, I'm buying the food. You owe me.",
-      "text": "El año que viene, la comida la compro yo. Me debes una.",
+      "text": "明年吃的东西我来买。你欠我一次。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "vetkmd",
       "source": "Somehow, that sounded like an invitation.",
-      "text": "No sé por qué, pero sonó a invitación.",
+      "text": "不知为什么，这听起来像是一个邀请。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "cz1hef",
       "source": "Thank you for playing Sunflower Days.",
-      "text": "Gracias por jugar a Días de Girasol.",
+      "text": "感谢你游玩《向日葵的日子》。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "c1a2ng",
       "source": "Summer vacation. The sunflowers are taller than I am.",
-      "text": "Vacaciones de verano. Los girasoles son más altos que yo.",
+      "text": "暑假。向日葵比我还高。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "07cgn7",
       "source": "There you are! I {b}knew{/b} you'd come.",
-      "text": "¡Ahí estás! {b}Sabía{/b} que vendrías.",
+      "text": "你来了！我就{b}知道{/b}你会来。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "6sv56e",
       "source": "The festival is tonight. Will you help me get ready?",
-      "text": "El festival es esta noche. ¿Me ayudas a prepararlo?",
+      "text": "祭典就在今晚。你能帮我准备吗？",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "7qff7k",
       "source": "What do you say?",
-      "text": "¿Qué le dices?",
+      "text": "你怎么回答？",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "g85k56",
       "source": "Of course!",
-      "text": "¡Claro que sí!",
+      "text": "当然！",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "v055rk",
       "source": "I knew I could count on you.",
-      "text": "Sabía que podía contar contigo.",
+      "text": "我就知道可以指望你。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "b7ss6q",
       "source": "Only if there's food.",
-      "text": "Solo si hay comida.",
+      "text": "有吃的我就去。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "g9gzae",
       "source": "There's {i}always{/i} food.",
-      "text": "{i}Siempre{/i} hay comida.",
+      "text": "吃的{i}永远{/i}都有。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "b3jptz",
       "source": "Who else is coming?",
-      "text": "¿Quién más viene?",
+      "text": "还有谁会来？",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "hzhpwq",
       "source": "See? It's a whole team now.",
-      "text": "¿Ves? Ya somos todo un equipo.",
+      "text": "看吧？现在是一整个团队了。",
       "status": "needs-review",
       "provenance": "ai"
     },
     {
       "id": "6q5we0",
       "source": "Someone has to make sure the lanterns don't catch fire.",
-      "text": "Alguien tiene que asegurarse de que los farolillos no se incendien.",
+      "text": "总得有人确保灯笼不会着火。",
       "status": "needs-review",
       "provenance": "ai"
     }

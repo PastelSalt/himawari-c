@@ -259,13 +259,14 @@ static void draw_character(game *g, const hw_stage_char *c, int slot)
 
 void render_scene(game *g, const hw_display *d, SDL_Texture *target)
 {
+    SDL_Texture *before = SDL_GetRenderTarget(g->ren); /* the window, or the --compare canvas */
     SDL_SetRenderTarget(g->ren, target);
     SDL_SetRenderDrawColor(g->ren, 0, 0, 0, 255);
     SDL_RenderClear(g->ren);
     if (d->bg) draw_backdrop(g, "bg", hw_str(&g->m, d->bg), "bg");
     for (uint32_t i = 0; i < d->stage_count; i++) draw_character(g, &d->stage[i], d == &g->shown ? (int)i : -1);
     if (d->cg) draw_backdrop(g, "cg", hw_str(&g->m, d->cg), "CG");
-    SDL_SetRenderTarget(g->ren, NULL);
+    SDL_SetRenderTarget(g->ren, before);
 }
 
 void compose_scene(game *g)
@@ -840,11 +841,14 @@ bool load_slot(game *g, int slot)
 
 /* ---- language ---- */
 
+static int cjk_group(const char *lang);
+
 static void set_language(game *g, const char *lang)
 {
     snprintf(g->lang, sizeof g->lang, "%s", lang);
     snprintf(g->settings.language, sizeof g->settings.language, "%s", lang);
     hw_vm_set_language(&g->vm, lang);
+    if (g->fonts && g->fonts_group != cjk_group(lang)) open_fonts(g); /* Chinese and Japanese prefer different fonts */
     if (g->have_line) {
         float reveal = g->reveal;
         bool prompt = g->blk == B_MENU;
@@ -852,6 +856,9 @@ static void set_language(game *g, const char *lang)
         g->reveal = reveal;
     }
     if (g->blk == B_MENU) layout_menu(g);
+    /* An NVL page shows earlier lines too: lay them all out in the new language. */
+    g->page_built = 0;
+    if (g->vm_ready && g->vm.s.display.textbox == HW_TEXTBOX_NVL) layout_page(g);
 }
 
 void next_language(game *g)
@@ -987,6 +994,7 @@ void reload(game *g)
     hw_assets_flush(g->assets);
     bind_theme(g);
     bind_extensions(g);
+    g->fonts_font = -1; /* the theme's font may have changed: open the fonts again */
     apply_settings(g);
     SDL_free(g->option_text);
     g->option_text = SDL_calloc(HW_VM_MAX_OPTIONS, sizeof *g->option_text);
@@ -1210,11 +1218,22 @@ static void update(game *g, double dt)
  * whatever they lack. The "easy to read" setting (§13) puts Verdana (wide, clear letterforms)
  * and UD Digi Kyokasho (Windows' universal-design Japanese font) first instead.
  */
+/*
+ * Which CJK font comes first: Chinese and Japanese share code points but not glyph shapes, and
+ * Japanese fonts lack many simplified characters. 0 Japanese and everything else, 1 Simplified
+ * Chinese, 2 Traditional Chinese.
+ */
+static int cjk_group(const char *lang)
+{
+    if (SDL_strncasecmp(lang, "zh", 2) != 0) return 0;
+    return SDL_strcasestr(lang, "Hant") || SDL_strcasestr(lang, "-TW") || SDL_strcasestr(lang, "-HK") || SDL_strcasestr(lang, "-MO") ? 2 : 1;
+}
+
 void open_fonts(game *g)
 {
-    hw_font_source src[8];
+    hw_font_source src[12];
     int n = 0;
-    char own[1100], verdana[512], ud[512], segoe[512], yu[512], meiryo[512];
+    char own[1100], verdana[512], ud[512], segoe[512], yu[512], meiryo[512], yahei[512], jhenghei[512];
     static const char *const exts[] = { ".ttf", ".otf", ".ttc", NULL };
     const char *windir = SDL_getenv("WINDIR");
     if (!windir) windir = "C:/Windows";
@@ -1223,6 +1242,8 @@ void open_fonts(game *g)
     snprintf(segoe, sizeof segoe, "%s/Fonts/segoeui.ttf", windir);
     snprintf(yu, sizeof yu, "%s/Fonts/YuGothM.ttc", windir);
     snprintf(meiryo, sizeof meiryo, "%s/Fonts/meiryo.ttc", windir);
+    snprintf(yahei, sizeof yahei, "%s/Fonts/msyh.ttc", windir);       /* Microsoft YaHei: Simplified Chinese */
+    snprintf(jhenghei, sizeof jhenghei, "%s/Fonts/msjh.ttc", windir); /* Microsoft JhengHei: Traditional Chinese */
     if (g->settings.font == 1) {
         if (SDL_GetPathInfo(verdana, NULL)) src[n++] = (hw_font_source){ verdana, NULL };
         if (SDL_GetPathInfo(ud, NULL)) src[n++] = (hw_font_source){ ud, NULL };
@@ -1234,13 +1255,17 @@ void open_fonts(game *g)
         if (s.io) src[n++] = s;
     }
     src[n++] = (hw_font_source){ segoe, NULL };
-    src[n++] = (hw_font_source){ yu, NULL };
-    src[n++] = (hw_font_source){ meiryo, NULL };
+    int group = cjk_group(g->lang);
+    const char *const order[3][4] = { { yu, meiryo, yahei, jhenghei }, { yahei, jhenghei, yu, meiryo }, { jhenghei, yahei, yu, meiryo } };
+    for (int i = 0; i < 4; i++) {
+        if (SDL_GetPathInfo(order[group][i], NULL)) src[n++] = (hw_font_source){ order[group][i], NULL };
+    }
     hw_fonts *f = hw_fonts_open_sources(g->ren, src, n);
     if (!f) return; /* keep the fonts we have */
     if (g->fonts) hw_fonts_close(g->fonts);
     g->fonts = f;
     g->fonts_font = g->settings.font;
+    g->fonts_group = group;
 }
 
 /* The player picks a language (Config, the accessibility prompt): it's kept for next time. */
@@ -1276,7 +1301,7 @@ void apply_settings(game *g)
     static const float SPACING[3] = { 1.0f, 1.25f, 1.5f };
     g->text_px *= SIZE[s->text_size & 3u];
     hw_rich_set_line_spacing(SPACING[s->line_spacing % 3u]);
-    if (g->fonts_font != s->font) open_fonts(g);
+    if (g->fonts_font != s->font || g->fonts_group != cjk_group(g->lang)) open_fonts(g);
     for (int i = 0; i < 4; i++) hw_audio_set_volume(g->audio, i, s->volume[i]);
     static int fullscreen = -1;
     if (!g->link && fullscreen != (int)s->fullscreen) {
@@ -1446,6 +1471,10 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
     SDL_SetRenderLogicalPresentation(g->ren, (int)g->W, (int)g->H, SDL_LOGICAL_PRESENTATION_LETTERBOX);
     g->scene_tex = SDL_CreateTexture(g->ren, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, (int)g->W, (int)g->H);
     g->prev_tex = SDL_CreateTexture(g->ren, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, (int)g->W, (int)g->H);
+    for (int i = 1; i < argc; i++) {
+        /* --compare: frames are drawn at the game's own size, whatever the window, so goldens match on any PC. */
+        if (strcmp(argv[i], "--compare") == 0) g->canvas_tex = SDL_CreateTexture(g->ren, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, (int)g->W, (int)g->H);
+    }
     SDL_SetTextureBlendMode(g->scene_tex, SDL_BLENDMODE_BLEND);
     SDL_SetTextureBlendMode(g->prev_tex, SDL_BLENDMODE_BLEND);
 
@@ -1637,6 +1666,7 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
     hw_vfs_destroy(g->vfs);
     SDL_DestroyTexture(g->scene_tex);
     SDL_DestroyTexture(g->prev_tex);
+    if (g->canvas_tex) SDL_DestroyTexture(g->canvas_tex);
     hw_rulewipe_close(g->wipe);
     SDL_DestroyRenderer(g->ren);
     if (g->gpu) SDL_DestroyGPUDevice(g->gpu);

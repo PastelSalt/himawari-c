@@ -191,6 +191,13 @@ jobs:
         env:
           SDL_AUDIO_DRIVER: dummy
         run: pnpm vitest run tests/golden
+      - name: Upload golden images that didn't match
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: golden-mismatches
+          path: tests/golden/*.actual.png
+          if-no-files-found: ignore
       - name: End to end (first run, edit → preview under 1 s, export, Japanese UI)
         run: pnpm --filter @himawari/studio e2e
       - name: Package (NSIS installer and portable)

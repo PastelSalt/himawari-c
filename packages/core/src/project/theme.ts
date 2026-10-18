@@ -88,7 +88,11 @@ export function readTheme(text: string): { entries: ThemeEntries | null; diagnos
     }
     if (value && typeof value === "object" && !Array.isArray(value)) {
       for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-        if (group === "textbox" && k === "slice" && Array.isArray(v)) {
+        if (group === "textbox" && k === "slice") {
+          if (!Array.isArray(v) || v.length !== 4) {
+            bad("textbox.slice", "must be four numbers: [left, top, right, bottom]");
+            continue;
+          }
           const [l, t, r, b] = v as unknown[];
           flat.set("textbox.slice.left", l);
           flat.set("textbox.slice.top", t);
@@ -126,6 +130,10 @@ export function readTheme(text: string): { entries: ThemeEntries | null; diagnos
       bad("strings", "must map languages to strings, like { \"en\": { \"start\": \"Begin\" } }");
     } else {
       for (const [lang, table] of Object.entries(strings as Record<string, unknown>)) {
+        if (!/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(lang)) {
+          bad(`strings.${lang}`, "must be named by a language tag, like \"en\", \"ja\", or \"zh-Hans\"");
+          continue;
+        }
         if (!table || typeof table !== "object") {
           bad(`strings.${lang}`, "must be an object of UI strings");
           continue;

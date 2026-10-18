@@ -133,6 +133,7 @@ typedef struct game {
     bool overlay;
     const char *shot; /* save the next frame as PNG */
     const char *compare;   /* --compare: check the last frame against this golden image (plan §16.1) */
+    SDL_Texture *canvas_tex; /* with --compare: frames are drawn here at the game's size, then shown */
     bool compare_failed;
     float cps_override; /* --text-speed: this run only, never saved */
 
@@ -150,6 +151,7 @@ typedef struct game {
     int32_t trans_ms;                           /* duration of transitions written without one */
     hw_fonts *name_fonts;                       /* theme font.name for the nameplate, or NULL */
     int fonts_font;                             /* the font setting g->fonts was opened with (-1 = none yet) */
+    int fonts_group;                            /* the CJK font order it was opened with (see cjk_group) */
     const hw_ext_statement **ext_of;            /* per XTNS index: its handler, or NULL */
     const hw_ext_statement *ext_active;         /* the blocking statement the story waits for */
     bool title_music;                           /* the theme's title music is playing */

@@ -12,24 +12,28 @@ const MAX_OFFSET = 65535;
 
 export function lz4Compress(src: Uint8Array): Uint8Array {
   const n = src.length;
-  const out: number[] = [];
+  // The worst case (incompressible input) grows by one byte per 255 plus a little; bytes, not a number[], so big files stay cheap.
+  const out = new Uint8Array(n + Math.ceil(n / 255) + 16);
+  let o = 0;
   const table = new Int32Array(1 << HASH_BITS).fill(-1);
   const read32 = (i: number) => ((src[i] as number) | ((src[i + 1] as number) << 8) | ((src[i + 2] as number) << 16) | ((src[i + 3] as number) << 24)) >>> 0;
   const hash = (v: number) => (Math.imul(v, 2654435761) >>> (32 - HASH_BITS)) & ((1 << HASH_BITS) - 1);
   const length = (v: number) => {
     // The rest of a length after the token's 15: 255s, then the remainder.
-    for (; v >= 255; v -= 255) out.push(255);
-    out.push(v);
+    for (; v >= 255; v -= 255) out[o++] = 255;
+    out[o++] = v;
   };
   const sequence = (litStart: number, litEnd: number, offset: number, matchLen: number) => {
     const lit = litEnd - litStart;
     const ml = matchLen - MIN_MATCH;
     const token = (Math.min(lit, 15) << 4) | (matchLen ? Math.min(ml, 15) : 0);
-    out.push(token);
+    out[o++] = token;
     if (lit >= 15) length(lit - 15);
-    for (let i = litStart; i < litEnd; i++) out.push(src[i] as number);
+    out.set(src.subarray(litStart, litEnd), o);
+    o += lit;
     if (!matchLen) return;
-    out.push(offset & 255, offset >> 8);
+    out[o++] = offset & 255;
+    out[o++] = offset >> 8;
     if (ml >= 15) length(ml - 15);
   };
 
@@ -53,7 +57,7 @@ export function lz4Compress(src: Uint8Array): Uint8Array {
     }
   }
   sequence(anchor, n, 0, 0);
-  return Uint8Array.from(out);
+  return out.slice(0, o);
 }
 
 export function lz4Decompress(src: Uint8Array, size: number): Uint8Array {

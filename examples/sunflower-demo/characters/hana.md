@@ -1,6 +1,6 @@
 ---
 id: hana
-name: { en: "Hana", ja: "花", es: "Hana" }
+name: { en: "Hana", ja: "花", zh-Hans: "小花" }
 color: "#e8a020"
 sprite:
   root: sprites/hana

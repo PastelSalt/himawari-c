@@ -1,6 +1,6 @@
 ---
 id: ren
-name: { en: "Ren", ja: "蓮", es: "Ren" }
+name: { en: "Ren", ja: "蓮", zh-Hans: "阿莲" }
 color: "#5a9ad0"
 sprite:
   root: sprites/ren

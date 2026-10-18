@@ -9,4 +9,4 @@ Copyright (c) 2026 Moesoft.
 
 You may implement these specs in any software, under any license. Attribution: "Himawari Script Data Contract by Moesoft, CC BY 4.0".
 
-> TODO before the first public release: add the full CC BY 4.0 legal code text to this folder (plan §17, Phase 7 license audit).
+> TODO before the first public release: add the full CC BY 4.0 legal code text to this folder (plan §17, Phase 8 license audit).

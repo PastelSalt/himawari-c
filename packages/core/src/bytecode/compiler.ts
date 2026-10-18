@@ -218,6 +218,8 @@ class Compiler {
   }
 
   private emit(op: OpName, ...args: (number | Label)[]): void {
+    // The checker refuses anything bigger (HW0332, HW0333); never write a file the runtime would refuse.
+    if (args.length > 255) throw new Error(`internal: ${op} with ${args.length} arguments (the limit is 255)`);
     if (OPS_1_1.has(Op[op])) this.uses11 = true;
     this.code.push(Op[op] | (args.length << 8));
     for (const a of args) {

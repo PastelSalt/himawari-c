@@ -280,3 +280,24 @@ scene start:
     expect(() => readHwb(writeHwb({ ...m, code: lineOut }))).toThrow(/text line out of range/);
   });
 });
+
+describe("instruction size limits (255 arguments)", () => {
+  const project = (script: string) =>
+    checkProject({ manifest: { file: "himawari.json", text: MANIFEST }, characters: [{ file: "characters/hana.md", text: HANA }], scripts: [{ file: "script/s.hws", text: script }] });
+  const errors = (c: ReturnType<typeof project>) => c.files.flatMap((f) => f.diagnostics.filter((d) => d.severity === "error").map((d) => d.code));
+  const options = (n: number) => Array.from({ length: n }, (_, i) => `        "Option ${i}":\n            end`).join("\n");
+  const words = (n: number) => Array.from({ length: n }, (_, i) => `a${i}`).join(" ");
+
+  test("the largest menu and show compile to files the reader accepts", () => {
+    for (const script of [`scene start:\n    menu:\n${options(126)}\n`, `scene start:\n    show hana ${words(248)}\n    end\n`]) {
+      const c = project(script);
+      expect(errors(c)).toEqual([]);
+      expect(() => readHwb(writeHwb(compile(c).module!))).not.toThrow();
+    }
+  });
+
+  test("one more is an error, not a broken file", () => {
+    expect(errors(project(`scene start:\n    menu:\n${options(127)}\n`))).toEqual(["HW0332"]);
+    expect(errors(project(`scene start:\n    hana ${words(249)} "Hi."\n    end\n`))).toEqual(["HW0333"]);
+  });
+});

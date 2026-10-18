@@ -2,7 +2,7 @@
 
 > A running record of how the project was planned and why each decision was made. Newest entries are at the **bottom**. Add a new entry for every work session.
 >
-> **Files:** [DETAILED_PLAN.md](DETAILED_PLAN.md) (the plan, currently **v0.5**) · [RESEARCH.md](RESEARCH.md) (evidence, **v1.2**) · [CLAUDE.md](CLAUDE.md) (context for AI coding sessions) · [rfcs/](rfcs/) (accepted spike decisions) · this file.
+> **Files:** [DETAILED_PLAN.md](DETAILED_PLAN.md) (the plan, currently **v0.6**) · [RESEARCH.md](RESEARCH.md) (evidence, **v1.2**) · [CLAUDE.md](CLAUDE.md) (context for AI coding sessions) · [rfcs/](rfcs/) (accepted spike decisions) · this file.
 
 ---
 
@@ -20,7 +20,8 @@
 | **Phase 2** | **Done** (session 10): `himawari.exe` (loader, VM, saves, rollback, headless playtests, windowed player with layered sprites, rule wipes, EN/JA), bytecode 1.0 frozen, 2.38 MB release |
 | **Phase 3** | **Done** (session 11): `@himawari/tools` (22 tools) + `himawari-mcp` (spec 2026-07-28, SDK v2), agent guide, `hwc run/playtest/graph/report/ai setup`, `build --release` packaging; **M1 reached** (`examples/festival-eve`) |
 | **Phase 4** | **Built** (session 13): Himawari Studio (Electron), docked preview, Screenplay and Script views, panels, AI proposals, Mode A live sync, Mode B. M2 hallway test pending |
-| **Phase 5** | **Done** (session 14): macros, extension statements, NVL, themes (bytecode 1.1); config, accessibility, gamepad, gallery, music room; `.hwp` packs and patches; JPEG/WebP; crash reports; budgets met; `examples/sunflower-demo` in 3 languages; golden images |
+| **Phase 5** | **Done** (session 14): macros, extension statements, NVL, themes (bytecode 1.1); config, accessibility, gamepad, gallery, music room; `.hwp` packs and patches; JPEG/WebP; crash reports; budgets met; `examples/sunflower-demo` in English, Japanese, and Simplified Chinese; golden images |
+| **Phase 6** | **Planned** (plan v0.6): the **UI Designer** (§11.6). Phase 7 AI depth and polish, Phase 8 launch |
 | **Owner** | Moesoft (GitHub: `PastelSalt`) |
 | **Repo** | **https://github.com/PastelSalt/himawari-c** (public) |
 
@@ -589,6 +590,46 @@ You then asked to commit and push: `0419238`.
   - `corepack pnpm check`: **311 tests** (+1 skipped live test), lint, i18n; Studio e2e; debug and ASan ctest (10 each); golden suite 12/12.
 - ✅ **Phase 5 done** (plan §18): backlog voice replay, auto/skip, config, gallery, music room, quick save; rule transitions, NVL, themes, gamepad and remapping; the accessibility baseline; `.hwp` packs and patches; JPEG and WebP; crash reports; extension statements; macros. **Exit criteria:** `sunflower-demo` covers every feature in 3 languages ✅; the golden-image suite is green ✅ (locally; CI pending); performance budgets met ✅ for games without rule wipes (a game with rule wipes starts in ≈ 350 ms, over the 250 ms budget, because the GPU renderer takes ≈ 200 ms to create). **Not verified:** a real gamepad, the golden suite and budgets on CI's GPU-less runners, Japanese UD fonts on PCs without them. Nothing from session 14 is committed.
 
+### Session 14b: 2026-10-18 · Phase 5 audit
+**You asked:** why Spanish is in the tests (the plan's Phase 5 exit asks for 3 languages; English and Japanese were given, Spanish was my pick, and it is the one language whose whole UI comes from a theme, which two golden images check), and to double-check everything and fix bugs before Phase 6.
+
+**Bugs found and fixed:**
+- **Core: errors inside macro bodies were swallowed.** A nested macro call with a bad argument was silently dropped from the expansion; a nested extension call with one compiled a value the runtime then refused (the whole game failed to load); unknown names inside bodies were never reported; names written in a body and passed to an inner call were never checked. All are now reported at the outermost call with an "inside the macro …" note (no quick fix, which would edit the wrong text), without double reports.
+- **Core: defaults weren't type-checked.** An extension parameter's `default` of the wrong type (a word for an int) compiled to garbage; a text parameter could have a default. A macro parameter's default was only checked when used. Both are checked where written now (HW0120, HW0223).
+- **Core (since Phase 1): the compiler could write files the runtime refuses.** An instruction holds at most 255 arguments: a menu with 127+ options or a line changing 249+ sprite attributes compiled without a word and failed to load. New errors HW0332 and HW0333, a 253-parameter cap for extensions, and the compiler now stops instead of writing such a file.
+- **Core: a theme with a non-ASCII language name under `strings`** sorted differently in TS (UTF-16) and C (bytes), so the runtime would refuse the game; language names must be language tags now. A malformed `textbox.slice` gets a clear message.
+- **Packer: memory.** LZ4 collected its output in a JS array (8+ bytes per byte), so a 100 MB WAV needed ~800 MB; now a byte buffer (64 MB in 0.3 s).
+- **Studio: the window's snapshot left out `extensions/` and `theme/`**, so opening a project with extension statements showed every call as an error; now included, with a unit test against Sunflower Days. The theme and extension schemas are listed in the Explorer (they weren't reachable).
+- **Player:** changing the language during novel mode left the earlier lines of the page untranslated; `textbox hide` didn't hide a novel-mode page; on the Controls screen a mouse-only player who clicked a gamepad cell couldn't cancel (only Esc did; a click does now); a held key repeated toggles (quick save every frame, skip flickering); F5 reload didn't pick up a changed theme font.
+- **Golden images on CI (9 of 12 failed, 0.6–1.3 % of pixels):** frames were drawn at the window's size, which depends on the display. With `--compare` the player now draws into a canvas of the game's own size; WARP (the software rasterizer CI runners use) and this PC's GPU now give the same pixels (0.000 % differ). Frames that don't match are kept as `*.actual.png` and uploaded by CI. **The fix isn't on CI yet** (needs a push); a remaining risk is different Windows font versions on the runner.
+
+**Checked, no problems found:** the formatter on the new syntax (`hwc fmt --check`), the 1.1 loader and the VM's new ops, saves v2 (including rewinding through a novel page, now a C test), pack mounting and patches, the packaged Sunflower Days (headless: 27/27 lines; windowed from `data.hwp`), libFuzzer on the loader (2.1 M inputs) and on saves (4.4 M), both seeded with 1.1 files, nothing found; the runtime under ASan, Studio e2e. `corepack pnpm check`: 317 tests.
+
+---
+
+### Session 14c: 2026-10-18 · Mandarin instead of Spanish, and the UI Designer in the plan (v0.6)
+**You asked:** to make the demo's third language Mandarin instead of Spanish, and to plan a way to customize the game's look in Studio (move buttons, change colors, shrink the text area, presets, a color wheel, "everything a user may possibly need"). Nothing is committed yet, as you asked.
+
+**Mandarin (Simplified Chinese, `zh-Hans`):**
+- Sunflower Days now ships English, Japanese, and Simplified Chinese (the written form of Mandarin used in mainland China and Singapore, and by most Mandarin learners). `locales/es.json` is gone; `locales/zh-Hans.json` holds the 34 lines, and the theme holds the whole Chinese UI (81 strings), since the runtime ships only English and Japanese. Characters: 小花 (Hana) and 阿莲 (Ren). All AI-written, marked `needs-review`. `hwc check`: clean; headless playtest in Chinese: 27/27 lines.
+- **Fonts: Chinese text needs a Chinese font first.** Chinese and Japanese share code points but draw many of them differently, and Japanese fonts lack many simplified characters. The player now picks the CJK fallback order by language: Microsoft YaHei first for Simplified Chinese, JhengHei for Traditional (`zh-Hant`, `-TW`, `-HK`, `-MO`), Yu Gothic and Meiryo for everything else; it reopens the fonts when the language changes. Missing fonts are skipped.
+- **Bug found on the way:** the text renderer kept at most 4 font faces, so with a game font and the readable font on, the CJK fallbacks were silently dropped (tofu boxes). Now 10.
+- Golden images: the three Spanish cases became `zh-river-night`, `zh-two-characters`, and `zh-accessibility-prompt` (they skip without YaHei, like the Japanese ones without Yu Gothic). All 13 images were regenerated and looked at; the suite passes 3 runs in a row.
+
+**The UI Designer (plan v0.6, §11.6, new Phase 6):** a Studio panel to restyle every part of the game's built-in UI by hand on the live preview:
+- **Layout:** drag and resize the textbox, nameplate, choices, quick bar, title buttons, save slots, and every menu, with snapping, guides, and safe areas; padding and text-area margins; positions as fractions of the canvas.
+- **Look:** fills, gradients, borders, corner radius, shadows, button states, nine-slice images (the user's own art).
+- **Text:** fonts per language, size, color, outline, spacing.
+- **Motion and sound:** show/hide animations, hover and click sounds.
+- **Colors:** a color wheel (HSV, hex/RGB, opacity), an eyedropper, palette tokens, harmonies, swatches.
+- **Presets:** Classic ADV, Modern minimal, Novel, Dark, Pastel, Retro, High contrast, plus palette-only presets and shareable theme packs.
+- **Guards:** a contrast check with a one-click fix, a color-blindness preview, overflow checks per language, undo and reset.
+- **AI:** may propose theme changes as ordinary proposals, but never images.
+- **Underneath:** theme schema 2.0 compiled into `THEM`, a data-driven runtime UI (today's look becomes the Classic ADV preset), and debug-protocol commands. All of that goes through an RFC first.
+- It takes ≈ 4 weeks, so AI depth and polish becomes Phase 7, the launch Phase 8, and the total is ≈ 37 weeks (D40).
+
+**Not re-verified on CI yet:** the golden fix and the Chinese cases (the runner may lack YaHei, in which case those three skip).
+
 ---
 
 ## Decision Register
@@ -633,6 +674,8 @@ You then asked to commit and push: `0419238`.
 | D36 | Shipped games read `data.hwp` + `patch*.hwp` (spec/pack.md 1.0, rfcs/0009): xxHash64 TOC, store/LZ4, tombstones, game-id binding, obfuscation documented as not DRM; entries stream through `hw_vfs`; exports are `<Game>.exe`, `data.hwp`, `CREDITS.txt` | session 14 | ✅ Active |
 | D37 | The VM remembers each extension statement's most recent call as display state (saved by name); `restore()` receives it, so extensions survive loads, rewinds, reloads, and warps without state of their own | session 14 | ✅ Active |
 | D38 | The GPU renderer is created only for games that use rule wipes (and in development); others start on D3D11 to meet the 250 ms start budget. Gamepads start after the first frame | session 14 | ✅ Active |
+| D39 | Sunflower Days' third language is Simplified Chinese (`zh-Hans`, Mandarin), replacing Spanish; the player orders CJK fallback fonts by language (YaHei for zh-Hans, JhengHei for zh-Hant, Yu Gothic otherwise) | session 14c | ✅ Active |
+| D40 | Plan v0.6: a Studio **UI Designer** (§11.6) becomes Phase 6 (≈ 4 weeks): every built-in UI element movable, resizable, and restylable on the live preview, with a color wheel, palette tokens, presets, and accessibility guards; theme schema 2.0 compiled into `THEM`; AI depth becomes Phase 7, the launch Phase 8 | session 14c | ✅ Active |
 
 Also: **D13** (games export for Windows x64 only) stays active; its "internal Linux runtime" clause is superseded by D21.
 
@@ -643,13 +686,13 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 14)
+## Next Steps (after session 14c)
 
-1. **Review Phase 5 and decide on committing it.** Nothing from session 14 is committed yet. Try `examples/sunflower-demo` (`hwc run`, or `hwc build --release` for a packed folder) and the new Config and accessibility screens.
+1. **Review sessions 14b and 14c and decide on committing them.** Phase 5 itself is committed (`675cf65`); the audit fixes, the Chinese demo, and plan v0.6 are not. Try `examples/sunflower-demo` in Chinese (`hwc run`, then Language).
 2. Watch the first CI run of Phase 5: the golden suite and the budget step run on GPU-less runners for the first time; if the golden tolerance is too tight there, regenerate references from CI's artifacts or widen it per case.
-3. Phase 5 follow-ups: a real gamepad test; the ≈ 200 ms GPU renderer start for games with rule wipes (create the GPU device in the background, or draw rule wipes on D3D11 without the GPU renderer); export icon and version patching (plan §14.4, `resedit`); async image decoding (a 4K JPEG costs one 67 ms frame); human review of the Spanish and Japanese demo text and the 48 new runtime UI strings in Japanese.
+3. Phase 5 follow-ups: a real gamepad test; the ≈ 200 ms GPU renderer start for games with rule wipes (create the GPU device in the background, or draw rule wipes on D3D11 without the GPU renderer); export icon and version patching (plan §14.4, `resedit`); async image decoding (a 4K JPEG costs one 67 ms frame); human review of the Chinese and Japanese demo text (and its 81 Chinese UI strings) and the 48 new runtime UI strings in Japanese.
 4. **The M2 hallway test** (plan §18): a non-programmer creates, writes, previews, localizes one scene, and exports, in English or Japanese, without docs, while an AI contributes through Mode A (a Claude app) and Mode B (the assistant, with your API key). Its findings decide the first Studio fixes.
 5. **Try Mode B with your key** (Settings → Built-in assistant), and add `ANTHROPIC_API_KEY` as a repository secret if you want CI's prompt-cache check to run (a few cents per run).
 6. Follow-ups: a real PSD/ORA from an artist through the importer; the Screenplay block palette and multi-select (§11.3 "later"); a pseudo-locale screenshot diff in CI; the agent loop in a utility process if long turns ever stutter the UI; watching for a hung preview (rfcs/0006 open question); app icon and code signing before v1.0. Earlier follow-ups stand: the MCP tasks extension, MCP Apps UI, runtime items from session 10.
 7. Human review of AI-written Japanese: `examples/tutorial` (30 lines), `examples/festival-eve` (45 lines), and Studio's own UI and diagnostic messages (`packages/studio/locales/ja.json`, 453 messages, written by the AI).
-8. **Phase 6: AI depth and polish**, on your go-ahead.
+8. **Phase 6: the UI Designer** (plan §11.6), on your go-ahead: an RFC for theme schema 2.0 and the data-driven runtime UI first, then the runtime, then the Studio panel. Phase 7 (AI depth and polish) and Phase 8 (launch) follow.

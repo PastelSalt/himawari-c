@@ -97,6 +97,8 @@ export const SEMANTIC_DIAGNOSTICS = {
   HW0320: { severity: "warning", message: "The scene \"{name}\" can reach its end without jump, return, or end; the game would stop there." },
   HW0321: { severity: "info", message: "The scene \"{name}\" is never reached from the entry scene." },
   HW0331: { severity: "warning", message: "Every option in this menu is \"once\", so it can run out of choices (it is then skipped)." },
+  HW0332: { severity: "error", message: "A menu can have at most {max} options (this one has {count})." },
+  HW0333: { severity: "error", message: "One statement can change at most {max} sprite attributes (this one changes {count})." },
   HW0401: { severity: "error", message: "The {lang} translation of line {id} {problem}." },
   HW0402: { severity: "info", message: "{count} line(s) aren't translated into {lang} yet." },
   HW0403: { severity: "warning", message: "The source of line {id} changed since this {lang} table was synced." },

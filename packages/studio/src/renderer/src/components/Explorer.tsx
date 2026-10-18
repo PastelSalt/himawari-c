@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
-import { isLocale, isScript } from "../model";
+import { isExtension, isLocale, isScript } from "../model";
 import { useStudio } from "../store";
 import { Icon } from "./Icon";
 
@@ -184,7 +184,7 @@ export function Explorer() {
             <FormattedMessage id="explorer.project" />
           </span>
         </div>
-        {["himawari.json", "AGENTS.md"]
+        {["himawari.json", "AGENTS.md", "theme/theme.json", ...Object.keys(files).filter(isExtension).sort()]
           .filter((f) => files[f] !== undefined)
           .map((f) => (
             <button key={f} className={current === f ? "tree-row tree-label selected" : "tree-row tree-label"} onClick={() => openFile(f)}>

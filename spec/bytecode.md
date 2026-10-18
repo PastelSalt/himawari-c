@@ -269,5 +269,6 @@ After validation the interpreter needs no further bounds checks.
 - `speaker attrs "text"` compiles to `SHOW speaker` (attributes only, position kept) followed by `SAY`.
 - `if/elif/else` compiles to `JZ`/`JMP` chains. A menu compiles its option conditions (`PUSH 1` for options without one), then `MENU`, then each option body; bodies that fall through end with `JMP` to the gather point after the menu. `MENU` is followed by a `JMP` to the gather point (taken when no option can be shown) only when the menu can run out: when no option is both unconditional and not `once`.
 - `$ x += e` compiles to `LOAD x`, `e`, `ADD`, `STORE x`.
+- An instruction has at most 255 arguments, so the checker limits a menu to 126 options (HW0332), one `show` or dialogue line to 248 attribute words (HW0333), and an extension statement to 253 parameters (HW0120); the compiler never writes a longer instruction.
 - Macro calls are expanded before compiling (rfcs/0008); nothing of a macro remains in the bytecode except its statements, whose debug entries point at the call.
 - The compiler is deterministic: the same project always produces identical bytes.

@@ -5,7 +5,7 @@ Numbered proposals for changes to the Script Data Contract (`spec/`) and for eng
 ## Process
 1. Copy `0000-template.md` to `NNNN-short-title.md` with the next free number.
 2. Open a pull request. Discussion happens on the PR.
-3. The BDFL accepts or rejects it (see GOVERNANCE.md, Phase 7). Accepted RFCs are merged with status **Accepted**; the spec change follows in its own PR.
+3. The BDFL accepts or rejects it (see GOVERNANCE.md, Phase 8). Accepted RFCs are merged with status **Accepted**; the spec change follows in its own PR.
 4. Spec changes bump versions per plan §5.6.
 
 Phase 0 spike results are recorded as RFCs 0001–0003.

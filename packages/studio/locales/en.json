@@ -466,6 +466,8 @@
   "diag.HW0320": "The scene \"{name}\" can reach its end without jump, return, or end; the game would stop there.",
   "diag.HW0321": "The scene \"{name}\" is never reached from the entry scene.",
   "diag.HW0331": "Every option in this menu is \"once\", so it can run out of choices (it is then skipped).",
+  "diag.HW0332": "A menu can have at most {max} options (this one has {count}).",
+  "diag.HW0333": "One statement can change at most {max} sprite attributes (this one changes {count}).",
   "diag.HW0401": "The {lang} translation of line {id} {problem}.",
   "diag.HW0402": "{count} line(s) aren't translated into {lang} yet.",
   "diag.HW0403": "The source of line {id} changed since this {lang} table was synced.",

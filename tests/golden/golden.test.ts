@@ -3,7 +3,8 @@
  * of examples/sunflower-demo and each frame must match its reference image
  * (perceptually: see compare_golden in runtime/src/app/hw_screens.c). Runs
  * when a built runtime is found (HIMAWARI_RUNTIME, or runtime/build/...);
- * skipped otherwise. Japanese cases need Yu Gothic (not on every CI runner).
+ * skipped otherwise. Japanese cases need Yu Gothic, Chinese ones Microsoft YaHei (both
+ * ship with Windows, but not every CI image has them).
  *
  * Regenerate (then look at every image!) with:
  *   HW_UPDATE_GOLDEN=1 corepack pnpm vitest run tests/golden
@@ -20,21 +21,23 @@ import { findRuntime } from "../../packages/tools/src/runtime.js";
 const DEMO = fileURLToPath(new URL("../../examples/sunflower-demo/", import.meta.url));
 const HERE = fileURLToPath(new URL("./", import.meta.url));
 const runtime = findRuntime();
-const hasYuGothic = existsSync(join(process.env["WINDIR"] ?? "C:/Windows", "Fonts", "YuGothM.ttc"));
+const fonts = join(process.env["WINDIR"] ?? "C:/Windows", "Fonts");
+const hasFont = { ja: existsSync(join(fonts, "YuGothM.ttc")), zh: existsSync(join(fonts, "msyh.ttc")) };
 
 /** name → the runtime's arguments for that moment (after the common ones). */
-const CASES: [string, string[], { ja?: boolean }][] = [
+const CASES: [string, string[], { needs?: "ja" | "zh" }][] = [
   ["en-hana-happy", ["--warp", "#07cgn7"], {}], // a layered sprite with a preset, the themed textbox and nameplate
   ["en-menu", ["--warp", "#7qff7k"], {}], // a menu with themed choices
   ["en-two-characters", ["--warp", "#6q5we0"], {}], // two characters; Ren's glasses (a "multiple" group)
   ["en-field-sepia-cg", ["--warp", "#7vaqn5"], {}], // a CG under the sepia tint, a select
-  ["es-river-night", ["--warp", "#hfrrzr", "--lang", "es"], {}], // the extension's tint after a warp, the yukata rule, Spanish UI from the theme
-  ["ja-ruby", ["--warp", "#c1a2ng", "--lang", "ja"], { ja: true }], // ruby
-  ["ja-nvl-page", ["--warp", "#hn7ndk", "--lang", "ja"], { ja: true }], // novel mode, color and size tags
+  ["zh-river-night", ["--warp", "#hfrrzr", "--lang", "zh-Hans"], { needs: "zh" }], // the extension's tint after a warp, the yukata rule, Chinese UI from the theme
+  ["zh-two-characters", ["--warp", "#6q5we0", "--lang", "zh-Hans"], { needs: "zh" }], // simplified characters with YaHei first, Chinese names
+  ["ja-ruby", ["--warp", "#c1a2ng", "--lang", "ja"], { needs: "ja" }], // ruby
+  ["ja-nvl-page", ["--warp", "#hn7ndk", "--lang", "ja"], { needs: "ja" }], // novel mode, color and size tags
   ["en-title", [], {}], // the title screen with the theme's string
   ["en-config", ["--screen", "config"], {}],
   ["en-gallery", ["--screen", "gallery", "--unlock-all"], {}],
-  ["es-accessibility-prompt", ["--screen", "accessibility", "--lang", "es"], {}],
+  ["zh-accessibility-prompt", ["--screen", "accessibility", "--lang", "zh-Hans"], { needs: "zh" }],
 ];
 
 describe.skipIf(!runtime)("golden images (sunflower-demo)", () => {
@@ -46,7 +49,7 @@ describe.skipIf(!runtime)("golden images (sunflower-demo)", () => {
   });
 
   for (const [name, args, opts] of CASES) {
-    test.skipIf(opts.ja && !hasYuGothic)(name, () => {
+    test.skipIf(opts.needs !== undefined && !hasFont[opts.needs])(name, () => {
       const golden = join(HERE, `${name}.png`);
       const r = spawnSync(
         runtime as string,

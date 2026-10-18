@@ -1,6 +1,6 @@
 # Himawari — Detailed Project Plan
 
-> **Status:** Draft **v0.5** · 2026-10-17 · Nothing here is final. **Phases 0–3 done; Phase 4 (Studio) built**, its M2 hallway test pending (§18); RFCs 0001–0006 accepted. Next: the M2 test, then Phase 5.
+> **Status:** Draft **v0.6** · 2026-10-18 · Nothing here is final. **Phases 0–3 and 5 done; Phase 4 (Studio) built**, its M2 hallway test pending (§18); RFCs 0001–0009 accepted. v0.6 adds the **UI Designer** (§11.6) as Phase 6. Next: the M2 test, then Phase 6.
 > **Companion files:** [RESEARCH.md](RESEARCH.md) (evidence) · [LOG.md](LOG.md) (decision history and next steps) · [CLAUDE.md](CLAUDE.md) (context for AI coding sessions)
 > Decisions marked 🔬 cite RESEARCH.md by section number (e.g. 🔬§3 = RESEARCH.md §3).
 
@@ -876,6 +876,7 @@ How each mode receives them:
 | **UI language** | English (default) + Japanese, switchable in Settings and on the Welcome screen (§11.5) | Community languages |
 | **Search** | Double-Shift fuzzy search everywhere | Command palette actions |
 | **History** | Unified undo plus a **selective history list** | Optional auto-commit to git with a `Co-authored-by` trailer for AI changes |
+| **UI Designer** (§11.6) | — | Phase 6: move, resize, and restyle every element of the game's UI on the live preview; color wheel, palette tokens, presets, accessibility guards |
 
 ### 11.4 Proposal flow
 ```
@@ -899,6 +900,31 @@ Per-tool trust settings (e.g., auto-accept `set_translation`). An "autopilot" mo
 - **Fonts:** the UI bundles Noto Sans / Noto Sans JP, so Japanese renders on any machine.
 
 ---
+
+### 11.6 UI Designer (your request, 2026-10-18; Phase 6)
+
+Every game should be able to look like its own game, not like "a Himawari game". The **UI Designer** is a Studio panel where writers and artists customize the game's built-in UI **by hand, visually**: move and resize anything, recolor it, restyle it, and see the result in the real game right away. No code and no JSON editing (P6, P7). It writes `theme/theme.json`, which Core validates and compiles (plan §8.10, rfcs/0007), so the runtime still never reads JSON (D01).
+
+**What can be customized (every screen, every element):**
+| Area | Elements | What can change |
+|---|---|---|
+| Story | Textbox (ADV), nameplate, NVL page, choice buttons, quick bar, "click to continue" mark, notifications | Position, size, anchor, padding, text area margins, alignment, visibility (e.g. hide the quick bar), order of quick-bar buttons |
+| Menus | Title screen (logo, buttons, their layout: column, row, grid, free), system menu, save/load slots (grid size, thumbnail size, what each slot shows), history, config, controls, extras, gallery (columns), music room, confirm dialog, the accessibility prompt | The same, per screen |
+| Look | Every element above | Fill color and opacity, gradient, border (color, width), corner radius, shadow, nine-slice image (user's own art), states (normal, hover, pressed, focused, disabled), cursor |
+| Text | Dialogue, names, buttons, menus, per language | Font (bundled OFL fonts or the game's own), size, color, outline, shadow, line spacing, letter spacing, text speed default |
+| Motion and sound | Screens, buttons, textbox | Show/hide animations (fade, slide, scale; duration and easing), hover and click sounds (user's files), transition defaults |
+
+**How it works:**
+- **Direct manipulation on the real game.** The docked runtime (rfcs/0006) shows any screen with sample content (a "theme preview" mode: every screen reachable from a list, sample lines in each language). Studio draws selection handles over it: drag to move, drag corners to resize, snap to edges, centers, and a grid, with safe-area guides. The runtime reports each element's rectangle over the debug pipe, and edits apply live (well under 1 s, like P2). Positions are stored as fractions of the canvas, so a design works at any resolution.
+- **Inspector** beside the preview for exact values (numbers, anchors, fonts), plus "apply to all buttons" and copy/paste style.
+- **Color tools:** a **color wheel** (HSV/HSL, hex and RGB input, opacity), an eyedropper that picks from the preview or from the game's own art, **palette tokens** (accent, text, panel, …: change a token and every element using it follows), harmony suggestions (complementary, analogous, triadic, monochrome), and saved swatches.
+- **Presets:** ready-made combinations to start from or apply in one click, for example **Classic ADV**, **Modern minimal**, **Novel (NVL book)**, **Dark**, **Pastel**, **Retro**, **High contrast**, and preset **palettes** that keep a layout but change every color. A game can save its own presets, and presets can be exported and imported as theme packs to share.
+- **Accessibility guards (§13, P10):** a live contrast check (WCAG AA, 4.5:1 for text) with a one-click fix, a minimum text size, a color-blindness preview (protanopia, deuteranopia, tritanopia), visible keyboard/gamepad focus. The player's accessibility settings (high contrast, text size, readable font) still override a design: games can extend them, not remove them.
+- **Per-language checks:** preview every screen in every language; long translations that overflow a button or the textbox are flagged (ties in with §11.3 Localization "overflow warnings").
+- **Safety nets:** unified undo (it's an ordinary file edit), reset an element, a screen, or everything to the preset, compare with the preset side by side, and Core diagnostics for designs that would break (elements off-screen, overlapping buttons, unreadable text).
+- **AI (optional):** the assistant can propose theme changes ("make the textbox smaller and warmer") as ordinary proposals with a diff (P12). It never generates images (§1.5); nine-slice art, fonts, and sounds are always the user's own or bundled with open licenses.
+
+**What it needs underneath (in Phase 6, through an RFC):** theme schema 2.0 with per-screen layouts and element styles, compiled into the bytecode's `THEM` section (additive keys, so bytecode stays 1.x); a runtime UI that draws from that data instead of fixed coordinates (today's look becomes the **Classic ADV** preset, so existing games don't change); debug-protocol commands for previewing screens, reporting element rectangles, and applying theme changes live.
 
 ## 12. Extensibility (engine for other devs) 🔬§10
 
@@ -1183,20 +1209,28 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 - Rule transitions, NVL mode, theming, gamepad and remapping.
 - **Accessibility baseline (§13)**, `.hwp` + patches, WebP, crash dumps, Tier B extension statements, macros.
 - ✅ **Exit:** `sunflower-demo` covers every feature in 3 languages. Golden-image suite green. Performance budgets met.
-- ✅ **Done** (2026-10-18, LOG session 14): bytecode 1.1 (macros rfcs/0008; extension statements, NVL, themes rfcs/0007), `.hwp` packs and patches (rfcs/0009), JPEG/WebP, config and accessibility screens, remapping, gallery, music room, crash reports, `examples/sunflower-demo` (EN/JA/ES), 11 golden images, budgets measured with `--perf` (first frame 135 ms, frame CPU p95 0.2 ms, peak memory ≤ 106 MB, `.hwb` load 3.6 ms/MB, 2.58 MB `.exe`). Open: games with rule wipes start in ≈ 350 ms.
+- ✅ **Done** (2026-10-18, LOG session 14): bytecode 1.1 (macros rfcs/0008; extension statements, NVL, themes rfcs/0007), `.hwp` packs and patches (rfcs/0009), JPEG/WebP, config and accessibility screens, remapping, gallery, music room, crash reports, `examples/sunflower-demo` (English, Japanese, Simplified Chinese), 12 golden images, budgets measured with `--perf` (first frame 135 ms, frame CPU p95 0.2 ms, peak memory ≤ 106 MB, `.hwb` load 3.6 ms/MB, 2.58 MB `.exe`). Open: games with rule wipes start in ≈ 350 ms.
 
-### Phase 6: AI depth and polish (⏱ 2)
+### Phase 6: UI Designer (⏱ 4)
+- Theme schema 2.0 (per-screen layouts, element styles, palette tokens), compiled into `THEM`; an RFC first.
+- A data-driven runtime UI for every screen (§8.10); today's look ships as the **Classic ADV** preset, so existing games look the same.
+- Studio's **UI Designer** panel (§11.6): live preview of any screen with sample content, drag/resize with snapping and safe areas, inspector, color wheel and eyedropper, palette tokens and harmonies, presets and preset palettes, theme packs (export/import), per-language overflow checks, contrast check, color-blindness preview, undo and reset.
+- Debug protocol 2: preview screens, report element rectangles, apply theme changes live.
+- Golden images for every preset in all demo languages.
+- ✅ **Exit:** a non-programmer restyles the default game into a visibly different one (move the textbox, shrink the text area, recolor, change fonts) in under 15 minutes without docs, and the result passes the contrast and overflow checks in every language.
+
+### Phase 7: AI depth and polish (⏱ 2)
 - Continuity checks, route balance, coverage overlay on the graph, graph editing.
 - AI batch translation with glossary (Haiku-class model by default for cost). Assistant slash-command recipes. MCP Apps (story graph, scene preview).
 - AI eval suite trending.
 
-### Phase 7: Open-source launch (⏱ 3)
+### Phase 8: Open-source launch (⏱ 3)
 - Docs site (Diátaxis, tutorials in EN + JA) on GitHub Pages, the tutorial project, a video walkthrough.
 - Signed Studio installer for Windows, auto-update, itch.io `butler` export, `hwc report ai-content`.
 - Governance and contribution docs, RFC repo, security policy, license audit.
 - 🎯 **M3: public v1.0.**
 
-**Total ≈ 33 weeks to v1.0** (v0.2 was 32: the built-in assistant and Studio UI localization add 2 weeks to Phase 4, and Phase 6 shrinks by 1). An AI-to-game slice still works at ≈ week 14.
+**Total ≈ 37 weeks to v1.0** (v0.2 was 32: the built-in assistant and Studio UI localization add 2 weeks to Phase 4, and Phase 6 shrinks by 1; v0.6 adds the 4-week UI Designer as Phase 6, and AI depth and the launch become Phases 7 and 8). An AI-to-game slice still works at ≈ week 14.
 
 ### 18.9 After v1
 - **Linux (future improvement, v0.5):** Studio on Linux, a Linux runtime build for its live preview and headless playtests, Linux CI (sanitizers, fuzzing), and possibly a tested Proton path for Steam Deck. The portable `core/` and `text/` code and the SDL layer keep this a small change. Phase 0 already proved most of the pieces on Windows.
@@ -1227,7 +1261,7 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 | MCP spec and SDK churn | Medium | Thin adapter over Core. Pinned SDK. Avoid deprecated features. Track the spec's 12-month deprecation policy |
 | Extension tier fragmenting tooling | Medium | Signature schemas are mandatory. Lua is opt-in and off by default |
 | OSS maintainer burnout | Medium | Clear scope, a "not planned" list, RFC gate for language changes, automation-heavy CI |
-| Licensing mistakes in exports | Low | Auto-generated `licenses/` and credits. License audit in the Phase 7 checklist |
+| Licensing mistakes in exports | Low | Auto-generated `licenses/` and credits. License audit in the Phase 8 checklist |
 | AI-content store policies | Low | No media generation at all. Text provenance plus a report export. Pre-generated-only by design |
 
 ---

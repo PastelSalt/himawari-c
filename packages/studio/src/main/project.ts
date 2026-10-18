@@ -79,6 +79,8 @@ export class Project {
     for (const f of this.fs.list("script", (n) => n.endsWith(".hws"))) add(f);
     for (const f of this.fs.list("characters", (n) => n.endsWith(".md"))) add(f);
     for (const f of this.fs.list("locales", (n) => n.endsWith(".json"))) add(f);
+    for (const f of this.fs.list("extensions", (n) => n.endsWith(".schema.json"))) add(f);
+    if (this.fs.exists("theme/theme.json")) add("theme/theme.json");
     this.assetsCache = this.listAssets();
     return { root: this.root, files, assets: this.assetsCache };
   }
