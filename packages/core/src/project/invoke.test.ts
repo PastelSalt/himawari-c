@@ -114,10 +114,10 @@ describe("textbox and themes (rfcs/0007)", () => {
   it("compiles a theme into typed entries and flags unknown settings", () => {
     const theme = {
       file: "theme/theme.json",
-      text: JSON.stringify({ colors: { accent: "#ff8800", textbox: "#123456" }, textbox: { opacity: 80, slice: [8, 8, 8, 8], image: "ui/box" }, strings: { ja: { start: "はじめる" } }, colours: {} }),
+      text: JSON.stringify({ colors: { accent: "#ffaa33", textbox: "#123456" }, textbox: { opacity: 80, slice: [8, 8, 8, 8], image: "ui/box" }, strings: { ja: { start: "はじめる" } }, colours: {} }),
     };
     const c = check("scene start:\n    end\n", { theme });
-    expect(c.theme?.get("color.accent")).toEqual({ type: "color", value: 0xff8800 });
+    expect(c.theme?.get("color.accent")).toEqual({ type: "color", value: 0xffaa33 });
     expect(c.theme?.get("textbox.slice.top")).toEqual({ type: "int", value: 8 });
     expect(c.theme?.get("string.ja.start")).toEqual({ type: "str", value: "はじめる" });
     expect(codes(c)).toEqual(["HW0131"]);

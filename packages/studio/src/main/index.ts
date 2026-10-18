@@ -6,9 +6,9 @@
  * sender and arguments. Fuses are set at packaging (electron-builder.yml).
  */
 import { existsSync } from "node:fs";
-import { readFile, stat } from "node:fs/promises";
+import { readFile, stat, writeFile } from "node:fs/promises";
 import { extname, join, normalize, sep } from "node:path";
-import { BrowserWindow, Menu, app, dialog, ipcMain, protocol, session, shell } from "electron";
+import { BrowserWindow, Menu, app, dialog, ipcMain, nativeTheme, protocol, session, shell } from "electron";
 import { type BundledProject, CHANNELS, type MethodName, type PreviewEvent, type ProjectSnapshot, type Settings } from "../shared/api.js";
 import { AssistantHost } from "./assistant.js";
 import { McpHost } from "./mcp-host.js";
@@ -165,7 +165,9 @@ const handlers: Record<MethodName, (...args: unknown[]) => unknown> = {
   "settings.get": () => getSettings(),
   "settings.set": (patch) => {
     if (!patch || typeof patch !== "object") throw new Error("settings must be an object");
-    return setSettings(patch as Partial<Settings>);
+    const next = setSettings(patch as Partial<Settings>);
+    if ("appearance" in patch) applyAppearance();
+    return next;
   },
   "dialog.pickFolder": async () => {
     // e2e tests can't drive the native dialog: in a test run it answers with the test's folder.
@@ -181,11 +183,21 @@ const handlers: Record<MethodName, (...args: unknown[]) => unknown> = {
       image: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "bmp"] }],
       audio: [{ name: "Audio", extensions: ["ogg", "wav", "mp3", "flac", "opus"] }],
       translation: [{ name: "CSV / XLIFF", extensions: ["csv", "xlf", "xliff"] }],
+      theme: [{ name: "Himawari theme", extensions: ["json"] }],
     };
     const r = await dialog.showOpenDialog(win!, { properties: ["openFile"], filters: filters[str(kind, "kind")] ?? [] });
     if (r.canceled || !r.filePaths[0]) return null;
     pickedFiles.add(r.filePaths[0]);
     return r.filePaths[0];
+  },
+  "dialog.saveFile": async (kind, defaultName, text) => {
+    if (str(kind, "kind") !== "theme") throw new Error("unknown file kind");
+    const body = str(text, "text");
+    if (body.length > 1_000_000) throw new Error("too large");
+    const r = await dialog.showSaveDialog(win!, { defaultPath: str(defaultName, "defaultName"), filters: [{ name: "Himawari theme", extensions: ["json"] }] });
+    if (r.canceled || !r.filePath) return false;
+    await writeFile(r.filePath, body);
+    return true;
   },
   "project.create": async (options) => {
     const o = options as Parameters<typeof createProject>[0];
@@ -230,13 +242,14 @@ const handlers: Record<MethodName, (...args: unknown[]) => unknown> = {
   "preview.stop": () => preview?.stop(),
   "preview.command": (command) => {
     const c = command as { cmd?: unknown };
-    const allowed = ["reload", "warp", "restart", "next_menu", "advance", "lang"];
+    const allowed = ["reload", "warp", "restart", "next_menu", "advance", "lang", "screen"];
     if (!c || typeof c.cmd !== "string" || !allowed.includes(c.cmd)) throw new Error("unknown preview command");
     if (c.cmd === "warp" && project && !preview?.running) {
       preview?.start(project.root, previewOptions(str((c as { to?: unknown }).to, "to")));
       return;
     }
     if (c.cmd === "lang") previewLang = str((c as { lang?: unknown }).lang, "lang");
+    if (c.cmd === "screen" && !/^[a-z]{2,16}$/.test(str((c as { name?: unknown }).name, "name"))) throw new Error("bad screen name");
     preview?.send(command as Parameters<Preview["send"]>[0]);
   },
   "preview.setBounds": (rect) => {
@@ -281,14 +294,26 @@ ipcMain.handle(CHANNELS.invoke, async (event, method: unknown, args: unknown) =>
   return handler(...args);
 });
 
+/** Follows Settings → Appearance: native menus, scrollbars, and prefers-color-scheme use the same theme as Studio. */
+function applyAppearance(): void {
+  nativeTheme.themeSource = getSettings().appearance;
+  win?.setBackgroundColor(windowBackground());
+}
+
+/** The window's color before the page paints (no white or black flash): the theme's --bg. */
+function windowBackground(): string {
+  return nativeTheme.shouldUseDarkColors ? "#1e1d23" : "#ffffff";
+}
+
 function createWindow(): void {
+  applyAppearance();
   win = new BrowserWindow({
     width: 1600,
     height: 980,
     minWidth: 1100,
     minHeight: 700,
     show: false,
-    backgroundColor: "#16171d",
+    backgroundColor: windowBackground(),
     title: "Himawari Studio",
     webPreferences: {
       preload: preloadPath(),

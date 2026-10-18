@@ -11,7 +11,7 @@ import { studio } from "./api";
 import { type ProjectModel, buildModel, isScript } from "./model";
 import { applyPatch } from "../../shared/patch";
 
-export type Tool = "characters" | "assets" | "variables" | "localization" | "graph" | "build" | "settings";
+export type Tool = "characters" | "assets" | "variables" | "localization" | "graph" | "designer" | "build" | "settings";
 export type Center = { kind: "file"; file: string } | { kind: "tool"; tool: Tool; arg?: string } | null;
 export type BottomTab = "problems" | "proposals" | "output" | "history";
 export type Source = "you" | "ai" | "refactor" | "outside" | "fix";
@@ -43,6 +43,8 @@ export interface PreviewState {
   /** How many times the game reloaded, and when last (e2e checks the edit → preview budget, P1). */
   reloads: number;
   reloadedAt: number;
+  /** Labels the game reported as too long for their buttons (the UI Designer lists them). */
+  overflows: { text: string; lang: string }[];
 }
 
 export type ChatItem =
@@ -132,6 +134,7 @@ const initialPreview: PreviewState = {
   reloaded: null,
   reloads: 0,
   reloadedAt: 0,
+  overflows: [],
 };
 
 let modelTimer: ReturnType<typeof setTimeout> | null = null;
@@ -256,6 +259,9 @@ export const useStudio = create<State>((set, get) => {
             break;
           case "warp":
             if (!e.ok) get().log("output.warpFailed", { to: e.to }, "error");
+            break;
+          case "overflow":
+            if (!p.overflows.some((o) => o.text === e.text && o.lang === e.lang)) set({ preview: { ...p, overflows: [...p.overflows, { text: e.text, lang: e.lang }].slice(-50) } });
             break;
           case "exited":
             set({ preview: { ...initialPreview, built: p.built } });

@@ -5,7 +5,7 @@ import { Ajv2020 } from "ajv/dist/2020.js";
 import { describe, expect, test } from "vitest";
 import { parse as parseYaml } from "yaml";
 import { readExtension } from "../../packages/core/src/project/invoke.js";
-import { readTheme } from "../../packages/core/src/project/theme.js";
+import { THEME_PRESETS, THEME_PRESET_NAMES, THEME_SETTINGS, readTheme } from "../../packages/core/src/project/theme.js";
 import { parseAst } from "../../packages/core/src/syntax/ast.js";
 
 const specDir = fileURLToPath(new URL("../../spec/", import.meta.url));
@@ -43,16 +43,25 @@ describe("extension and theme schemas (rfcs/0007)", () => {
     expect(readTheme(text).diagnostics).toEqual([]);
   });
 
-  test("every setting the theme schema allows is one Core knows", () => {
-    const schema = readJson("theme.schema.json") as { properties: Record<string, { properties?: Record<string, unknown> }> };
-    for (const [group, def] of Object.entries(schema.properties)) {
-      if (group === "$schema" || group === "strings") continue;
-      for (const key of Object.keys(def.properties ?? {})) {
-        const value = key === "slice" ? [1, 1, 1, 1] : group === "colors" ? "#000000" : ["image", "main", "name", "background", "music"].includes(key) ? "a/b" : 50;
-        const r = readTheme(JSON.stringify({ [group]: { [key]: value } }));
-        expect(r.diagnostics.filter((d) => d.code === "HW0131"), `${group}.${key}`).toEqual([]);
+  test("the theme schema and Core know the same settings (rfcs/0010)", () => {
+    type Def = { properties?: Record<string, Def> };
+    const schema = readJson("theme.schema.json") as Def;
+    const keys: string[] = [];
+    for (const [group, def] of Object.entries(schema.properties ?? {})) {
+      if (["$schema", "strings", "preset"].includes(group)) continue;
+      for (const [key, sub] of Object.entries(def.properties ?? {})) {
+        if (group === "layout") for (const k of Object.keys(sub.properties ?? {})) keys.push(`layout.${key}.${k}`);
+        else if (key === "slice") keys.push(...["left", "top", "right", "bottom"].map((side) => `textbox.slice.${side}`));
+        else keys.push(`${group === "colors" ? "color" : group}.${key}`);
       }
     }
+    expect(keys.sort()).toEqual(Object.keys(THEME_SETTINGS).sort());
+  });
+
+  test.each(THEME_PRESET_NAMES)("the %s preset is a valid theme file", (name) => {
+    const preset = THEME_PRESETS[name]!;
+    expect(validateTheme(preset), JSON.stringify(validateTheme.errors)).toBe(true);
+    expect(validateTheme({ preset: name }), JSON.stringify(validateTheme.errors)).toBe(true);
   });
 
   test.each([

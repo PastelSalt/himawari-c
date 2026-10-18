@@ -109,7 +109,7 @@ export function checkProject(input: ProjectInput): ProjectCheck {
   }
   let theme: ThemeEntries | null = null;
   if (input.theme) {
-    const t = readTheme(input.theme.text);
+    const t = readTheme(input.theme.text, manifest ? { aspect: manifest.resolution[0] / manifest.resolution[1] } : {});
     report(input.theme.file, input.theme.text).diagnostics.push(...t.diagnostics);
     theme = t.entries;
   }

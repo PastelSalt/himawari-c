@@ -66,6 +66,8 @@ export const SEMANTIC_DIAGNOSTICS = {
   HW0120: { severity: "error", message: "This extension schema is invalid: {reason}." },
   HW0130: { severity: "error", message: "The theme is invalid: {reason}." },
   HW0131: { severity: "warning", message: "Unknown theme setting \"{key}\"." },
+  HW0132: { severity: "warning", message: "The {element} goes past the {side} edge of the screen." },
+  HW0133: { severity: "warning", message: "Text in {fg} on {bg} has a contrast of only {ratio}:1; at least 4.5:1 keeps it readable." },
   HW0201: { severity: "error", message: "\"{name}\" isn't a character." },
   HW0202: { severity: "error", message: "There's no character called \"{name}\"." },
   HW0204: { severity: "error", message: "{character} has no expression or attribute called \"{name}\"." },

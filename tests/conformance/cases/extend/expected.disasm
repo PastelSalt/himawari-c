@@ -8,7 +8,7 @@ var 0: calls int = 0 (save)
 char hana "Hana" #f2a541
 extension phone(from: character, message: text, ms: int, loud: bool) [blocking]
 extension screen_tint(color: word, ms: int)
-theme color.accent = #ff8800
+theme color.accent = #ffaa33
 theme color.textbox = #202030
 theme string.en.start = "Begin"
 theme string.ja.start = "はじめる"

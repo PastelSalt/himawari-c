@@ -27,7 +27,12 @@ export function resources(): { templates: string; spec: string; projects: Record
 }
 
 function bundled(examples: string): Record<BundledProject, string> {
-  return { tutorial: join(examples, "tutorial"), "festival-eve": join(examples, "festival-eve"), layered: join(examples, "layered") };
+  return {
+    tutorial: join(examples, "tutorial"),
+    "sunflower-demo": join(examples, "sunflower-demo"),
+    "festival-eve": join(examples, "festival-eve"),
+    layered: join(examples, "layered"),
+  };
 }
 
 /** The renderer's built files (production). */

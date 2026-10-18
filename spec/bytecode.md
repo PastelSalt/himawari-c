@@ -242,7 +242,8 @@ count
 entries[count] = { key: str, type, value }
 ```
 - Sorted by key, keys unique. `type`: 0 int, 1 color (`0xRRGGBB`), 2 string (`value` is a string index).
-- Keys are `theme.schema.json`'s settings flattened with dots: `color.accent`, `textbox.opacity`, `textbox.slice.left`, `font.main`, `title.music`, …, and `string.<lang>.<key>` for UI strings. The runtime uses the keys it knows and ignores the rest.
+- Keys are `theme.schema.json`'s settings flattened with dots: `color.accent`, `textbox.opacity`, `textbox.slice.left`, `font.main`, `title.music`, `shape.radius`, `layout.textbox.x`, `layout.title_menu.gap`, `motion.choices`, `sound.click`, …, and `string.<lang>.<key>` for UI strings. A theme's preset is already merged in. The runtime uses the keys it knows and ignores the rest.
+- Values (theme 2.0, rfcs/0010): percent settings (`layout.*.x`, `.y`, and box sizes) are ints in tenths of a percent; booleans are ints 0/1; choices (`shape.hover`, `layout.quickbar.align`, `motion.choices`) are strings. These are new keys, not a new format, so bytecode stays 1.1 and older players show the 1.0 look.
 
 ### 2.12 `DBUG`: debug info
 ```

@@ -26,7 +26,7 @@ cpSync(runtime, join(out, "runtime", "himawari.exe"));
 
 const skip = (src) => !["build", "cache", "node_modules", ".git"].includes(basename(src)) && !src.endsWith("session.json");
 cpSync(join(repo, "templates"), join(out, "templates"), { recursive: true, filter: skip });
-for (const name of ["tutorial", "festival-eve", "layered"]) {
+for (const name of ["tutorial", "sunflower-demo", "festival-eve", "layered"]) {
   cpSync(join(repo, "examples", name), join(out, "examples", name), { recursive: true, filter: skip });
 }
 cpSync(join(repo, "spec"), join(out, "spec"), { recursive: true });

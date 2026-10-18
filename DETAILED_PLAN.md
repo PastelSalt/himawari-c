@@ -1,6 +1,6 @@
 # Himawari — Detailed Project Plan
 
-> **Status:** Draft **v0.6** · 2026-10-18 · Nothing here is final. **Phases 0–3 and 5 done; Phase 4 (Studio) built**, its M2 hallway test pending (§18); RFCs 0001–0009 accepted. v0.6 adds the **UI Designer** (§11.6) as Phase 6. Next: the M2 test, then Phase 6.
+> **Status:** Draft **v0.6** · 2026-10-18 · Nothing here is final. **Phases 0–3 and 5 done; Phases 4 (Studio) and 6 (UI Designer) built**, their hallway tests pending (§18); RFCs 0001–0010 accepted. Next: the hallway tests, then Phase 7.
 > **Companion files:** [RESEARCH.md](RESEARCH.md) (evidence) · [LOG.md](LOG.md) (decision history and next steps) · [CLAUDE.md](CLAUDE.md) (context for AI coding sessions)
 > Decisions marked 🔬 cite RESEARCH.md by section number (e.g. 🔬§3 = RESEARCH.md §3).
 
@@ -658,7 +658,7 @@ UTF-8 everywhere. Stack decided in RFC 0003: **FreeType directly + libunibreak +
   - CG Gallery, Music Room, Scene Replay (v1.x)
   - Quick Save/Load, Confirm
   - **Accessibility** (§13)
-- **Themes:** `theme/theme.json` (since Phase 5: colors, the textbox with a nine-slice image, fonts, text size, title and menu backgrounds, title music, transition time, UI strings per language; positions, layouts, and animations come with the UI Designer, §11.6). The **default theme** ships polished, localized, and accessible (P10).
+- **Themes:** `theme/theme.json` (2.0, rfcs/0010): colors, shapes, text, the layout of every built-in screen, choice animations, UI sounds, UI strings per language, and a starting preset; edited visually in Studio's UI Designer (§11.6). The **default theme** ships polished, localized, and accessible (P10).
 - **Modes:** ADV (textbox) and NVL (full screen) can be switched per scene.
 - **Input:** keyboard, mouse, and gamepad, fully remappable.
 
@@ -1213,13 +1213,14 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 - ✅ **Exit:** `sunflower-demo` covers every feature in 3 languages. Golden-image suite green. Performance budgets met.
 - ✅ **Done** (2026-10-18, LOG session 14): bytecode 1.1 (macros rfcs/0008; extension statements, NVL, themes rfcs/0007), `.hwp` packs and patches (rfcs/0009), JPEG/WebP, config and accessibility screens, remapping, gallery, music room, crash reports, `examples/sunflower-demo` (English, Japanese, Simplified Chinese), 12 golden images, budgets measured with `--perf` (first frame 135 ms, frame CPU p95 0.2 ms, peak memory ≤ 106 MB, `.hwb` load 3.6 ms/MB, 2.58 MB `.exe`). Open: games with rule wipes start in ≈ 350 ms.
 
-### Phase 6: UI Designer (⏱ 4)
+### Phase 6: UI Designer (⏱ 4) ✅ built 2026-10-19 (hallway test pending)
 - Theme schema 2.0 (per-screen layouts, element styles, palette tokens), compiled into `THEM`; an RFC first.
 - A data-driven runtime UI for every screen (§8.10); today's look ships as the **Classic ADV** preset, so existing games look the same.
 - Studio's **UI Designer** panel (§11.6): live preview of any screen with sample content, drag/resize with snapping and safe areas, inspector, color wheel and eyedropper, palette tokens and harmonies, presets and preset palettes, theme packs (export/import), per-language overflow checks, contrast check, color-blindness preview, undo and reset.
 - Debug-protocol additions (still version 1, since they're additive): preview screens, report element rectangles, apply theme changes live.
 - Golden images for every preset in all demo languages.
 - ✅ **Exit:** a non-programmer restyles the default game into a visibly different one (move the textbox, shrink the text area, recolor, change fonts) in under 15 minutes without docs, and the result passes the contrast and overflow checks in every language.
+- ✅ **Built** (2026-10-19, LOG session 15): theme schema 2.0 with 7 presets and 9 palettes (rfcs/0010); a data-driven runtime UI (rounded, bordered, shadowed panels; every screen placed from the theme; the default look pixel-identical); the debug pipe's `screen` command and `overflow` event; Studio's UI Designer (a draggable mock of five screens with snapping and a safe area, number fields, presets, palettes, a color wheel with eyedropper and harmonies, contrast badges with one-click fixes, a color-blindness preview, theme pack export and import); 12 preset golden images. Also: Studio's own light (default), dark, and match-Windows themes. Open: the hallway test; the mock can't show per-language fonts yet (the docked game does).
 
 ### Phase 7: AI depth and polish (⏱ 2)
 - Continuity checks, route balance, coverage overlay on the graph, graph editing.

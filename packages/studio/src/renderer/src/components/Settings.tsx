@@ -4,6 +4,7 @@ import type { AssistantKeyStatus, McpStatus, UiLanguage } from "../../../shared/
 import { studio } from "../api";
 import { LANGUAGE_NAMES } from "../i18n";
 import { useStudio } from "../store";
+import { ThemeSelect } from "./Welcome";
 
 /** Models for the built-in assistant (plan §10.9). */
 export const MODELS = [
@@ -53,6 +54,14 @@ export function SettingsPage() {
             ))}
           </select>
         </label>
+        <div className="field">
+          <span>
+            <FormattedMessage id="settings.theme" />
+          </span>
+          <div>
+            <ThemeSelect />
+          </div>
+        </div>
         {!settings.coachDone ? null : (
           <button className="small-button" onClick={() => set({ coachDone: false })}>
             <FormattedMessage id="settings.showTips" />

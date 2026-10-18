@@ -66,7 +66,125 @@ void gradient(game *g, SDL_FRect r, uint32_t top, uint32_t bottom, float a)
         { { r.x, r.y + r.h }, fcol(bottom, a), { 0, 0 } },
     };
     static const int idx[6] = { 0, 1, 2, 0, 2, 3 };
+    SDL_SetRenderDrawBlendMode(g->ren, SDL_BLENDMODE_BLEND);
     SDL_RenderGeometry(g->ren, NULL, v, 4, idx, 6);
+}
+
+/* The outline of a rounded rectangle: 9 points per corner, clockwise from the top right. */
+#define RR_POINTS 36
+static void rr_outline(SDL_FRect r, float rad, SDL_FPoint *pts)
+{
+    rad = fmaxf(0.0f, fminf(rad, fminf(r.w, r.h) / 2.0f));
+    const float cx[4] = { r.x + r.w - rad, r.x + r.w - rad, r.x + rad, r.x + rad };
+    const float cy[4] = { r.y + rad, r.y + r.h - rad, r.y + r.h - rad, r.y + rad };
+    int n = 0;
+    for (int c = 0; c < 4; c++) {
+        for (int i = 0; i <= 8; i++) {
+            float a = ((float)c + (float)i / 8.0f) * SDL_PI_F / 2.0f - SDL_PI_F / 2.0f;
+            pts[n++] = (SDL_FPoint){ cx[c] + rad * cosf(a), cy[c] + rad * sinf(a) };
+        }
+    }
+}
+
+void rounded(game *g, SDL_FRect r, float rad, uint32_t rgb, float a)
+{
+    if (rad < 0.5f) {
+        fill(g, r, rgb, a);
+        return;
+    }
+    SDL_FPoint p[RR_POINTS];
+    rr_outline(r, rad, p);
+    SDL_Vertex v[RR_POINTS + 1];
+    int idx[RR_POINTS * 3];
+    SDL_FColor c = fcol(rgb, a);
+    v[0] = (SDL_Vertex){ { r.x + r.w / 2, r.y + r.h / 2 }, c, { 0, 0 } };
+    for (int i = 0; i < RR_POINTS; i++) {
+        v[i + 1] = (SDL_Vertex){ p[i], c, { 0, 0 } };
+        idx[i * 3] = 0;
+        idx[i * 3 + 1] = i + 1;
+        idx[i * 3 + 2] = (i + 1) % RR_POINTS + 1;
+    }
+    SDL_SetRenderDrawBlendMode(g->ren, SDL_BLENDMODE_BLEND); /* geometry uses the draw blend mode, whatever was set last */
+    SDL_RenderGeometry(g->ren, NULL, v, RR_POINTS + 1, idx, RR_POINTS * 3);
+}
+
+/* A border `w` wide just inside `r`. */
+static void rounded_ring(game *g, SDL_FRect r, float rad, float w, uint32_t rgb, float a)
+{
+    if (w <= 0.0f) return;
+    SDL_FPoint o[RR_POINTS], in[RR_POINTS];
+    rr_outline(r, rad, o);
+    rr_outline((SDL_FRect){ r.x + w, r.y + w, r.w - 2 * w, r.h - 2 * w }, rad - w, in);
+    SDL_Vertex v[RR_POINTS * 2];
+    int idx[RR_POINTS * 6];
+    SDL_FColor c = fcol(rgb, a);
+    for (int i = 0; i < RR_POINTS; i++) {
+        v[i] = (SDL_Vertex){ o[i], c, { 0, 0 } };
+        v[RR_POINTS + i] = (SDL_Vertex){ in[i], c, { 0, 0 } };
+        int j = (i + 1) % RR_POINTS;
+        int *t = &idx[i * 6];
+        t[0] = i, t[1] = j, t[2] = RR_POINTS + i;
+        t[3] = RR_POINTS + i, t[4] = j, t[5] = RR_POINTS + j;
+    }
+    SDL_SetRenderDrawBlendMode(g->ren, SDL_BLENDMODE_BLEND);
+    SDL_RenderGeometry(g->ren, NULL, v, RR_POINTS * 2, idx, RR_POINTS * 6);
+}
+
+void panel(game *g, SDL_FRect r, uint32_t rgb, float a)
+{
+    float rad = sc(g, g->ui.radius), shadow = sc(g, g->ui.shadow);
+    if (shadow >= 0.5f) {
+        /* A soft shadow below: three widening layers. */
+        for (int i = 3; i >= 1; i--) {
+            float e = shadow * (float)i / 3.0f;
+            rounded(g, (SDL_FRect){ r.x - e / 2, r.y - e / 2 + shadow * 0.35f, r.w + e, r.h + e }, rad + e / 2, 0x000000, 0.07f * a);
+        }
+    }
+    rounded(g, r, rad, rgb, a);
+    rounded_ring(g, r, rad, sc(g, g->ui.border), g->pal.border, fminf(1.0f, a + 0.15f));
+}
+
+void hover_mark(game *g, SDL_FRect r)
+{
+    if (g->ui.hover == HW_HOVER_FILL) return; /* the hover color is the mark */
+    if (g->ui.hover == HW_HOVER_OUTLINE) {
+        rounded_ring(g, r, sc(g, g->ui.radius), fmaxf(sc(g, 3), sc(g, g->ui.border) + 1), g->pal.accent, 1.0f);
+        return;
+    }
+    if (g->ui.radius < 0.5f) {
+        fill(g, (SDL_FRect){ r.x, r.y, sc(g, 6), r.h }, g->pal.accent, 1.0f);
+    } else {
+        /* A short pill inside the rounded corner instead of a bar along the edge. */
+        rounded(g, (SDL_FRect){ r.x + sc(g, 12), r.y + r.h * 0.25f, sc(g, 6), r.h * 0.5f }, sc(g, 3), g->pal.accent, 1.0f);
+    }
+}
+
+SDL_FRect textbox_rect(const game *g)
+{
+    const hw_ui_box *b = &g->ui.textbox;
+    return (SDL_FRect){ g->W * b->x, g->H * b->y, g->W * b->w, g->H * b->h };
+}
+
+void ui_sound(game *g, const char *name)
+{
+    if (name && g->audio && !g->fast_forward) hw_audio_play(g->audio, HW_CHANNEL_SFX, name, -1);
+}
+
+/* In development, a label that doesn't fit its button is reported once to Studio (debug pipe `overflow`). */
+static void report_overflow(game *g, const char *text)
+{
+    if (!g->link) return;
+    uint32_t h = hash_str(text);
+    for (int i = 0; i < g->overflow_count; i++) {
+        if (g->overflow_seen[i] == h) return;
+    }
+    if (g->overflow_count < (int)(sizeof g->overflow_seen / sizeof g->overflow_seen[0])) g->overflow_seen[g->overflow_count++] = h;
+    hw_buf b = { 0 };
+    hw_buf_put(&b, "{\"ev\":\"overflow\",\"text\":", 25);
+    hw_json_put_str(&b, text);
+    hw_buf_printf(&b, ",\"lang\":\"%s\"}", g->lang);
+    if (b.data) hw_link_send(g->link, b.data);
+    hw_buf_free(&b);
 }
 
 /* A soft color from a name, for placeholders. */
@@ -87,7 +205,7 @@ static uint32_t name_color(const char *name, float light)
 
 void label(game *g, const char *s, float px, float x, float y, int align, SDL_Color c)
 {
-    hw_text_draw(g->fonts, s, sc(g, px), 0, x, y, align, c, col(g->pal.ink), sc(g, px) > 20 ? 2.0f : 0.0f);
+    hw_text_draw(g->fonts, s, sc(g, px), 0, x, y, align, c, col(g->pal.ink), sc(g, px) > 20 ? g->ui.outline : 0.0f);
 }
 
 static void notify(game *g, const char *msg)
@@ -108,9 +226,16 @@ void button(game *g, SDL_FRect r, const char *text, int id, float px, bool activ
     int index = g->hit_count;
     if (g->hit_count < MAX_HITS) g->hits[g->hit_count++] = (hit){ r, id };
     bool hover = point_in(g->mx, g->my, r) || g->focus == index;
-    fill(g, r, hover ? g->pal.choice_hover : g->pal.panel, hover ? 0.95f : 0.85f);
-    if (active) fill(g, (SDL_FRect){ r.x, r.y, sc(g, 6), r.h }, g->pal.accent, 1.0f);
-    label(g, text, px, r.x + r.w / 2, r.y + r.h / 2 + sc(g, px) * 0.36f, 1, hover ? col(g->pal.accent) : col(g->pal.text));
+    panel(g, r, hover ? g->pal.choice_hover : g->pal.button, hover ? 0.95f : fmaxf(0.85f, g->tb_alpha));
+    if (active) {
+        int style = g->ui.hover;
+        g->ui.hover = HW_HOVER_BAR; /* "on" is always the bar, whatever hover looks like */
+        hover_mark(g, r);
+        g->ui.hover = style;
+    }
+    if (hover && g->ui.hover == HW_HOVER_OUTLINE) hover_mark(g, r);
+    if (hw_text_width(g->fonts, text, sc(g, px), 0) > r.w - sc(g, 12)) report_overflow(g, text);
+    label(g, text, px, r.x + r.w / 2, r.y + r.h / 2 + sc(g, px) * 0.36f, 1, hover ? col(g->pal.accent) : col(g->pal.button_text));
 }
 
 /* ---- the scene ---- */
@@ -372,7 +497,7 @@ static void plain_text(const hw_rich_text *rt, char *out, size_t cap)
     for (uint32_t i = 0; i < rt->run_count && n + 1 < cap; i++) n += (size_t)snprintf(out + n, cap - n, "%s", rt->runs[i].text);
 }
 
-float text_width(const game *g) { return g->W * 0.84f - sc(g, 2 * g->tb_pad); }
+float text_width(const game *g) { return g->W * g->ui.textbox.w - sc(g, g->ui.text_left + g->ui.text_right); }
 
 static void layout_line(game *g)
 {
@@ -387,12 +512,12 @@ void layout_page(game *g)
     if (g->page_built > d->page_count) g->page_built = 0;
     for (uint32_t i = g->page_built; i < d->page_count; i++) {
         hw_rich_build(&g->page_text[i], &g->vm, hw_vm_line_text(&g->vm, d->page[i]));
-        hw_rich_layout(&g->page_text[i], g->fonts, g->W * 0.76f, sc(g, g->text_px), g->lang);
+        hw_rich_layout(&g->page_text[i], g->fonts, g->W * (g->ui.page.w - 0.12f), sc(g, g->text_px), g->lang);
     }
     g->page_built = d->page_count;
     float h = 0;
     for (uint32_t i = 0; i < d->page_count; i++) h += g->page_text[i].layout.height + sc(g, g->text_px * 0.6f);
-    if (h > g->H * 0.80f && d->page_count > 1) {
+    if (h > g->H * g->ui.page.h * 0.89f && d->page_count > 1) {
         hw_vm_page_restart(&g->vm);
         g->page_built = 0;
         layout_page(g);
@@ -403,8 +528,9 @@ static void layout_menu(game *g)
 {
     for (uint32_t i = 0; i < g->option_count; i++) {
         hw_rich_build(&g->option_text[i], &g->vm, hw_vm_line_text(&g->vm, g->options[i]));
-        hw_rich_layout(&g->option_text[i], g->fonts, g->W * 0.55f - sc(g, 60), sc(g, 36), g->lang);
+        hw_rich_layout(&g->option_text[i], g->fonts, g->W * g->ui.choice_w - sc(g, 60), sc(g, 36), g->lang);
     }
+    g->menu_t0 = g->now;
 }
 
 static bool skipping(const game *g)
@@ -549,8 +675,7 @@ static void bind_theme(game *g)
 {
     hw_theme_palette(&g->m, &g->pal);
     g->tb_alpha = (float)hw_theme_int(&g->m, "textbox.opacity", 82) / 100.0f;
-    g->tb_height = (float)hw_theme_int(&g->m, "textbox.height", 27) / 100.0f;
-    g->tb_pad = (float)hw_theme_int(&g->m, "textbox.padding", 44);
+    hw_theme_layout(&g->m, &g->ui);
     g->text_px = (float)hw_theme_int(&g->m, "text.size", 40);
     g->trans_ms = hw_theme_int(&g->m, "transition.ms", 500);
     if (g->name_fonts) hw_fonts_close(g->name_fonts);
@@ -1121,6 +1246,36 @@ static void link_report(game *g)
     hw_buf_free(&b);
 }
 
+/* Shows a built-in screen by name (--screen, and the debug pipe's `screen` for the UI Designer). */
+static bool show_screen(game *g, const char *name)
+{
+    static const struct { const char *name; screen scr; } SCREENS[] = {
+        { "config", SCR_CONFIG }, { "controls", SCR_CONTROLS }, { "accessibility", SCR_A11Y }, { "extras", SCR_EXTRAS },
+        { "gallery", SCR_GALLERY }, { "music", SCR_MUSIC }, { "load", SCR_SLOTS }, { "menu", SCR_SYSMENU }, { "history", SCR_HISTORY },
+    };
+    if (strcmp(name, "title") == 0) {
+        g->scr = SCR_TITLE;
+        g->focus = -1;
+        return true;
+    }
+    if (strcmp(name, "play") == 0) {
+        if (g->scr == SCR_TITLE || !g->have_line) start_story(g);
+        else g->scr = SCR_PLAY;
+        g->focus = -1;
+        return true;
+    }
+    for (size_t k = 0; k < sizeof SCREENS / sizeof SCREENS[0]; k++) {
+        if (strcmp(name, SCREENS[k].name) != 0) continue;
+        g->back_to = g->scr == SCR_PLAY ? SCR_SYSMENU : SCR_TITLE;
+        if (SCREENS[k].scr == SCR_SYSMENU || SCREENS[k].scr == SCR_HISTORY) g->back_to = SCR_PLAY;
+        if (SCREENS[k].scr == SCR_SLOTS) g->slots_saving = false;
+        g->scr = SCREENS[k].scr;
+        g->focus = -1;
+        return true;
+    }
+    return false;
+}
+
 /* Handles the commands Studio sent since the last frame (spec/debug-protocol.md). */
 static void link_poll(game *g)
 {
@@ -1161,6 +1316,8 @@ static void link_poll(game *g)
             memcpy(saved, g->settings.language, sizeof saved);
             set_language(g, arg); /* for this run only, like --lang */
             memcpy(g->settings.language, saved, sizeof saved);
+        } else if (strcmp(cmd, "screen") == 0 && hw_json_str(line, "name", arg, sizeof arg)) {
+            show_screen(g, arg); /* the UI Designer previews each screen (rfcs/0010) */
         } else if (strcmp(cmd, "quit") == 0) {
             g->running = false;
         } else {
@@ -1292,11 +1449,15 @@ void apply_settings(game *g)
     if (s->high_contrast) {
         g->pal = (hw_palette){ .accent = 0xffe000, .text = 0xffffff, .dim = 0xe8e8e8, .textbox = 0x000000, .nameplate = 0x000000,
                                .choice = 0x000000, .choice_hover = 0x1a3fbf, .choice_text = 0xffffff, .background = 0x000000,
-                               .panel = 0x000000, .ink = 0x000000 };
+                               .panel = 0x000000, .ink = 0x000000, .border = 0xffffff, .button = 0x000000,
+                               .button_text = 0xffffff, .title = 0x000000 };
         g->tb_alpha = 1.0f;
+        if (g->ui.border < 2) g->ui.border = 2; /* panels stand out from any background */
+        if (g->ui.outline < 2) g->ui.outline = 2;
     } else if (s->textbox_opacity >= 0) {
         g->tb_alpha = (float)s->textbox_opacity / 100.0f;
     }
+    if (s->reduce_motion) g->ui.motion = HW_MOTION_NONE;
     static const float SIZE[4] = { 1.0f, 1.15f, 1.3f, 1.5f };
     static const float SPACING[3] = { 1.0f, 1.25f, 1.5f };
     g->text_px *= SIZE[s->text_size & 3u];
@@ -1561,18 +1722,7 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
             for (uint32_t k = 0; k < g->unlocks.cg_count; k++) g->unlocks.cg_seen[k] = 1;
             for (uint32_t k = 0; k < g->unlocks.music_count; k++) g->unlocks.music_heard[k] = 1;
         }
-        if (strcmp(argv[i], "--screen") == 0 && i + 1 < argc) {
-            static const struct { const char *name; screen scr; } SCREENS[] = {
-                { "config", SCR_CONFIG }, { "controls", SCR_CONTROLS }, { "accessibility", SCR_A11Y }, { "extras", SCR_EXTRAS },
-                { "gallery", SCR_GALLERY }, { "music", SCR_MUSIC }, { "load", SCR_SLOTS }, { "menu", SCR_SYSMENU }, { "history", SCR_HISTORY },
-            };
-            for (size_t k = 0; k < sizeof SCREENS / sizeof SCREENS[0]; k++) {
-                if (strcmp(argv[i + 1], SCREENS[k].name) != 0) continue;
-                g->back_to = g->scr == SCR_PLAY ? SCR_SYSMENU : SCR_TITLE;
-                if (SCREENS[k].scr == SCR_SYSMENU || SCREENS[k].scr == SCR_HISTORY) g->back_to = SCR_PLAY;
-                g->scr = SCREENS[k].scr;
-            }
-        }
+        if (strcmp(argv[i], "--screen") == 0 && i + 1 < argc) show_screen(g, argv[i + 1]);
     }
     /* The first-launch accessibility prompt (§13), before the title screen. Never in unattended runs or Studio's preview. */
     if (g->scr == SCR_TITLE && !g->settings.a11y_prompted && !unattended && !link) {

@@ -4,6 +4,7 @@
  *  - First run: New Project → template → the game plays (P1: under 60 s).
  *  - Play-as-you-write: an edit shows up in the running game in under 1 s (P1).
  *  - Export a Windows game.
+ *  - The UI Designer: a preset, then dragging the title buttons.
  *  - The UI switches to Japanese.
  * Needs `electron-vite build` and runtime/build/win64-release (or -debug).
  * Run: corepack pnpm --filter @himawari/studio e2e
@@ -90,6 +91,26 @@ describe("Himawari Studio", () => {
     const dir = join(projects, "Hallway Test", "build", "windows", "Hallway Test");
     expect(readdirSync(dir)).toEqual(expect.arrayContaining(["Hallway Test.exe", "data.hwp", "CREDITS.txt"]));
   }, 90000);
+
+  test("the UI Designer restyles the game (plan §11.6): a preset, then a drag", async () => {
+    await page.getByRole("button", { name: "UI Designer", exact: true }).click();
+    let before = await state();
+    await page.getByRole("button", { name: "Pastel" }).click();
+    let s = await waitFor((x) => x.preview.reloads > before.preview.reloads, 10000);
+    expect(JSON.parse(s.files["theme/theme.json"] ?? "{}")).toMatchObject({ preset: "pastel" });
+    await page.getByRole("tab", { name: "Title screen" }).click();
+    const menu = page.getByRole("button", { name: "Title buttons" });
+    const b = (await menu.boundingBox())!;
+    before = await state();
+    await page.mouse.move(b.x + b.width / 2, b.y + 8);
+    await page.mouse.down();
+    await page.mouse.move(b.x + b.width / 2 - 120, b.y + 8, { steps: 6 });
+    await page.mouse.up();
+    s = await waitFor((x) => x.preview.reloads > before.preview.reloads, 10000);
+    const theme = JSON.parse(s.files["theme/theme.json"] ?? "{}") as { layout?: { title_menu?: { x: number } } };
+    expect(theme.layout?.title_menu?.x).toBeLessThan(45);
+    expect(s.preview.built?.ok).toBe(true);
+  }, 30000);
 
   test("the UI switches to Japanese", async () => {
     await page.getByRole("button", { name: "Settings", exact: true }).click();

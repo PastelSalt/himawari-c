@@ -38,26 +38,32 @@ static void textbox_panel(game *g, SDL_FRect r, float alpha)
         SDL_SetTextureAlphaModFloat(img, 1.0f);
         return;
     }
-    fill(g, r, g->pal.textbox, alpha);
+    panel(g, r, g->pal.textbox, alpha);
 }
 
 /* The blinking "click to continue" mark. */
 static void continue_mark(game *g, float x, float y)
 {
     float a = 0.5f + 0.5f * sinf((float)g->now * 5.0f);
-    fill(g, (SDL_FRect){ x, y, sc(g, 18), sc(g, 18) }, g->pal.accent, a);
+    rounded(g, (SDL_FRect){ x, y, sc(g, 18), sc(g, 18) }, fminf(sc(g, g->ui.radius), sc(g, 9)), g->pal.accent, a);
 }
 
-/* The quick bar along the bottom right of `box`. */
+/* The quick bar along the bottom of `box`: right, left, or centered (layout.quickbar). */
 static void quick_bar(game *g, SDL_FRect box)
 {
+    if (!g->ui.quick_show) return;
     struct { int id; hw_ui_string s; bool on; } items[] = {
         { BTN_ROLLBACK, UI_ROLLBACK, false }, { BTN_HISTORY, UI_HISTORY, false }, { BTN_AUTO, UI_AUTO, g->auto_mode },
         { BTN_SKIP, UI_SKIP, g->skip_mode }, { BTN_SAVE, UI_SAVE, false }, { BTN_LOAD, UI_LOAD, false }, { BTN_MENU, UI_MENU, false },
     };
-    float x = box.x + box.w - sc(g, 16);
+    int n = (int)(sizeof items / sizeof items[0]);
+    float total = -sc(g, 6);
+    for (int i = 0; i < n; i++) total += hw_text_width(g->fonts, ui(g, items[i].s), sc(g, 22), 0) + sc(g, 24) + sc(g, 6);
+    float x = box.x + box.w - sc(g, 16); /* the right end of the bar */
+    if (g->ui.quick_align == HW_ALIGN_LEFT) x = box.x + sc(g, 16) + total;
+    else if (g->ui.quick_align == HW_ALIGN_CENTER) x = box.x + (box.w + total) / 2;
     float y = box.y + box.h - sc(g, 14);
-    for (int i = (int)(sizeof items / sizeof items[0]) - 1; i >= 0; i--) {
+    for (int i = n - 1; i >= 0; i--) {
         const char *s = ui(g, items[i].s);
         float w = hw_text_width(g->fonts, s, sc(g, 22), 0) + sc(g, 24);
         SDL_FRect r = { x - w, y - sc(g, 34), w, sc(g, 34) };
@@ -75,9 +81,10 @@ static void quick_bar(game *g, SDL_FRect box)
 static void draw_page(game *g)
 {
     const hw_display *d = &g->vm.s.display;
-    SDL_FRect box = { g->W * 0.06f, g->H * 0.05f, g->W * 0.88f, g->H * 0.90f };
+    const hw_ui_box *p = &g->ui.page;
+    SDL_FRect box = { g->W * p->x, g->H * p->y, g->W * p->w, g->H * p->h };
     textbox_panel(g, box, g->tb_alpha);
-    float x = g->W * 0.12f, y = box.y + sc(g, g->tb_pad);
+    float x = box.x + g->W * 0.06f, y = box.y + sc(g, g->ui.text_left);
     uint32_t n = d->page_count < g->page_built ? d->page_count : g->page_built;
     for (uint32_t i = 0; i < n; i++) {
         const hw_rich_text *t = &g->page_text[i];
@@ -85,10 +92,10 @@ static void draw_page(game *g)
         const char *name = g->m.lines[line].speaker ? hw_vm_speaker_name(&g->vm, line) : "";
         if (name[0]) {
             hw_text_draw(g->name_fonts ? g->name_fonts : g->fonts, name, sc(g, g->text_px * 0.8f), HW_TS_BOLD, x - sc(g, 12), y + sc(g, g->text_px * 0.9f), 2,
-                         col(g->pal.accent), col(g->pal.ink), 2.0f);
+                         col(g->pal.accent), col(g->pal.ink), g->ui.outline);
         }
         bool newest = i + 1 == n && g->have_line && g->line == line;
-        hw_rich_draw(g->fonts, t, x, y, newest ? g->reveal : 1e9f, (float)g->now, 1.0f, col(g->pal.text), col(g->pal.ink), 2.0f);
+        hw_rich_draw(g->fonts, t, x, y, newest ? g->reveal : 1e9f, (float)g->now, 1.0f, col(g->pal.text), col(g->pal.ink), g->ui.outline);
         y += t->layout.height + sc(g, g->text_px * 0.6f);
     }
     if (g->blk == B_SAY && g->reveal >= (float)g->text.chars) continue_mark(g, box.x + box.w - sc(g, 54), box.y + box.h - sc(g, 76));
@@ -103,20 +110,24 @@ static void draw_textbox(game *g)
         draw_page(g);
         return;
     }
-    float h = g->H * g->tb_height;
-    SDL_FRect box = { g->W * 0.08f, g->H * 0.97f - h, g->W * 0.84f, h };
+    SDL_FRect box = textbox_rect(g);
     textbox_panel(g, box, g->tb_alpha);
-    if (!theme_image(g, "textbox.image")) fill(g, (SDL_FRect){ box.x, box.y, box.w, sc(g, 3) }, g->pal.accent, 0.7f);
+    /* The accent line along the top of a square textbox. */
+    if (!theme_image(g, "textbox.image") && g->ui.radius < 0.5f) fill(g, (SDL_FRect){ box.x, box.y, box.w, sc(g, 3) }, g->pal.accent, 0.7f);
     if (g->have_line) {
         if (g->speaker[0]) {
             hw_fonts *nf = g->name_fonts ? g->name_fonts : g->fonts;
             float w = hw_text_width(nf, g->speaker, sc(g, 34), HW_TS_BOLD) + sc(g, 48);
-            SDL_FRect plate = { box.x + sc(g, 24), box.y - sc(g, 58), w, sc(g, 58) };
-            fill(g, plate, g->pal.nameplate, fminf(1.0f, g->tb_alpha + 0.1f));
-            fill(g, (SDL_FRect){ plate.x, plate.y + plate.h - sc(g, 4), plate.w, sc(g, 4) }, g->speaker_color, 1.0f);
-            hw_text_draw(nf, g->speaker, sc(g, 34), HW_TS_BOLD, plate.x + sc(g, 24), plate.y + sc(g, 42), 0, col(g->pal.text), col(g->pal.ink), 2.0f);
+            SDL_FRect plate = { box.x + sc(g, g->ui.plate_x), box.y + sc(g, g->ui.plate_y), w, sc(g, g->ui.plate_h) };
+            panel(g, plate, g->pal.nameplate, fminf(1.0f, g->tb_alpha + 0.1f));
+            /* The speaker's color along the plate's bottom (inside the corners when they're rounded). */
+            float rad = fminf(sc(g, g->ui.radius), plate.h / 2);
+            fill(g, (SDL_FRect){ plate.x + rad, plate.y + plate.h - sc(g, 4) - (rad > 0 ? sc(g, 2) : 0), plate.w - 2 * rad, sc(g, 4) }, g->speaker_color, 1.0f);
+            hw_text_draw(nf, g->speaker, sc(g, 34), HW_TS_BOLD, plate.x + sc(g, 24), plate.y + plate.h * 42.0f / 58.0f, 0, col(g->pal.text),
+                         col(g->pal.ink), g->ui.outline);
         }
-        hw_rich_draw(g->fonts, &g->text, box.x + sc(g, g->tb_pad), box.y + sc(g, 18), g->reveal, (float)g->now, 1.0f, col(g->pal.text), col(g->pal.ink), 2.0f);
+        hw_rich_draw(g->fonts, &g->text, box.x + sc(g, g->ui.text_left), box.y + sc(g, g->ui.text_top), g->reveal, (float)g->now, 1.0f,
+                     col(g->pal.text), col(g->pal.ink), g->ui.outline);
         if (g->blk == B_SAY && g->reveal >= (float)g->text.chars) continue_mark(g, box.x + box.w - sc(g, 54), box.y + box.h - sc(g, 76));
     }
     quick_bar(g, box);
@@ -124,21 +135,40 @@ static void draw_textbox(game *g)
 
 static void draw_menu(game *g)
 {
-    float bw = g->W * 0.55f, bh = sc(g, 76), gap = sc(g, 18);
+    float bw = g->W * g->ui.choice_w, bh = sc(g, g->ui.choice_h), gap = sc(g, g->ui.choice_gap);
     float total = (float)g->option_count * (bh + gap) - gap;
-    float y = g->H * 0.40f - total / 2;
+    float y = g->H * g->ui.choice_y - total / 2;
     if (y < g->H * 0.05f) y = g->H * 0.05f;
     for (uint32_t i = 0; i < g->option_count; i++) {
-        SDL_FRect r = { (g->W - bw) / 2, y, bw, bh };
+        /* motion.choices: each option fades (and rises) in, a little after the one before. */
+        float a = 1.0f, rise = 0.0f;
+        if (g->ui.motion != HW_MOTION_NONE && g->ui.motion_ms > 0) {
+            float t = ((float)(g->now - g->menu_t0) * 1000.0f - 40.0f * (float)i) / g->ui.motion_ms;
+            a = t <= 0 ? 0.0f : t >= 1 ? 1.0f : t * (2 - t);
+            if (g->ui.motion == HW_MOTION_RISE) rise = (1.0f - a) * sc(g, 24);
+        }
+        SDL_FRect r = { g->W * g->ui.choice_x - bw / 2, y + rise, bw, bh };
         int index = g->hit_count;
         if (g->hit_count < MAX_HITS) g->hits[g->hit_count++] = (hit){ r, BTN_OPTION + (int)i };
         bool hover = point_in(g->mx, g->my, r) || g->focus == index;
-        fill(g, r, hover ? g->pal.choice_hover : g->pal.choice, hover ? 0.95f : 0.85f);
-        if (hover) fill(g, (SDL_FRect){ r.x, r.y, sc(g, 6), r.h }, g->pal.accent, 1.0f);
+        panel(g, r, hover ? g->pal.choice_hover : g->pal.choice, (hover ? 0.95f : fmaxf(0.85f, g->tb_alpha)) * a); /* as solid as the textbox */
+        if (hover) hover_mark(g, r);
         const hw_rich_text *t = &g->option_text[i];
         float ty = r.y + (r.h - t->layout.height) / 2 - sc(g, 4);
-        hw_rich_draw(g->fonts, t, r.x + (r.w - t->width) / 2, ty, 1e9f, (float)g->now, 1.0f, hover ? col(g->pal.accent) : col(g->pal.choice_text), col(g->pal.ink), 2.0f);
+        hw_rich_draw(g->fonts, t, r.x + (r.w - t->width) / 2, ty, 1e9f, (float)g->now, a, hover ? col(g->pal.accent) : col(g->pal.choice_text), col(g->pal.ink),
+                     g->ui.outline);
         y += bh + gap;
+    }
+}
+
+/* A column of menu buttons (layout.title_menu, layout.game_menu). */
+static void button_column(game *g, const hw_ui_column *c, const char *const *labels, const int *ids, int n, int skip_mask)
+{
+    float y = g->H * c->y;
+    for (int i = 0; i < n; i++) {
+        if (skip_mask & (1 << i)) continue;
+        button(g, (SDL_FRect){ g->W * c->x - sc(g, c->w) / 2, y, sc(g, c->w), sc(g, c->h) }, labels[i], ids[i], 32, false);
+        y += sc(g, c->h + c->gap);
     }
 }
 
@@ -150,20 +180,20 @@ static void draw_title(game *g)
         SDL_FRect all = { 0, 0, g->W, g->H };
         SDL_RenderTexture(g->ren, t, NULL, &all);
     } else {
-        gradient(g, (SDL_FRect){ 0, 0, g->W, g->H }, 0x2b3a67, g->pal.background, 1.0f);
+        gradient(g, (SDL_FRect){ 0, 0, g->W, g->H }, g->pal.title, g->pal.background, 1.0f);
     }
-    hw_text_draw(g->fonts, hw_str(&g->m, g->m.title), sc(g, 88), HW_TS_BOLD, g->W / 2, g->H * 0.28f, 1, col(g->pal.text), col(g->pal.ink), 4.0f);
+    if (g->ui.title_show) {
+        hw_text_draw(g->fonts, hw_str(&g->m, g->m.title), sc(g, g->ui.title_size), HW_TS_BOLD, g->W * g->ui.title_x, g->H * g->ui.title_y, 1,
+                     col(g->pal.text), col(g->pal.ink), g->ui.outline * 2.0f);
+    }
     char lang[64];
     snprintf(lang, sizeof lang, "%s: %s", ui(g, UI_LANGUAGE), hw_language_name(g->lang));
     const char *labels[] = { ui(g, UI_START), ui(g, UI_LOAD), ui(g, UI_CONFIG), ui(g, UI_EXTRAS), lang, ui(g, UI_QUIT) };
     int ids[] = { BTN_START, BTN_LOAD, BTN_CONFIG, BTN_EXTRAS, BTN_LANGUAGE, BTN_QUIT };
-    float y = g->H * 0.40f;
-    for (int i = 0; i < 6; i++) {
-        if (ids[i] == BTN_LANGUAGE && g->m.language_count < 2) continue;
-        if (ids[i] == BTN_EXTRAS && g->unlocks.cg_count == 0 && g->unlocks.music_count == 0) continue;
-        button(g, (SDL_FRect){ g->W / 2 - sc(g, 220), y, sc(g, 440), sc(g, 66) }, labels[i], ids[i], 32, false);
-        y += sc(g, 82);
-    }
+    int skip = 0;
+    if (g->m.language_count < 2) skip |= 1 << 4;
+    if (g->unlocks.cg_count == 0 && g->unlocks.music_count == 0) skip |= 1 << 3;
+    button_column(g, &g->ui.title_menu, labels, ids, 6, skip);
 }
 
 /* Behind the menus: the theme's menu background, else the story dimmed. */
@@ -172,7 +202,7 @@ void dim_background(game *g, float a)
     /* Over the title screen, cover its buttons so they don't show through. */
     bool over_title = g->scr == SCR_EXTRAS || g->scr == SCR_GALLERY || g->scr == SCR_MUSIC || g->scr == SCR_A11Y ||
                       ((g->scr == SCR_CONFIG || g->scr == SCR_CONTROLS || g->scr == SCR_SLOTS || g->scr == SCR_CONFIRM_QUIT) && g->back_to == SCR_TITLE);
-    if (over_title && a < 0.96f) a = 0.96f;
+    if (over_title) a = 1.0f;
     SDL_Texture *t = theme_image(g, "menu.background");
     if (t) {
         SDL_FRect all = { 0, 0, g->W, g->H };
@@ -187,11 +217,7 @@ static void draw_sysmenu(game *g)
     dim_background(g, 0.7f);
     const char *labels[] = { ui(g, UI_RESUME), ui(g, UI_SAVE), ui(g, UI_LOAD), ui(g, UI_HISTORY), ui(g, UI_CONFIG), ui(g, UI_TITLE), ui(g, UI_QUIT) };
     int ids[] = { BTN_RESUME, BTN_SAVE, BTN_LOAD, BTN_HISTORY, BTN_CONFIG, BTN_TITLE, BTN_QUIT };
-    float y = g->H * 0.14f;
-    for (int i = 0; i < 7; i++) {
-        button(g, (SDL_FRect){ g->W / 2 - sc(g, 260), y, sc(g, 520), sc(g, 68) }, labels[i], ids[i], 32, false);
-        y += sc(g, 88);
-    }
+    button_column(g, &g->ui.game_menu, labels, ids, 7, 0);
 }
 
 /* Reads every slot's header and thumbnail once, when the save screen opens or after a save. */
@@ -240,8 +266,8 @@ static void draw_slots(game *g)
         int index = g->hit_count;
         if (g->hit_count < MAX_HITS) g->hits[g->hit_count++] = (hit){ r, BTN_SLOT + s };
         bool hover = point_in(g->mx, g->my, r) || g->focus == index;
-        fill(g, r, hover ? g->pal.choice_hover : g->pal.choice, 0.92f);
-        if (hover) fill(g, (SDL_FRect){ r.x, r.y, sc(g, 6), r.h }, g->pal.accent, 1.0f);
+        panel(g, r, hover ? g->pal.choice_hover : g->pal.choice, 0.92f);
+        if (hover) hover_mark(g, r);
         /* The thumbnail on the left (16:9), the text beside it. */
         float tw = ch * 16.0f / 9.0f * 0.82f, th = tw * 9.0f / 16.0f;
         SDL_FRect thumb = { r.x + sc(g, 16), r.y + (ch - th) / 2, tw, th };
@@ -304,7 +330,7 @@ static void draw_center_card(game *g, const char *title, const char *body, const
         memset(&rt, 0, sizeof rt);
         hw_rich_plain(&rt, body);
         hw_rich_layout(&rt, g->fonts, g->W * 0.7f, sc(g, 30), g->lang);
-        hw_rich_draw(g->fonts, &rt, (g->W - rt.width) / 2, g->H * 0.44f, 1e9f, 0, 1, col(g->pal.text), col(g->pal.ink), 2.0f);
+        hw_rich_draw(g->fonts, &rt, (g->W - rt.width) / 2, g->H * 0.44f, 1e9f, 0, 1, col(g->pal.text), col(g->pal.ink), g->ui.outline);
         hw_rich_free(&rt);
     }
     if (detail) label(g, detail, 24, g->W / 2, g->H * 0.80f, 1, col(g->pal.dim));
@@ -372,7 +398,7 @@ static bool compare_golden(SDL_Surface *frame, const char *path)
             const uint8_t *pb = (const uint8_t *)b->pixels + (size_t)y * (size_t)b->pitch;
             for (int x = 0; x < a->w * 4; x += 4) {
                 int d = 0;
-                for (int c = 0; c < 3; c++) {
+                for (int c = 0; c < 4; c++) { /* alpha too: a frame must be as opaque as its reference */
                     int v = abs((int)pa[x + c] - (int)pb[x + c]);
                     if (v > d) d = v;
                 }
@@ -488,6 +514,16 @@ void render(game *g)
     SDL_RenderPresent(g->ren);
     memcpy(g->last_hits, g->hits, sizeof g->hits);
     g->last_hit_count = g->hit_count;
+    /* sound.hover when the pointer or the focus moves onto another button. */
+    int hovered = -1;
+    for (int i = 0; i < g->hit_count; i++) {
+        if (point_in(g->mx, g->my, g->hits[i].r) || g->focus == i) hovered = g->hits[i].id;
+    }
+    if (hovered != g->hover_id) {
+        if (hovered >= 0 && g->scr != SCR_PLAY) ui_sound(g, g->ui.sound_hover);
+        if (hovered >= 0 && g->scr == SCR_PLAY && g->blk == B_MENU) ui_sound(g, g->ui.sound_hover);
+        g->hover_id = hovered;
+    }
 }
 
 /* ---- input ---- */
@@ -503,6 +539,7 @@ static void open_slots(game *g, bool saving)
 
 void activate(game *g, int id)
 {
+    ui_sound(g, g->ui.sound_click);
     if (menus_activate(g, id)) return;
     switch (id) {
     case BTN_START: start_story(g); break;

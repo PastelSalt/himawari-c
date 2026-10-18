@@ -21,3 +21,4 @@ Phase 0 spike results are recorded as RFCs 0001–0003.
 | [0007](0007-extensions-textbox-themes.md) | Extension statements, textbox modes, and themes (bytecode 1.1) | **Accepted** 2026-10-18 |
 | [0008](0008-macros.md) | Macros (`define statement`) | **Accepted** 2026-10-18 |
 | [0009](0009-asset-packs.md) | Asset packs (`.hwp`) and patches | **Accepted** 2026-10-18 |
+| [0010](0010-theme-2-and-ui-designer.md) | Theme 2.0 (layout, shapes, presets) and the UI Designer | **Accepted** 2026-10-18 |

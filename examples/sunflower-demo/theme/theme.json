@@ -1,7 +1,7 @@
 {
   "$schema": "https://pastelsalt.github.io/himawari-c/spec/theme/1.0.json",
   "colors": {
-    "accent": "#f5b700",
+    "accent": "#f5ba0a",
     "textbox": "#2a1e10",
     "nameplate": "#3a2a14",
     "choice": "#3a2a14",

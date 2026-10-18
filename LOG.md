@@ -21,7 +21,7 @@
 | **Phase 3** | **Done** (session 11): `@himawari/tools` (22 tools) + `himawari-mcp` (spec 2026-07-28, SDK v2), agent guide, `hwc run/playtest/graph/report/ai setup`, `build --release` packaging; **M1 reached** (`examples/festival-eve`) |
 | **Phase 4** | **Built** (session 13): Himawari Studio (Electron), docked preview, Screenplay and Script views, panels, AI proposals, Mode A live sync, Mode B. M2 hallway test pending |
 | **Phase 5** | **Done** (session 14): macros, extension statements, NVL, themes (bytecode 1.1); config, accessibility, gamepad, gallery, music room; `.hwp` packs and patches; JPEG/WebP; crash reports; budgets met; `examples/sunflower-demo` in English, Japanese, and Simplified Chinese; golden images |
-| **Phase 6** | **Planned** (plan v0.6): the **UI Designer** (§11.6). Phase 7 AI depth and polish, Phase 8 launch |
+| **Phase 6** | **Built** (session 15): theme 2.0 (layout, shapes, presets, rfcs/0010), a data-driven runtime UI, Studio's **UI Designer**, and Studio's light/dark/system themes. Hallway test pending. Next: Phase 7 AI depth and polish, Phase 8 launch |
 | **Owner** | Moesoft (GitHub: `PastelSalt`) |
 | **Repo** | **https://github.com/PastelSalt/himawari-c** (public) |
 
@@ -672,6 +672,66 @@ You then asked to commit and push: `0419238`.
 
 ---
 
+## Session 15: 2026-10-18–19 · Phase 6: the UI Designer, and Studio's new look
+**You asked:** to continue with Phase 6; to make Studio look less AI-generated, with ease of use and a comfortable, intuitive UI first; rounded corners and soft pastel colors that are easy on the eyes; and a white background by default, with black or the Windows theme as options. (Studio was dark only: its colors were fixed in the stylesheet, with no setting.)
+
+**Studio's look:**
+- **Three themes:** Light (the default), Dark, and Match Windows, under Settings → Studio and on the Welcome screen.
+- **One set of colors per theme.** Every color is a token defined once per theme, and no component uses a raw color, so both themes stay complete. The main process sets Windows' theme source to the same choice, so menus, scrollbars, and the window frame match.
+- **A calmer style:**
+  - The light theme uses near-white panels, warm grays, and a pastel sunflower accent. The dark theme is a warm charcoal, not black.
+  - Corners are rounder (7–16 px), and panels have soft shadows.
+- **Removed the things that read as "AI-made":** the glowing gradient behind the Welcome card, the sunflower emoji as the logo (now a small drawn mark), the sparkles icon for the assistant (now a speech bubble), and tiny uppercase section labels (now normal sentence case).
+- **Sunflower Days is offered as a sample** on the Welcome screen.
+
+**Theme 2.0 (rfcs/0010, D41):**
+- **What a theme can now hold:** the layout of every built-in screen (textbox, text area, name plate, choices, quick buttons, novel page, title, title and game menus), shapes (corner radius, border, shadow, how a pointed-at button shows it), text outline, choice animations, and hover and click sounds.
+- **Presets and palettes:** a theme can start from one of 7 presets (himawari, pastel, minimal, paper, night, retro, high contrast). There are also 9 color-only palettes.
+- **Checks:** Core validates every value. It warns about elements past the edge of the screen (HW0132) and text below 4.5:1 contrast (HW0133); HW0133 suggests a readable color.
+- **No bytecode change:** these are new `THEM` keys, so bytecode stays 1.1.
+- **Tests:** every preset and palette is tested to pass its own contrast check. The schema and Core are tested to know the same settings.
+- **The contrast check found two real problems:** the Sunflower Days accent was slightly too dim on hovered choices (4.4:1, now fixed), and so was the conformance fixture's accent. Their expected outputs were regenerated.
+
+**The runtime draws the UI from the theme:**
+- Every screen is placed from the theme's layout.
+- Panels can be rounded, bordered, and shadowed.
+- A game without the new keys looks exactly as before: the 13 earlier golden images still match.
+- Accessibility settings still win over any design: high contrast forces borders and outlines, and reduce motion turns off choice animations.
+- New on the debug pipe: a `screen` command (show any screen) and an `overflow` event (a label too long for its button).
+- **Two bugs found and fixed while checking the presets:**
+  - Rounded panels drew without blending whenever the last blend mode set elsewhere was "none".
+  - The golden comparison ignored alpha, so it couldn't catch that. Now alpha is compared too.
+- On light themes, the title screen faintly showed through menus opened from it. Those menus are fully opaque now.
+
+**The UI Designer** (the palette icon in the left bar):
+- **Mock screens:** five editable mock screens (dialogue, choices, novel page, title, game menu), drawn from the theme over the game's own background.
+- **Editing:**
+  - Drag to move. Drag a corner to resize.
+  - Moves snap to the center, the 5% safe area, and other elements. Hold Alt to place freely. Arrow keys nudge.
+  - Number fields hold the exact values, with a Reset for each element.
+- **Looks:** preset and palette cards, the 15 named colors with contrast badges, and sliders for corners, border, shadow, opacity, text size, and outline. You can also choose how choices appear and pick sounds from `assets/sfx/`.
+- **The color wheel:** a hue ring around a saturation and brightness square, hex and RGB input, the Windows eyedropper, harmonies (opposite, neighbors, triad, shades), the game's own colors, and "Make it readable".
+- **Readability and accessibility:** a readability list, a color-blindness preview (three types), and labels the real game reports as too long (switch the preview's language to check translations).
+- **Theme packs:** export and import; the project keeps its own UI text.
+- **The real game updates too:**
+  - Every change is an ordinary file edit, so undo, history, autosave, and the live preview all work.
+  - While you drag, it's one undo step.
+  - The docked game switches to the screen you're designing.
+- **More room:** the project tree hides while designing.
+
+**Checked:**
+- `corepack pnpm check`: 359 tests and 624 locale messages in sync (English and Japanese).
+- Runtime tests: debug 10/10 and ASan 10/10. Conformance transcripts and pack fixtures were regenerated.
+- **Golden images: 19 of 19,** stable over 3 runs. That includes 12 new ones for the presets, which I looked at.
+- **Studio e2e: 5 of 5.** The new e2e test applies a preset, drags the title buttons, and checks that the game rebuilds.
+
+**Not done:**
+- The hallway test (a non-programmer restyling a game in 15 minutes).
+- The mock uses Windows UI fonts, not the game's own fonts or languages; the docked game beside it does.
+- New projects still start with the himawari look; the wizard could offer a look.
+
+---
+
 ## Decision Register
 
 | ID | Decision | Since | Status |
@@ -716,6 +776,9 @@ You then asked to commit and push: `0419238`.
 | D38 | The GPU renderer is created only for games that use rule wipes (and in development); others start on D3D11 to meet the 250 ms start budget. Gamepads start after the first frame | session 14 | ✅ Active |
 | D39 | Sunflower Days' third language is Simplified Chinese (`zh-Hans`, Mandarin), replacing Spanish; the player orders CJK fallback fonts by language (YaHei for zh-Hans, JhengHei for zh-Hant, Yu Gothic otherwise) | session 14c | ✅ Active |
 | D40 | Plan v0.6: a Studio **UI Designer** (§11.6) becomes Phase 6 (≈ 4 weeks): every built-in UI element movable, resizable, and restylable on the live preview, with a color wheel, palette tokens, presets, and accessibility guards; theme schema 2.0 compiled into `THEM`; AI depth becomes Phase 7, the launch Phase 8 | session 14c | ✅ Active |
+| D41 | Theme 2.0 (rfcs/0010): layout, shapes, motion, sounds, presets, and palettes in `theme/theme.json`, compiled into new `THEM` keys (bytecode stays 1.1); the runtime falls back to the himawari look; contrast (HW0133) and edge (HW0132) warnings | session 15 | ✅ Active |
+| D42 | Studio has light (default), dark, and match-Windows themes; colors are CSS tokens per theme and components never use raw colors; the main process mirrors the choice in `nativeTheme.themeSource` | session 15 | ✅ Active |
+| D43 | The UI Designer edits a mock of each screen beside the real docked game (HTML can't draw over the native preview window); changes are ordinary edits of theme.json, one undo step per drag | session 15 | ✅ Active |
 
 Also: **D13** (games export for Windows x64 only) stays active; its "internal Linux runtime" clause is superseded by D21.
 
@@ -726,13 +789,14 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 14d)
+## Next Steps (after session 15)
 
-1. **Review session 14d and decide on committing it.** Sessions 14b and 14c are committed (`d9dfdd5`); the cross-check fixes are not. Try `examples/sunflower-demo` in Chinese (`hwc run`, then Language).
+1. **Review Phase 6 and decide on committing it** (nothing from session 15 is committed). Try Studio in light and dark (Settings → Studio → Appearance), and the UI Designer (the palette icon) on Sunflower Days: a preset, a palette, dragging the textbox, the color wheel.
 2. Watch the first CI run of Phase 5: the golden suite and the budget step run on GPU-less runners for the first time; if the golden tolerance is too tight there, regenerate references from CI's artifacts or widen it per case.
 3. Phase 5 follow-ups: a real gamepad test; the ≈ 200 ms GPU renderer start for games with rule wipes (create the GPU device in the background, or draw rule wipes on D3D11 without the GPU renderer); export icon and version patching (plan §14.4, `resedit`); async image decoding (a 4K JPEG costs one 67 ms frame); human review of the Chinese and Japanese demo text (and its 81 Chinese UI strings) and the 48 new runtime UI strings in Japanese.
 4. **The M2 hallway test** (plan §18): a non-programmer creates, writes, previews, localizes one scene, and exports, in English or Japanese, without docs, while an AI contributes through Mode A (a Claude app) and Mode B (the assistant, with your API key). Its findings decide the first Studio fixes.
 5. **Try Mode B with your key** (Settings → Built-in assistant), and add `ANTHROPIC_API_KEY` as a repository secret if you want CI's prompt-cache check to run (a few cents per run).
 6. Follow-ups: a real PSD/ORA from an artist through the importer; the Screenplay block palette and multi-select (§11.3 "later"); a pseudo-locale screenshot diff in CI; the agent loop in a utility process if long turns ever stutter the UI; watching for a hung preview (rfcs/0006 open question); app icon and code signing before v1.0. Earlier follow-ups stand: the MCP tasks extension, MCP Apps UI, runtime items from session 10.
 7. Human review of AI-written Japanese: `examples/tutorial` (30 lines), `examples/festival-eve` (45 lines), and Studio's own UI and diagnostic messages (`packages/studio/locales/ja.json`, 453 messages, written by the AI).
-8. **Phase 6: the UI Designer** (plan §11.6), on your go-ahead: an RFC for theme schema 2.0 and the data-driven runtime UI first, then the runtime, then the Studio panel. Phase 7 (AI depth and polish) and Phase 8 (launch) follow.
+8. **Phase 6 follow-ups:** the hallway test (restyle a game in 15 minutes without docs); a "look" step in the New Project wizard (start a game as pastel, say); the game's own fonts and languages in the Designer's mock; per-language layout overrides if projects ask (rfcs/0010 open question).
+9. **Phase 7: AI depth and polish**, on your go-ahead.

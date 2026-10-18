@@ -7,9 +7,13 @@
 
 export type UiLanguage = "en" | "ja" | "en-XA";
 
+/** Studio's color theme: light (the default), dark, or whatever Windows uses. */
+export type Appearance = "light" | "dark" | "system";
+
 export interface Settings {
   /** Studio's UI language (§11.5). "en-XA" is the pseudo-locale, offered in development builds. */
   language: UiLanguage;
+  appearance: Appearance;
   recentProjects: string[];
   /** The coach mark on the first project ("Type a line. Watch it appear.") was dismissed. */
   coachDone: boolean;
@@ -49,7 +53,7 @@ export interface ProjectSnapshot {
   assets: string[];
 }
 
-export type BundledProject = "tutorial" | "festival-eve" | "layered";
+export type BundledProject = "tutorial" | "sunflower-demo" | "festival-eve" | "layered";
 
 export interface NewProjectOptions {
   /** The parent folder; the project gets its own folder inside it. */
@@ -92,6 +96,8 @@ export type PreviewEvent =
   | { ev: "state"; screen: string; line: string | null; waiting: boolean; choice: boolean; error?: string }
   | { ev: "reloaded"; result: string; message: string }
   | { ev: "warp"; ok: boolean; to: string; message?: string }
+  /** A button label that doesn't fit (development; the UI Designer lists them). */
+  | { ev: "overflow"; text: string; lang: string }
   | { ev: "exited"; code: number | null }
   /** Studio rebuilt build/game.hwb after a save (not from the runtime). */
   | { ev: "built"; ok: boolean; errors: string; ms: number }
@@ -103,7 +109,9 @@ export type PreviewCommand =
   | { cmd: "restart" }
   | { cmd: "next_menu" }
   | { cmd: "advance" }
-  | { cmd: "lang"; lang: string };
+  | { cmd: "lang"; lang: string }
+  /** Shows a built-in screen (the UI Designer): title, play, menu, load, history, config, controls, accessibility, extras, gallery, music. */
+  | { cmd: "screen"; name: string };
 
 export interface Rect {
   x: number;
@@ -184,7 +192,9 @@ export interface StudioApi {
   };
   dialog: {
     pickFolder(): Promise<string | null>;
-    pickFile(kind: "psd" | "ora" | "image" | "audio" | "translation"): Promise<string | null>;
+    pickFile(kind: "psd" | "ora" | "image" | "audio" | "translation" | "theme"): Promise<string | null>;
+    /** Asks where to save a file and writes `text` there (a theme pack). False when cancelled. */
+    saveFile(kind: "theme", defaultName: string, text: string): Promise<boolean>;
   };
   project: {
     create(options: NewProjectOptions): Promise<ProjectSnapshot>;

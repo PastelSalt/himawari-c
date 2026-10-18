@@ -1,12 +1,56 @@
 import { useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
-import type { BundledProject, ProjectSnapshot, UiLanguage } from "../../../shared/api";
+import type { Appearance, BundledProject, ProjectSnapshot, UiLanguage } from "../../../shared/api";
 import { studio } from "../api";
 import { useStudio } from "../store";
 import { Icon } from "./Icon";
 import { NewProjectWizard } from "./Wizard";
 
-/** The first screen (plan §2.1): New Project, Open, the tutorial, samples, and the UI language. */
+/** Himawari's mark: a flat sunflower (petals around a seed disc), drawn in the theme's accent. */
+export function Logo() {
+  const petals = Array.from({ length: 12 }, (_, i) => i * 30);
+  return (
+    <svg className="logo" viewBox="0 0 64 64" aria-hidden>
+      <g transform="translate(32 32)">
+        {petals.map((a) => (
+          <ellipse key={a} cx="0" cy="-19" rx="6.5" ry="11" transform={`rotate(${a})`} fill="var(--accent)" stroke="var(--accent-line)" strokeWidth="1" />
+        ))}
+        <circle r="12" fill="var(--hl-string)" opacity="0.85" />
+        <circle r="12" fill="none" stroke="var(--accent-hover)" strokeWidth="1.5" />
+      </g>
+    </svg>
+  );
+}
+
+/** Light, dark, or Windows's own theme (Settings → Appearance). */
+export function ThemeSelect({ compact = false }: { compact?: boolean }) {
+  const intl = useIntl();
+  const appearance = useStudio((s) => s.settings?.appearance ?? "light");
+  const options: [Appearance, string][] = [
+    ["light", "sun"],
+    ["dark", "moon"],
+    ["system", "monitor"],
+  ];
+  return (
+    <div className="segmented theme-select" role="radiogroup" aria-label={intl.formatMessage({ id: "settings.theme" })}>
+      {options.map(([a, icon]) => (
+        <button
+          key={a}
+          role="radio"
+          aria-checked={appearance === a}
+          className={appearance === a ? "active" : ""}
+          title={intl.formatMessage({ id: `settings.theme.${a}` })}
+          onClick={() => void useStudio.getState().setSettings({ appearance: a })}
+        >
+          <Icon name={icon} />
+          {!compact && <FormattedMessage id={`settings.theme.${a}`} />}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** The first screen (plan §2.1): New Project, Open, the tutorial, samples, the UI language, and the theme. */
 export function Welcome() {
   const intl = useIntl();
   const settings = useStudio((s) => s.settings)!;
@@ -41,9 +85,7 @@ export function Welcome() {
     <div className="welcome">
       <div className="welcome-card">
         <div className="welcome-brand">
-          <span className="logo" aria-hidden>
-            🌻
-          </span>
+          <Logo />
           <div>
             <h1>
               <FormattedMessage id="app.title" />
@@ -131,6 +173,7 @@ export function Welcome() {
               ))}
             </select>
           </label>
+          <ThemeSelect compact />
           <span className="muted small">{info ? intl.formatMessage({ id: "welcome.version" }, { version: info.version }) : ""}</span>
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 An open-source, AI-assisted **visual novel engine** for developers. Write in plain text, play instantly, ship a small native Windows game.
 
-> **Status: Phases 0–5 built.** The script language, compiler, and validator (`hwc`), the C runtime (`himawari.exe`, about 2.6 MB, feature-complete: menus, saves, config, accessibility, gamepad, gallery, music room, novel mode, themes, asset packs), the AI tools (`himawari-mcp`), and **Himawari Studio** (the editor, with the game playing beside it as you write) work. The Phase 4 hallway test with a non-programmer is still to do. Next is Phase 6, the Studio UI Designer. See [DETAILED_PLAN.md](DETAILED_PLAN.md) for the full plan and [LOG.md](LOG.md) for progress.
+> **Status: Phases 0–6 built.** The script language, compiler, and validator (`hwc`), the C runtime (`himawari.exe`, about 2.6 MB, feature-complete: menus, saves, config, accessibility, gamepad, gallery, music room, novel mode, themes, asset packs), the AI tools (`himawari-mcp`), and **Himawari Studio** (the editor, with the game playing beside it as you write) work. Studio's **UI Designer** restyles a game's menus and textbox by hand (move, resize, recolor, presets, a color wheel), and Studio itself comes in light (the default), dark, or Windows's own theme. The hallway tests with non-programmers (Phases 4 and 6) are still to do. See [DETAILED_PLAN.md](DETAILED_PLAN.md) for the full plan and [LOG.md](LOG.md) for progress.
 >
 > **Platform: Windows only.** Games, Studio, and all tooling target Windows x64. Linux support is planned as a future improvement.
 

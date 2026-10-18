@@ -26,6 +26,7 @@ Every command is an object with a string `cmd`. Unknown commands and malformed l
 | `next_menu` | | Play on without waiting until the next menu or the end. Sound effects and voices are skipped on the way; music and ambience follow the display state. |
 | `advance` | | What a click does: finish the text, or go to the next line. |
 | `lang` | `lang` (string) | Show the story in another language for this run only (the player's own choice isn't changed). |
+| `screen` | `name` (string) | Show a built-in screen: `title`, `play`, `menu`, `load`, `history`, `config`, `controls`, `accessibility`, `extras`, `gallery`, `music` (the UI Designer, rfcs/0010). |
 | `quit` | | Quit. |
 
 ## Events (stdout)
@@ -38,6 +39,7 @@ Every event is an object with a string `ev`.
 | `state` | `screen` (`title`, `play`, `menu`, `slots`, `history`, `confirm`, `end`, `error`, `config`, `controls`, `accessibility`, `extras`, `gallery`, `cg`, `music`; readers show unknown names generically), `line` (6-character line ID or `null`), `waiting` (bool: the player is expected to click or choose), `choice` (bool: a menu is shown), `error` (string, only when `screen` is `error`) | Whenever any of these changes. Studio highlights the line (green while playing, yellow while waiting) and follows it. |
 | `reloaded` | `result` (`exact`, `remapped`, `fallback`, `restarted`, `title`, `failed`), `message` (string) | After each `reload`. `fallback`: the current line was edited away and play resumed a little earlier. |
 | `warp` | `ok` (bool), `to` (string), `message` (when not ok) | After each `warp`. |
+| `overflow` | `text` (string), `lang` (string) | A button label that doesn't fit its button, once per text (the UI Designer lists them). |
 
 ## Versioning
 

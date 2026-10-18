@@ -154,7 +154,13 @@ The mode is part of the saved state.
 
 ### 2.9 Themes
 
-`theme/theme.json` ([theme.schema.json](theme.schema.json)) restyles the built-in UI without code: colors, the textbox (opacity, height, a nine-slice image), text size, fonts, the title and menu backgrounds, the title music, the default transition time, and per-language UI strings. Core validates it (`HW0130`, unknown settings `HW0131` with suggestions) and compiles it into the bytecode, so the runtime never reads JSON.
+`theme/theme.json` ([theme.schema.json](theme.schema.json) 2.0, rfcs/0007 and rfcs/0010) restyles the built-in UI without code:
+- **Look:** colors, rounded corners, borders, shadows, how a pointed-at button shows it, text size and outline, fonts, a nine-slice textbox image, the title and menu backgrounds, and the title music.
+- **Layout:** where the textbox, its text area, the name plate, the choices, the quick buttons, the novel-mode page, the game's title, and the title and game menus are, and how big. Places are in percent of the screen; sizes are in pixels at a 1080-pixel-high screen.
+- **Motion and sound:** how choices appear, and hover and click sounds.
+- **Text:** per-language UI strings, and the default transition time.
+
+A theme can start from a `preset` (`himawari`, `pastel`, `minimal`, `paper`, `night`, `retro`, `high-contrast`); its own settings override the preset's. Studio's UI Designer edits it visually. Core validates it (`HW0130`; unknown settings `HW0131` with suggestions) and warns about elements past the edge of the screen (`HW0132`) and hard-to-read text (`HW0133`, below 4.5:1). It compiles the theme into the bytecode, so the runtime never reads JSON. The player's accessibility settings still apply over any theme.
 
 ## 3. Line IDs
 

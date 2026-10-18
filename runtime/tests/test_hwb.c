@@ -227,7 +227,7 @@ int main(void)
         CHECK(m.minor == 1 && m.ext_count == 2 && m.theme_count > 0);
         CHECK(strcmp(hw_str(&m, m.exts[0].name), "phone") == 0 && (m.exts[0].flags & HW_XTNS_BLOCKING));
         const hw_theme_entry *accent = hw_module_theme(&m, "color.accent");
-        CHECK(accent && accent->type == HW_THEME_COLOR && accent->value == 0xff8800);
+        CHECK(accent && accent->type == HW_THEME_COLOR && accent->value == 0xffaa33);
         CHECK(hw_module_theme(&m, "color.nope") == NULL);
         /* Find the first TEXTBOX and XCALL by walking the instructions. */
         uint32_t code_at = section_at(bytes, "CODE", NULL) + 4, textbox = 0, xcall = 0;

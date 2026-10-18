@@ -13,7 +13,7 @@ export const SPEC_VERSIONS = {
   bytecode: "1.1.0",
   ast: "1.1.0",
   extension: "1.0.0-draft",
-  theme: "1.0.0-draft",
+  theme: "2.0.0-draft",
   pack: "1.0.0",
 } as const;
 

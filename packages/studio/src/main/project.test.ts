@@ -15,6 +15,6 @@ describe("project snapshot", () => {
     for (const f of Object.keys(files)) expect(isProjectText(f), f).toBe(true);
     const model = buildModel(files, snap.assets);
     expect(model.errors).toBe(0);
-    expect(model.check.theme?.get("color.accent")).toEqual({ type: "color", value: 0xf5b700 });
+    expect(model.check.theme?.get("color.accent")).toEqual({ type: "color", value: 0xf5ba0a });
   });
 });

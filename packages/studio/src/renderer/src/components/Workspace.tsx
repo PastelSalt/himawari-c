@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { type Tool, useStudio } from "../store";
 import { Assets } from "./Assets";
+import { Designer } from "./Designer";
 import { Assistant } from "./Assistant";
 import { BottomPanel } from "./BottomPanel";
 import { BuildPanel } from "./BuildPanel";
@@ -65,6 +66,7 @@ const TOOLS: { tool: Tool; icon: string; label: string }[] = [
   { tool: "variables", icon: "variables", label: "tool.variables" },
   { tool: "localization", icon: "translate", label: "tool.localization" },
   { tool: "graph", icon: "graph", label: "tool.graph" },
+  { tool: "designer", icon: "palette", label: "tool.designer" },
   { tool: "build", icon: "build", label: "tool.build" },
 ];
 
@@ -124,15 +126,21 @@ export function Workspace() {
             <Icon name="settings" size={20} />
           </button>
         </nav>
-        <aside className="side" style={{ width: sideW }}>
-          <Explorer />
-        </aside>
-        <Splitter dir="col" onDrag={(d) => setSideW(Math.min(480, Math.max(170, sideW + d)))} />
+        {/* The UI Designer needs the room more than the project tree does. */}
+        {active !== "designer" && (
+          <>
+            <aside className="side" style={{ width: sideW }}>
+              <Explorer />
+            </aside>
+            <Splitter dir="col" onDrag={(d) => setSideW(Math.min(480, Math.max(170, sideW + d)))} />
+          </>
+        )}
         <div className="ws-center-col">
           <main className="center">
             {center?.kind === "file" && <FileEditor file={center.file} />}
             {center?.kind === "tool" && center.tool === "characters" && <Characters initial={center.arg} />}
             {center?.kind === "tool" && center.tool === "assets" && <Assets />}
+            {center?.kind === "tool" && center.tool === "designer" && <Designer />}
             {center?.kind === "tool" && center.tool === "variables" && <Variables />}
             {center?.kind === "tool" && center.tool === "localization" && <Localization />}
             {center?.kind === "tool" && center.tool === "graph" && <StoryGraph />}

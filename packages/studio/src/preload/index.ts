@@ -20,7 +20,7 @@ function listen<A extends unknown[]>(channel: string) {
 const api: StudioApi = {
   app: { info: call("app.info"), openExternal: call("app.openExternal"), reveal: call("app.reveal") },
   settings: { get: call("settings.get"), set: call("settings.set") },
-  dialog: { pickFolder: call("dialog.pickFolder"), pickFile: call("dialog.pickFile") },
+  dialog: { pickFolder: call("dialog.pickFolder"), pickFile: call("dialog.pickFile"), saveFile: call("dialog.saveFile") },
   project: {
     create: call("project.create"),
     open: call("project.open"),

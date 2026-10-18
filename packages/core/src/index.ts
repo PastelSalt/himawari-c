@@ -38,7 +38,25 @@ export { DEFAULT_POSITIONS, type Manifest, type VarType, type VariableDecl, read
 export { editDistance, suggest } from "./project/suggest.js";
 export { RenameError, type RenameKind, type RenamePlan, planRename, splitFrontmatter } from "./project/rename.js";
 export { type ExtensionDef, type ExtensionParam, type MacroEntry, PARAM_TYPES, type ParamType, readExtension } from "./project/invoke.js";
-export { THEME_STRING_KEYS, type ThemeEntries, type ThemeValue, readTheme } from "./project/theme.js";
+export {
+  CONTRAST_PAIRS,
+  THEME_COLORS,
+  THEME_DEFAULTS,
+  THEME_PALETTES,
+  THEME_PRESETS,
+  THEME_PRESET_NAMES,
+  THEME_SETTINGS,
+  THEME_STRING_KEYS,
+  type ResolvedTheme,
+  type ThemeColor,
+  type ThemeEntries,
+  type ThemeJson,
+  type ThemeValue,
+  contrastRatio,
+  fixContrast,
+  readTheme,
+  resolveTheme,
+} from "./project/theme.js";
 export { lineIdToNumber, numberToLineId } from "./ids.js";
 export { type CompileResult, compile } from "./bytecode/compiler.js";
 export { writeHwb } from "./bytecode/writer.js";

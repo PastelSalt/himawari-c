@@ -147,7 +147,12 @@ typedef struct game {
 
     /* The theme (THEM) and extension statements (XTNS), bound to the module at startup and on reload. */
     hw_palette pal;
-    float tb_alpha, tb_height, tb_pad, text_px; /* textbox opacity (0-1), height (share of the screen), padding and text size (px at 1080p) */
+    float tb_alpha, text_px; /* textbox opacity (0-1) and text size (px at 1080p) */
+    hw_ui_layout ui;         /* where the UI's elements are and how they look (theme 2.0, rfcs/0010) */
+    double menu_t0;          /* when the current menu appeared (choice animations) */
+    int hover_id;            /* the button under the pointer or focus last frame (hover sounds), -1 = none */
+    uint32_t overflow_seen[32]; /* labels already reported as too long for their button (debug pipe) */
+    int overflow_count;
     int32_t trans_ms;                           /* duration of transitions written without one */
     hw_fonts *name_fonts;                       /* theme font.name for the nameplate, or NULL */
     int fonts_font;                             /* the font setting g->fonts was opened with (-1 = none yet) */
@@ -189,6 +194,16 @@ static inline const char *ui(const game *g, hw_ui_string id) { return hw_theme_u
 static inline bool point_in(float x, float y, SDL_FRect r) { return x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h; }
 
 void fill(game *g, SDL_FRect r, uint32_t rgb, float a);
+/* A rectangle with rounded corners of radius `rad` (screen px); a plain fill when rad is 0. */
+void rounded(game *g, SDL_FRect r, float rad, uint32_t rgb, float a);
+/* A panel in the theme's shape: shadow, rounded corners, and border (shape.*). */
+void panel(game *g, SDL_FRect r, uint32_t rgb, float a);
+/* How a hovered or focused button shows it (shape.hover). */
+void hover_mark(game *g, SDL_FRect r);
+/* The ADV textbox's rectangle on screen. */
+SDL_FRect textbox_rect(const game *g);
+/* Plays a UI sound from the theme (sound.hover, sound.click), if it has one. */
+void ui_sound(game *g, const char *name);
 void gradient(game *g, SDL_FRect r, uint32_t top, uint32_t bottom, float a);
 void label(game *g, const char *s, float px, float x, float y, int align, SDL_Color c);
 void save_global(game *g);

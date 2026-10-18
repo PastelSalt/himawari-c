@@ -122,14 +122,15 @@ static void cfg_button(game *g, SDL_FRect r, cfg_row row)
     int index = g->hit_count;
     if (g->hit_count < MAX_HITS) g->hits[g->hit_count++] = (hit){ r, BTN_CFG + (int)row };
     bool hover = point_in(g->mx, g->my, r) || g->focus == index;
-    fill(g, r, hover ? g->pal.choice_hover : g->pal.panel, hover ? 0.95f : 0.85f);
-    if (hover) fill(g, (SDL_FRect){ r.x, r.y, sc(g, 6), r.h }, g->pal.accent, 1.0f);
+    panel(g, r, hover ? g->pal.choice_hover : g->pal.button, hover ? 0.95f : fmaxf(0.85f, g->tb_alpha));
+    if (hover) hover_mark(g, r);
     float base = r.y + r.h / 2 + sc(g, 28) * 0.36f;
-    label(g, ui(g, CFG_LABEL[row]), 28, r.x + sc(g, 26), base, 0, hover ? col(g->pal.accent) : col(g->pal.text));
+    label(g, ui(g, CFG_LABEL[row]), 28, r.x + sc(g, 26) + (g->ui.radius > 0 && g->ui.hover == HW_HOVER_BAR ? sc(g, 10) : 0), base, 0,
+          hover ? col(g->pal.accent) : col(g->pal.button_text));
     char value[64];
     cfg_value(g, row, value, sizeof value);
     /* Not color alone: the focused row also has the bar on its left (§13). */
-    label(g, value, 28, r.x + r.w - sc(g, 26), base, 2, col(g->pal.text));
+    label(g, value, 28, r.x + r.w - sc(g, 26), base, 2, col(g->pal.button_text));
 }
 
 static void back_button(game *g, int id)
@@ -164,7 +165,7 @@ void draw_a11y(game *g)
     memset(&rt, 0, sizeof rt);
     hw_rich_plain(&rt, ui(g, UI_A11Y_PROMPT_BODY));
     hw_rich_layout(&rt, g->fonts, g->W * 0.7f, sc(g, 30), g->lang);
-    hw_rich_draw(g->fonts, &rt, (g->W - rt.width) / 2, sc(g, 150), 1e9f, 0, 1, col(g->pal.text), col(g->pal.ink), 2.0f);
+    hw_rich_draw(g->fonts, &rt, (g->W - rt.width) / 2, sc(g, 150), 1e9f, 0, 1, col(g->pal.text), col(g->pal.ink), g->ui.outline);
     hw_rich_free(&rt);
     static const cfg_row rows[] = { CFG_LANGUAGE, CFG_TEXT_SIZE, CFG_FONT, CFG_LINE_SPACING, CFG_CONTRAST, CFG_MOTION, CFG_TEXT_SPEED };
     float y = sc(g, 290);
@@ -252,7 +253,7 @@ void draw_gallery(game *g)
         if (i >= u->cg_count) break;
         SDL_FRect r = { g->W * 0.07f + (float)(k % GALLERY_COLUMNS) * (cw + gap), sc(g, 140) + (float)(k / GALLERY_COLUMNS) * (ch + gap), cw, ch };
         if (!u->cg_seen[i]) {
-            fill(g, r, g->pal.panel, 0.9f);
+            panel(g, r, g->pal.panel, 0.9f);
             label(g, ui(g, UI_LOCKED), 22, r.x + r.w / 2, r.y + r.h / 2 + sc(g, 8), 1, col(g->pal.dim));
             continue;
         }
@@ -294,7 +295,7 @@ void draw_music(game *g)
         SDL_FRect r = { g->W * 0.2f, y, g->W * 0.6f, h };
         y += h + sc(g, 10);
         if (!u->music_heard[i]) {
-            fill(g, r, g->pal.panel, 0.7f);
+            panel(g, r, g->pal.panel, 0.7f);
             label(g, ui(g, UI_LOCKED), 26, r.x + sc(g, 26), r.y + h / 2 + sc(g, 9), 0, col(g->pal.dim));
             continue;
         }

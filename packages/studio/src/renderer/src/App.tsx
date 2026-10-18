@@ -4,10 +4,12 @@ import { Welcome } from "./components/Welcome";
 import { Workspace } from "./components/Workspace";
 import { MESSAGES, intlLocale } from "./i18n";
 import { useStudio } from "./store";
+import { useTheme } from "./theme";
 
 export function App() {
   const settings = useStudio((s) => s.settings);
   const root = useStudio((s) => s.root);
+  useTheme();
 
   useEffect(() => {
     void useStudio.getState().init();

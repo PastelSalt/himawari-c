@@ -4,6 +4,7 @@ import ELK from "elkjs/lib/elk.bundled.js";
 import { useEffect, useMemo, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { useStudio } from "../store";
+import { token, useTheme } from "../theme";
 
 type SceneData = { scene: string; file: string; lines: number; entry: boolean; ending: boolean; reachable: boolean; playing: boolean };
 
@@ -18,6 +19,12 @@ export function StoryGraph() {
   const playingLine = useStudio((s) => s.preview.line);
   const playingScene = playingLine ? model?.lines.get(playingLine)?.scene : undefined;
   const graph = useMemo(() => (model ? storyGraph(model.check) : null), [model]);
+  const theme = useTheme();
+  // React Flow draws edges and the grid as SVG attributes, which can't use var(): read the tokens.
+  const colors = useMemo(
+    () => ({ edge: token("--hl-punct"), call: token("--info"), text: token("--text"), label: token("--bg-2"), grid: token("--border") }),
+    [theme], // recomputed when the theme changes
+  );
   const [positions, setPositions] = useState<Map<string, { x: number; y: number }>>(new Map());
 
   // Layout with ELK (layered, left to right) whenever the graph's shape changes.
@@ -79,9 +86,9 @@ export function StoryGraph() {
       label: label || undefined,
       animated: false,
       markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
-      style: { strokeDasharray: e.when ? "6 4" : e.kind === "call" ? "2 4" : undefined, stroke: e.kind === "call" ? "#6fb3ff" : "#8a8fa6" },
-      labelStyle: { fill: "#e6e7ee", fontSize: 11 },
-      labelBgStyle: { fill: "#23252e" },
+      style: { strokeDasharray: e.when ? "6 4" : e.kind === "call" ? "2 4" : undefined, stroke: e.kind === "call" ? colors.call : colors.edge },
+      labelStyle: { fill: colors.text, fontSize: 11 },
+      labelBgStyle: { fill: colors.label },
     };
   });
 
@@ -108,7 +115,7 @@ export function StoryGraph() {
           nodes={nodes}
           edges={edges}
           nodeTypes={NODE_TYPES}
-          colorMode="dark"
+          colorMode={theme}
           fitView
           fitViewOptions={{ padding: 0.15, maxZoom: 1.1 }}
           nodesDraggable={false}
@@ -120,7 +127,7 @@ export function StoryGraph() {
             if (scene) s.revealAt(scene.file, scene.start);
           }}
         >
-          <Background gap={24} color="#2a2c36" />
+          <Background gap={24} color={colors.grid} />
           <Controls showInteractive={false} />
         </ReactFlow>
         )}

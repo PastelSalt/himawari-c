@@ -2,15 +2,17 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { app } from "electron";
-import type { Settings, UiLanguage } from "../shared/api.js";
+import type { Appearance, Settings, UiLanguage } from "../shared/api.js";
 
 const LANGUAGES: readonly UiLanguage[] = ["en", "ja", "en-XA"];
+const APPEARANCES: readonly Appearance[] = ["light", "dark", "system"];
 
 function defaults(): Settings {
   // English is the default (§11.5); a Japanese Windows starts in Japanese.
   const ui: UiLanguage = app.getLocale().toLowerCase().startsWith("ja") ? "ja" : "en";
   return {
     language: ui,
+    appearance: "light",
     recentProjects: [],
     coachDone: false,
     ai: { model: "claude-opus-5-5", replyLanguage: "", autoAccept: {}, effort: "high" },
@@ -30,6 +32,7 @@ function sanitize(raw: unknown): Settings {
   const auto = ai["autoAccept"] && typeof ai["autoAccept"] === "object" ? (ai["autoAccept"] as Record<string, unknown>) : {};
   return {
     language: LANGUAGES.includes(r["language"] as UiLanguage) ? (r["language"] as UiLanguage) : d.language,
+    appearance: APPEARANCES.includes(r["appearance"] as Appearance) ? (r["appearance"] as Appearance) : d.appearance,
     recentProjects: Array.isArray(r["recentProjects"]) ? r["recentProjects"].filter((p): p is string => typeof p === "string").slice(0, 10) : [],
     coachDone: r["coachDone"] === true,
     ai: {

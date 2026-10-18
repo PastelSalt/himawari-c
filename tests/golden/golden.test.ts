@@ -3,17 +3,18 @@
  * of examples/sunflower-demo and each frame must match its reference image
  * (perceptually: see compare_golden in runtime/src/app/hw_screens.c). Runs
  * when a built runtime is found (HIMAWARI_RUNTIME, or runtime/build/...);
- * skipped otherwise. Japanese cases need Yu Gothic, Chinese ones Microsoft YaHei (both
+ * skipped otherwise. The theme presets (rfcs/0010) are drawn on a copy of the demo. Japanese cases need Yu Gothic, Chinese ones Microsoft YaHei (both
  * ship with Windows, but not every CI image has them).
  *
  * Regenerate (then look at every image!) with:
  *   HW_UPDATE_GOLDEN=1 corepack pnpm vitest run tests/golden
  */
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, test } from "vitest";
+import { afterAll, describe, expect, test } from "vitest";
 import { compileProject } from "../../packages/tools/src/package.js";
 import { ProjectFs } from "../../packages/tools/src/fs.js";
 import { findRuntime } from "../../packages/tools/src/runtime.js";
@@ -40,6 +41,21 @@ const CASES: [string, string[], { needs?: "ja" | "zh" }][] = [
   ["zh-accessibility-prompt", ["--screen", "accessibility", "--lang", "zh-Hans"], { needs: "zh" }],
 ];
 
+/** Theme presets (rfcs/0010): the demo under each one, at a line with a speaker and on its title screen. */
+const PRESETS = ["pastel", "minimal", "paper", "night", "retro", "high-contrast"];
+
+function run(project: string, name: string, args: string[]) {
+  const golden = join(HERE, `${name}.png`);
+  const r = spawnSync(
+    runtime as string,
+    ["--project", project, ...args, "--text-speed", "1000", "--no-gpu", "--frames", "45", "--compare", golden],
+    { encoding: "utf8", env: { ...process.env, SDL_AUDIO_DRIVER: "dummy", SDL_WINDOW_ACTIVATE_WHEN_SHOWN: "0" }, timeout: 60000 },
+  );
+  const log = `${r.stdout}${r.stderr}`;
+  expect(r.status, log).toBe(0);
+  if (!process.env["HW_UPDATE_GOLDEN"]) expect(log).toMatch(/golden: .*: match/);
+}
+
 describe.skipIf(!runtime)("golden images (sunflower-demo)", () => {
   test("the demo builds", () => {
     const fs = new ProjectFs(DEMO);
@@ -49,16 +65,27 @@ describe.skipIf(!runtime)("golden images (sunflower-demo)", () => {
   });
 
   for (const [name, args, opts] of CASES) {
-    test.skipIf(opts.needs !== undefined && !hasFont[opts.needs])(name, () => {
-      const golden = join(HERE, `${name}.png`);
-      const r = spawnSync(
-        runtime as string,
-        ["--project", DEMO, ...args, "--text-speed", "1000", "--no-gpu", "--frames", "45", "--compare", golden],
-        { encoding: "utf8", env: { ...process.env, SDL_AUDIO_DRIVER: "dummy", SDL_WINDOW_ACTIVATE_WHEN_SHOWN: "0" }, timeout: 60000 },
-      );
-      const log = `${r.stdout}${r.stderr}`;
-      expect(r.status, log).toBe(0);
-      if (!process.env["HW_UPDATE_GOLDEN"]) expect(log).toMatch(/golden: .*: match/);
-    }, 60000);
+    test.skipIf(opts.needs !== undefined && !hasFont[opts.needs])(name, () => run(DEMO, name, args), 60000);
+  }
+});
+
+describe.skipIf(!runtime)("golden images (theme presets)", () => {
+  const dirs: string[] = [];
+  afterAll(() => dirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
+
+  for (const preset of PRESETS) {
+    test(`preset ${preset}`, () => {
+      const dir = mkdtempSync(join(tmpdir(), "hw-golden-"));
+      dirs.push(dir);
+      cpSync(DEMO, dir, { recursive: true, filter: (s) => !s.endsWith("build") && !s.includes("\build\\") });
+      const theme = JSON.parse(readFileSync(join(dir, "theme/theme.json"), "utf8")) as Record<string, unknown>;
+      writeFileSync(join(dir, "theme/theme.json"), JSON.stringify({ preset, title: theme["title"], strings: theme["strings"] }));
+      const fs = new ProjectFs(dir);
+      const c = compileProject(fs);
+      expect(c.errors).toBe("");
+      fs.write("build/game.hwb", c.bytes as Uint8Array);
+      run(dir, `preset-${preset}-textbox`, ["--warp", "#07cgn7"]);
+      run(dir, `preset-${preset}-menu`, ["--warp", "#7qff7k"]);
+    }, 120000);
   }
 });
