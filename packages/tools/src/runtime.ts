@@ -9,14 +9,18 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 /**
- * Where himawari.exe is: $HIMAWARI_RUNTIME, else beside this package in a
- * Himawari checkout (runtime/build/win64-release, then win64-debug), else null.
+ * Where himawari.exe is: $HIMAWARI_RUNTIME, else runtime/himawari.exe in an
+ * installed Studio's resources, else in a Himawari checkout
+ * (runtime/build/win64-release, then win64-debug), else null.
  */
 export function findRuntime(): string | null {
   const env = process.env["HIMAWARI_RUNTIME"];
   if (env && existsSync(env)) return resolve(env);
   let dir = dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 6; i++) {
+    // Installed with Studio: resources/runtime/himawari.exe beside resources/mcp/.
+    const installed = join(dir, "runtime", "himawari.exe");
+    if (existsSync(installed)) return installed;
     for (const preset of ["win64-release", "win64-debug"]) {
       const exe = join(dir, "runtime", "build", preset, "himawari.exe");
       if (existsSync(exe)) return exe;

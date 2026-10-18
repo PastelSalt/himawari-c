@@ -10,11 +10,11 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "typecheck": "tsc -b && tsc -p tests",
+    "typecheck": "tsc -b && tsc -p tests && tsc -p packages/studio/tsconfig.node.json && tsc -p packages/studio/tsconfig.web.json",
     "test": "vitest run",
     "lint": "eslint .",
     "check:i18n": "node packages/studio/scripts/check-locales.mjs",
-    "check": "tsc -b && tsc -p tests && eslint . && vitest run && node packages/studio/scripts/check-locales.mjs"
+    "check": "tsc -b && tsc -p tests && tsc -p packages/studio/tsconfig.node.json && tsc -p packages/studio/tsconfig.web.json && eslint . && vitest run && node packages/studio/scripts/check-locales.mjs"
   },
   "devDependencies": {
     "@formatjs/icu-messageformat-parser": "3.5.21",

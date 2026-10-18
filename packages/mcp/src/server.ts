@@ -11,6 +11,7 @@ import { CORE_VERSION, graphToMermaid, storyGraph } from "@himawari/core";
 import { ProjectFs, SandboxError, TOOLS, type ToolContext, ToolError, check, findScene, isConfirm } from "@himawari/tools";
 import { McpServer, ResourceTemplate, acceptedContent, inputRequired } from "@modelcontextprotocol/server";
 import { z } from "zod";
+import type { ToolResultLike } from "./studio-link.js";
 
 export interface ServerOptions {
   /** The project folder (contains himawari.json). */
@@ -18,13 +19,23 @@ export interface ServerOptions {
   /** himawari.exe, or null when there is none. */
   runtime: string | null;
   allowBuild: boolean;
+  /** Set when Studio hosts this server: writes become proposals for the user (plan §4.2). */
+  propose?: ToolContext["propose"];
+  /**
+   * Set for the stdio server: a write tool is sent to Studio when it has the
+   * project open (resolves null when it hasn't, and the write happens here).
+   */
+  forwardWrite?: (name: string, args: Record<string, unknown>) => Promise<ToolResultLike | null>;
 }
 
-/** spec/ beside this package in a checkout, or $HIMAWARI_SPEC_DIR. */
+/** $HIMAWARI_SPEC_DIR, else spec/ in a checkout (packages/mcp/dist → spec), else beside an installed Studio's resources/mcp. */
 function specDir(): string {
   const env = process.env["HIMAWARI_SPEC_DIR"];
   if (env && existsSync(env)) return env;
-  return join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..", "spec");
+  const here = dirname(fileURLToPath(import.meta.url));
+  const checkout = join(here, "..", "..", "..", "spec");
+  const installed = join(here, "..", "spec");
+  return existsSync(checkout) ? checkout : installed;
 }
 
 export function readSpecDoc(name: "agent-guide.md" | "llm-reference.md"): string {
@@ -50,8 +61,21 @@ export function createServer(options: ServerOptions): McpServer {
       def.name,
       { title: def.title, description: def.description, inputSchema: def.input, outputSchema: def.output, annotations: { title: def.title, ...def.annotations } },
       async (args: Record<string, unknown>, ctx) => {
-        const confirmed = acceptedContent(ctx.mcpReq.inputResponses, "confirm", ConfirmSchema)?.confirm === true;
-        const tctx: ToolContext = { fs, runtime: options.runtime, allowBuild: options.allowBuild, confirmed };
+        if (def.kind === "write" && options.forwardWrite && args["dry_run"] !== true) {
+          const forwarded = await options.forwardWrite(def.name, args);
+          if (forwarded) return forwarded as never;
+        }
+        // In Studio the proposal review is the confirmation, so wide-impact writes don't ask twice.
+        const confirmed = options.propose !== undefined || acceptedContent(ctx.mcpReq.inputResponses, "confirm", ConfirmSchema)?.confirm === true;
+        const tctx: ToolContext = {
+          fs,
+          runtime: options.runtime,
+          allowBuild: options.allowBuild,
+          confirmed,
+          tool: def.name,
+          ...(typeof args["rationale"] === "string" ? { rationale: args["rationale"] } : {}),
+          ...(options.propose ? { propose: options.propose } : {}),
+        };
         try {
           const out = await def.run(tctx, args as never);
           if (isConfirm(out)) {

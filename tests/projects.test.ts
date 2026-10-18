@@ -8,7 +8,7 @@ import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
-import { TEMPLATES, projectId, readTemplate, renderTemplate } from "../packages/cli/src/init.js";
+import { TEMPLATES, projectId, readTemplate, renderTemplate } from "../packages/tools/src/init.js";
 import { compile } from "../packages/core/src/bytecode/compiler.js";
 import { readHwb } from "../packages/core/src/bytecode/reader.js";
 import { writeHwb } from "../packages/core/src/bytecode/writer.js";

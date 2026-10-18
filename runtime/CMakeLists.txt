@@ -46,6 +46,7 @@ add_library(hw_core STATIC
   src/core/hw_vm.c
   src/core/hw_play.c
   src/core/hw_save.c
+  src/core/hw_json.c
 )
 target_include_directories(hw_core PUBLIC src/core)
 target_link_libraries(hw_core PRIVATE hw_warnings)
@@ -57,7 +58,7 @@ add_test(NAME utf8 COMMAND test_utf8)
 
 # Tests that read the conformance cases (tests/conformance/cases/*/expected.hwb, written by the TS half).
 set(HW_CONFORMANCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../tests/conformance/cases")
-foreach(t hwb conformance save sprite)
+foreach(t hwb conformance save sprite json)
   add_executable(test_${t} tests/test_${t}.c)
   target_link_libraries(test_${t} PRIVATE hw_core hw_warnings)
   target_compile_definitions(test_${t} PRIVATE HW_CONFORMANCE_DIR="${HW_CONFORMANCE_DIR}")
@@ -98,6 +99,15 @@ if(HW_FUZZ)
   target_link_libraries(fuzz_save PRIVATE hw_warnings "${hw_clang_rt_dir}/libclang_rt.fuzzer-x86_64.a")
   set_target_properties(fuzz_save PROPERTIES LINKER_LANGUAGE CXX)
 
+  # hw_json.c uses hw_buf from hw_play.c, so the play module comes along.
+  add_executable(fuzz_json fuzz/fuzz_json.c
+    src/core/hw_json.c src/core/hw_utf8.c src/core/hw_crc32.c src/core/hw_hwb.c src/core/hw_vm.c src/core/hw_play.c src/core/hw_save.c)
+  target_include_directories(fuzz_json PRIVATE src/core)
+  target_compile_options(fuzz_json PRIVATE ${hw_fuzz_flags})
+  target_link_options(fuzz_json PRIVATE -fsanitize=address)
+  target_link_libraries(fuzz_json PRIVATE hw_warnings "${hw_clang_rt_dir}/libclang_rt.fuzzer-x86_64.a")
+  set_target_properties(fuzz_json PROPERTIES LINKER_LANGUAGE CXX)
+
   # Inputs that once crashed a target are replayed on every fuzz build.
   file(GLOB hw_hwb_regressions "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/regressions/hwb/*")
   add_test(NAME fuzz_hwb_regressions COMMAND fuzz_hwb ${hw_hwb_regressions})
@@ -126,6 +136,7 @@ if(HW_WITH_SDL)
     src/app/hw_persist.c
     src/app/hw_ui_text.c
     src/app/hw_rulewipe.c
+    src/app/hw_link.c
   )
   target_include_directories(himawari PRIVATE src/app shaders/generated)
   target_link_libraries(himawari PRIVATE

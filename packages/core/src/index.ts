@@ -32,9 +32,11 @@ export { DIAGNOSTICS, type Fix, SEMANTIC_DIAGNOSTICS } from "./syntax/diagnostic
 export { type Ref } from "./syntax/ast.js";
 export { type FileReport, type ProjectCheck, type ProjectInput, type SourceFile, checkProject } from "./project/check.js";
 export { type Character, type SpriteDef, type SpriteGroup, characterWords, readCharacter } from "./project/character.js";
+export { type SpriteAttr, type SpriteLayer, type SpriteState, applySpriteWords, spriteLayers } from "./project/sprite.js";
 export { type GraphEdge, type GraphNode, type StoryGraph, exprToString, graphToMermaid, storyGraph } from "./project/graph.js";
 export { DEFAULT_POSITIONS, type Manifest, type VarType, type VariableDecl, readManifest } from "./project/manifest.js";
 export { editDistance, suggest } from "./project/suggest.js";
+export { RenameError, type RenameKind, type RenamePlan, planRename, splitFrontmatter } from "./project/rename.js";
 export { lineIdToNumber, numberToLineId } from "./ids.js";
 export { type CompileResult, compile } from "./bytecode/compiler.js";
 export { writeHwb } from "./bytecode/writer.js";

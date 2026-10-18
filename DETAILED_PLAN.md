@@ -1,6 +1,6 @@
 # Himawari — Detailed Project Plan
 
-> **Status:** Draft **v0.5** · 2026-10-17 · Nothing here is final. **Phases 0–3 done** (§18); RFCs 0001–0005 accepted. Next: Phase 4, Studio.
+> **Status:** Draft **v0.5** · 2026-10-17 · Nothing here is final. **Phases 0–3 done; Phase 4 (Studio) built**, its M2 hallway test pending (§18); RFCs 0001–0006 accepted. Next: the M2 test, then Phase 5.
 > **Companion files:** [RESEARCH.md](RESEARCH.md) (evidence) · [LOG.md](LOG.md) (decision history and next steps) · [CLAUDE.md](CLAUDE.md) (context for AI coding sessions)
 > Decisions marked 🔬 cite RESEARCH.md by section number (e.g. 🔬§3 = RESEARCH.md §3).
 
@@ -1170,7 +1170,7 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 - ✅ `AGENTS.md` + `CLAUDE.md` in templates. Setup docs for the Claude desktop app and Claude Code (Mode A): `docs/ai-setup.md`, `hwc ai setup`. CLI: `hwc run`, `playtest`, `graph`, `report ai-content`, `build --release` packaging.
 - ✅ 🎯 **M1, vertical slice (≈ week 14):** *starting from a premise and two character bibles with layered sprites, an AI agent writes a 3-route chapter via MCP. It validates, reaches 100% playtest ending coverage, gets translated to a second language, and plays as a Windows `.exe`.* Done: `examples/festival-eve/` (3 of 3 endings, 45 lines translated into Japanese, `Festival Eve.exe`).
 
-### Phase 4: Studio MVP (⏱ 9)
+### Phase 4: Studio MVP (⏱ 9) ✅ built 2026-10-18 (M2 hallway test pending)
 - Shell and **first-run flow (§2.1)**, Explorer, **Screenplay view + Script view** (CodeMirror 6), live preview with **play-as-you-write replay** and two-way line sync.
 - Story graph, characters panel, **sprite composer + PSD/ORA import**, assets with a procedural placeholder maker, variables, localization table, build panel.
 - Embedded MCP with AI Proposals panel; **live sync with external Claude apps (Mode A)**; unified and selective undo; double-Shift search.

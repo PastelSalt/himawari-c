@@ -1,2 +1,6 @@
 packages:
   - packages/*
+# Install scripts are blocked unless allowed here. electron-winstaller (Squirrel) isn't used:
+# Studio ships with NSIS (plan §14.5). Electron itself downloads its binary on first use.
+allowBuilds:
+  electron-winstaller: false

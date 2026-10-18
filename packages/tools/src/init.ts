@@ -1,4 +1,4 @@
-/** `hwc init`: create a project from a template (plan §2.1, §9.2). */
+/** Creating a project from a template (plan §2.1, §9.2): `hwc init` and Studio's New Project wizard. */
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -15,7 +15,7 @@ export interface InitOptions {
   random?: RandomSource;
 }
 
-/** templates/ at the repository root (next to packages/). Override with HWC_TEMPLATES. */
+/** templates/ at the repository root (next to packages/). Override with HWC_TEMPLATES; Studio passes its own. */
 export function templatesDir(): string {
   return process.env["HWC_TEMPLATES"] ?? fileURLToPath(new URL("../../../templates/", import.meta.url));
 }
@@ -71,11 +71,11 @@ export function renderTemplate(files: readonly SourceFile[], options: InitOption
   });
 }
 
-export function initProject(folder: string, template: TemplateName, options: InitOptions): SourceFile[] {
+export function initProject(folder: string, template: TemplateName, options: InitOptions, dir = templatesDir()): SourceFile[] {
   if (existsSync(folder) && readdirSync(folder).length > 0) {
     throw new Error(`${folder} already exists and isn't empty`);
   }
-  const files = renderTemplate(readTemplate(template), options);
+  const files = renderTemplate(readTemplate(template, dir), options);
   for (const f of files) {
     const target = join(folder, f.file);
     mkdirSync(dirname(target), { recursive: true });

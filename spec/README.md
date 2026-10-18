@@ -10,7 +10,8 @@ The specifications every Himawari tool agrees on (plan §5). `@himawari/core` im
 | [character.schema.json](character.schema.json) | Character frontmatter, including layered sprites | 1.0.0-draft |
 | [ast.schema.json](ast.schema.json) | The AST as JSON (`read_scene` with `format: ast`) | 1.0 |
 | [bytecode.md](bytecode.md) | The compiled `.hwb` format the runtime loads | 1.0, frozen |
-| [agent-guide.md](agent-guide.md) | What AI assistants are told (layer 1 instructions) | 1.0 |
+| [agent-guide.md](agent-guide.md) | What AI assistants are told (layer 1 instructions) | 1.1 |
 | [llm-reference.md](llm-reference.md) | The script language on two pages, for language models | with the language |
+| [debug-protocol.md](debug-protocol.md) | How Studio drives the runtime in its preview (stdin/stdout JSON lines) | 1 |
 
 [`examples/`](examples/) holds the plan's sample `himawari.json` and character file; the schema tests validate them.

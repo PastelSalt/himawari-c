@@ -20,6 +20,8 @@
 #include "hw_audio.h"
 #include "hw_headless.h"
 #include "hw_hwb.h"
+#include "hw_json.h"
+#include "hw_link.h"
 #include "hw_persist.h"
 #include "hw_play.h"
 #include "hw_rulewipe.h"
@@ -129,6 +131,11 @@ typedef struct game {
 
     /* Auto-blink per stage slot (plan §6.1): when the next blink starts. */
     double blink_at[HW_VM_MAX_STAGE];
+
+    /* The Studio debug pipe (--link), and the last state reported on it. */
+    hw_link *link;
+    char link_state[512];
+    bool fast_forward; /* skipping to the next menu: no sound effects or voices on the way */
 } game;
 
 static const SDL_Color WHITE = { 255, 255, 255, 255 };
@@ -575,7 +582,7 @@ static void handle(game *g, const hw_event *ev)
         hw_audio_stop(g->audio, HW_CHANNEL_VOICE, 0);
         show_line(g, ev->line, false);
         add_backlog(g);
-        if (m->lines[ev->line].line_id != HW_NONE && !may_skip_line(g)) {
+        if (m->lines[ev->line].line_id != HW_NONE && !may_skip_line(g) && !g->fast_forward) {
             char id[7];
             hw_line_id_format(m->lines[ev->line].line_id, id);
             hw_audio_line_voice(g->audio, g->lang, id);
@@ -598,6 +605,7 @@ static void handle(game *g, const hw_event *ev)
         stage_change(g, ev);
         break;
     case HW_EV_AUDIO:
+        if (g->fast_forward && (ev->channel == HW_CHANNEL_SFX || ev->channel == HW_CHANNEL_VOICE)) break;
         hw_audio_play(g->audio, (int)ev->channel, hw_str(m, ev->subject), ev->ms);
         break;
     case HW_EV_STOP:
@@ -844,6 +852,18 @@ static bool load_module(game *g, hw_module *out, char *err, size_t cap)
     return ok;
 }
 
+static void link_reloaded(game *g, const char *result, const char *message)
+{
+    if (!g->link) return;
+    hw_buf b = { 0 };
+    hw_buf_printf(&b, "{\"ev\":\"reloaded\",\"result\":\"%s\",\"message\":", result);
+    hw_json_put_str(&b, message);
+    hw_buf_put(&b, "}", 1);
+    if (b.data) hw_link_send(g->link, b.data);
+    hw_buf_free(&b);
+    g->link_state[0] = 0; /* report the state again, even if it looks the same */
+}
+
 static void reload(game *g)
 {
     char err[200], msg[300];
@@ -851,6 +871,7 @@ static void reload(game *g)
     if (!load_module(g, &fresh, err, sizeof err)) {
         snprintf(msg, sizeof msg, ui(g, UI_RELOAD_FAILED), err);
         notify(g, msg);
+        link_reloaded(g, "failed", err);
         return;
     }
     /* Carry the position over through a save, which remaps by line ID. */
@@ -871,6 +892,7 @@ static void reload(game *g)
         SDL_free(read);
         hw_buf_free(&save);
         hw_module_free(&fresh);
+        link_reloaded(g, "failed", "out of memory");
         return;
     }
     /* Read lines and globals survive by line ID and name. */
@@ -912,7 +934,153 @@ static void reload(game *g)
     hw_buf_free(&save);
     snprintf(msg, sizeof msg, "%s%s", ui(g, UI_RELOADED),
              r == HW_SAVE_FALLBACK ? " (the current line changed; resumed a little earlier)" : "");
-    notify(g, msg);
+    if (!g->link) notify(g, msg); /* Studio shows its own status */
+    link_reloaded(g, !in_story ? "title" : r == HW_SAVE_EXACT ? "exact" : r == HW_SAVE_REMAPPED ? "remapped"
+                     : r == HW_SAVE_FALLBACK ? "fallback" : "restarted",
+                  r == HW_SAVE_BAD ? err : "");
+}
+
+/* ---- dev: warp, skip to the next menu, and the Studio link ---- */
+
+static void proceed(game *g);
+
+/* Plays from `where` (a scene, file:line, or #lineid) with a state reconstructed along a real path. */
+static bool warp_to(game *g, const char *where, char *msg, size_t cap)
+{
+    uint32_t target = hw_warp_target(&g->m, where);
+    uint8_t *snap = SDL_malloc(hw_vm_snapshot_size(&g->vm));
+    bool ok = target != HW_NONE && snap && hw_warp(&g->m, target, (uint64_t)SDL_GetTicksNS(), 0, snap);
+    if (ok) {
+        start_story(g); /* resets the presentation; then jump to the reconstructed state */
+        hw_vm_restore(&g->vm, snap);
+        hw_history_clear(&g->hist);
+        reset_presentation(g);
+        sync_audio(g);
+        pump(g);
+        SDL_Log("warp: %s", where);
+    } else {
+        snprintf(msg, cap, target == HW_NONE ? "warp: no line at %s" : "warp: no path reaches %s", where);
+        SDL_Log("%s", msg);
+    }
+    SDL_free(snap);
+    return ok;
+}
+
+/* Plays on, without waiting, until the next menu or the end. */
+static void skip_to_menu(game *g)
+{
+    if (g->scr != SCR_PLAY) return;
+    g->fast_forward = true;
+    for (int i = 0; i < 20000 && g->scr == SCR_PLAY && g->blk != B_MENU && g->blk != B_DONE; i++) {
+        if (g->blk == B_SAY) {
+            finish_reveal(g);
+            advance(g);
+        } else if (g->blk == B_TRANS) {
+            g->trans_active = false;
+            g->blk = B_NONE;
+            pump(g);
+        } else if (g->blk == B_WAIT) {
+            g->blk = B_NONE;
+            pump(g);
+        } else {
+            pump(g);
+        }
+    }
+    g->fast_forward = false;
+    sync_audio(g);
+}
+
+static const char *screen_name(screen s)
+{
+    switch (s) {
+    case SCR_TITLE: return "title";
+    case SCR_PLAY: return "play";
+    case SCR_SYSMENU: return "menu";
+    case SCR_SLOTS: return "slots";
+    case SCR_HISTORY: return "history";
+    case SCR_CONFIRM_QUIT: return "confirm";
+    case SCR_END: return "end";
+    case SCR_ERROR: return "error";
+    }
+    return "play";
+}
+
+/* Sends {"ev":"state"} when what the player sees changes: the screen, the line, or waiting for a click. */
+static void link_report(game *g)
+{
+    if (!g->link) return;
+    hw_buf b = { 0 };
+    hw_buf_printf(&b, "{\"ev\":\"state\",\"screen\":\"%s\",\"line\":", screen_name(g->scr));
+    bool story = g->scr != SCR_TITLE;
+    if (story && g->have_line && g->line < g->m.line_count && g->m.lines[g->line].line_id != HW_NONE) {
+        char id[7];
+        hw_line_id_format(g->m.lines[g->line].line_id, id);
+        hw_buf_printf(&b, "\"%s\"", id);
+    } else {
+        hw_buf_put(&b, "null", 4);
+    }
+    bool waiting = (g->blk == B_SAY && g->reveal >= (float)g->text.chars) || g->blk == B_MENU;
+    hw_buf_printf(&b, ",\"waiting\":%s,\"choice\":%s", story && waiting ? "true" : "false",
+                  story && g->blk == B_MENU ? "true" : "false");
+    if (g->scr == SCR_ERROR) {
+        hw_buf_put(&b, ",\"error\":", 9);
+        hw_json_put_str(&b, g->error);
+    }
+    hw_buf_put(&b, "}", 1);
+    if (b.data && strcmp(b.data, g->link_state) != 0) {
+        snprintf(g->link_state, sizeof g->link_state, "%s", b.data);
+        hw_link_send(g->link, b.data);
+    }
+    hw_buf_free(&b);
+}
+
+/* Handles the commands Studio sent since the last frame (spec/debug-protocol.md). */
+static void link_poll(game *g)
+{
+    char *line;
+    while ((line = hw_link_poll(g->link)) != NULL) {
+        char cmd[32], arg[512], msg[600];
+        double x = 0, y = 0, w = 0, h = 0;
+        if (!hw_json_str(line, "cmd", cmd, sizeof cmd)) {
+            SDL_Log("link: ignored %.80s", line);
+        } else if (strcmp(cmd, "bounds") == 0) {
+            hw_json_num(line, "x", &x);
+            hw_json_num(line, "y", &y);
+            hw_json_num(line, "w", &w);
+            hw_json_num(line, "h", &h);
+            hw_link_place(g->win, (int)x, (int)y, (int)w, (int)h);
+        } else if (strcmp(cmd, "reload") == 0) {
+            reload(g);
+        } else if (strcmp(cmd, "warp") == 0 && hw_json_str(line, "to", arg, sizeof arg)) {
+            hw_buf b = { 0 };
+            bool ok = warp_to(g, arg, msg, sizeof msg);
+            hw_buf_printf(&b, "{\"ev\":\"warp\",\"ok\":%s,\"to\":", ok ? "true" : "false");
+            hw_json_put_str(&b, arg);
+            if (!ok) {
+                hw_buf_put(&b, ",\"message\":", 11);
+                hw_json_put_str(&b, msg);
+            }
+            hw_buf_put(&b, "}", 1);
+            if (b.data) hw_link_send(g->link, b.data);
+            hw_buf_free(&b);
+        } else if (strcmp(cmd, "restart") == 0) {
+            start_story(g);
+        } else if (strcmp(cmd, "next_menu") == 0) {
+            skip_to_menu(g);
+        } else if (strcmp(cmd, "advance") == 0) {
+            proceed(g);
+        } else if (strcmp(cmd, "lang") == 0 && hw_json_str(line, "lang", arg, sizeof arg)) {
+            char saved[sizeof g->settings.language];
+            memcpy(saved, g->settings.language, sizeof saved);
+            set_language(g, arg); /* for this run only, like --lang */
+            memcpy(g->settings.language, saved, sizeof saved);
+        } else if (strcmp(cmd, "quit") == 0) {
+            g->running = false;
+        } else {
+            SDL_Log("link: unknown command %s", cmd);
+        }
+        SDL_free(line);
+    }
 }
 
 /* ---- drawing the screens ---- */
@@ -1420,9 +1588,14 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
 {
     static game G; /* large; zero-initialized */
     game *g = &G;
+    uint64_t parent = 0;
+    bool link = false;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--dev") == 0) g->dev = true;
         if (strcmp(argv[i], "--frames") == 0) unattended = true;
+        /* --link: the Studio debug pipe on stdin/stdout. --parent-window HWND: dock inside Studio's preview pane. */
+        if (strcmp(argv[i], "--link") == 0) link = true;
+        if (strcmp(argv[i], "--parent-window") == 0 && i + 1 < argc) parent = strtoull(argv[i + 1], NULL, 0);
     }
     if (project) g->dev = true; /* --project means a project folder: dev tools on */
     snprintf(g->game_path, sizeof g->game_path, "%s", game_path);
@@ -1447,7 +1620,13 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
         wh = (int)((float)dm->h * 0.80f);
         ww = (int)((float)wh * g->W / g->H);
     }
-    g->win = SDL_CreateWindow(hw_str(&g->m, g->m.title), ww, wh, SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+    g->win = SDL_CreateWindow(hw_str(&g->m, g->m.title), ww, wh,
+                              SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | (parent ? SDL_WINDOW_HIDDEN : 0));
+    if (g->win && parent && !hw_link_embed(g->win, parent)) {
+        SDL_Log("link: can't dock into window %llu; using a separate window", (unsigned long long)parent);
+        parent = 0;
+        SDL_ShowWindow(g->win);
+    }
     bool allow_gpu = true;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--no-gpu") == 0) allow_gpu = false;
@@ -1494,7 +1673,7 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
     hw_persist_open(&g->persist, hw_str(&g->m, g->m.game_id));
     hw_global_load(&g->persist, &g->m, &g->vm, g->read_lines, &g->settings);
     for (int i = 0; i < 4; i++) hw_audio_set_volume(g->audio, i, g->settings.volume[i]);
-    if (g->settings.fullscreen) SDL_SetWindowFullscreen(g->win, true);
+    if (g->settings.fullscreen && !parent) SDL_SetWindowFullscreen(g->win, true);
     pick_language(g);
 
     for (int i = 1; i < argc; i++) {
@@ -1526,28 +1705,22 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
         if (strcmp(argv[i], "--screenshot") == 0 && i + 1 < argc) shot = argv[i + 1];
         if (strcmp(argv[i], "--start") == 0) start_story(g);
         if (strcmp(argv[i], "--warp") == 0 && i + 1 < argc) {
-            uint32_t target = hw_warp_target(&g->m, argv[i + 1]);
-            uint8_t *snap = SDL_malloc(hw_vm_snapshot_size(&g->vm));
-            if (target != HW_NONE && snap && hw_warp(&g->m, target, (uint64_t)SDL_GetTicksNS(), 0, snap)) {
-                start_story(g); /* resets the presentation; then jump to the reconstructed state */
-                hw_vm_restore(&g->vm, snap);
-                hw_history_clear(&g->hist);
-                reset_presentation(g);
-                sync_audio(g);
-                pump(g);
-                SDL_Log("warp: %s", argv[i + 1]);
-            } else {
-                char msg[300];
-                snprintf(msg, sizeof msg, target == HW_NONE ? "warp: no line at %s" : "warp: no path reaches %s", argv[i + 1]);
-                SDL_Log("%s", msg);
+            char msg[600];
+            if (!warp_to(g, argv[i + 1], msg, sizeof msg)) {
                 notify(g, msg);
                 if (unattended) warp_failed = true;
             }
-            SDL_free(snap);
         }
     }
     if (g->dev) SDL_Log("dev mode: F3 overlay, F5 reload %s", game_path);
     if (warp_failed) g->running = false;
+    if (link) {
+        g->link = hw_link_open();
+        char ready[160];
+        snprintf(ready, sizeof ready, "{\"ev\":\"ready\",\"protocol\":1,\"docked\":%s,\"gpu\":%s}",
+                 parent ? "true" : "false", g->gpu ? "true" : "false");
+        hw_link_send(g->link, ready);
+    }
 
     while (g->running) {
         double t = (double)SDL_GetTicksNS() / 1e9;
@@ -1556,6 +1729,7 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
         g->now = t;
         SDL_Event e;
         while (SDL_PollEvent(&e)) on_event(g, &e);
+        if (g->link) link_poll(g);
         if (clicks > 0 && frames > 0 && frames % 20 == 0) {
             clicks--;
             if (g->blk == B_MENU) choose(g, pick >= 0 && (uint32_t)pick < g->option_count ? (uint32_t)pick : 0);
@@ -1565,12 +1739,14 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
             }
         }
         update(g, dt);
+        link_report(g);
         if (shot && frames == 1) g->shot = shot;
         render(g);
         if (frames > 0 && --frames == 0) g->running = false;
     }
 
     save_global(g);
+    hw_link_close(g->link);
     hw_rich_free(&g->text);
     for (uint32_t i = 0; i < HW_VM_MAX_OPTIONS; i++) hw_rich_free(&g->option_text[i]);
     SDL_free(g->option_text);

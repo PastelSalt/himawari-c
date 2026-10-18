@@ -16,7 +16,10 @@ import {
   format,
   lex,
   parseAst,
+  RenameError,
   parseTable,
+  planRename,
+  splitFrontmatter,
   stringifyTable,
   syncTable,
 } from "@himawari/core";
@@ -38,6 +41,11 @@ import { type ToolContext, ToolError, type ToolOk, defineTool } from "../registr
 
 const Ident = z.string().regex(/^[a-z_][a-z0-9_]*$/, "lowercase letters, digits, and _, starting with a letter or _");
 const DryRun = z.boolean().default(false).describe("Validate and return the result without writing anything");
+const Rationale = z
+  .string()
+  .max(300)
+  .optional()
+  .describe("One sentence for the developer: what this change does and why. Shown with the change when they review it in Studio");
 const BaseRevision = z.string().optional().describe("The revision read_scene returned; the write is refused if the scene changed since");
 
 interface CommitResult {
@@ -53,7 +61,7 @@ const errorKey = (d: DiagnosticJson) => `${d.code} ${d.file} ${d.message}`;
  * add errors (or this is a dry run). Errors the project already had don't
  * block a write; only new ones do (and a write that fixes errors is welcome).
  */
-function commit(ctx: ToolContext, input: ProjectInput, changes: Changes, dryRun: boolean, summary: string): CommitResult {
+async function commit(ctx: ToolContext, input: ProjectInput, changes: Changes, dryRun: boolean, summary: string): Promise<CommitResult> {
   const before = new Map<string, number>();
   for (const d of diagnosticsJson(checkProject(input))) {
     if (d.severity === "error") before.set(errorKey(d), (before.get(errorKey(d)) ?? 0) + 1);
@@ -80,13 +88,35 @@ function commit(ctx: ToolContext, input: ProjectInput, changes: Changes, dryRun:
       input,
     };
   }
+  const notes = here.length ? `\n${describeDiagnostics(here)}` : "";
+  if (!dryRun && ctx.propose) {
+    // Studio is open and owns writes: a person accepts or rejects the change (plan §11.4).
+    const outcome = await ctx.propose({ tool: ctx.tool ?? "write", summary: ctx.rationale?.trim() || summary, changes, diagnostics: here.map((d) => ({ file: d.file, code: d.code, severity: d.severity, message: d.message, line: d.line })) });
+    if (outcome.status === "accepted") {
+      return { ok: { text: `Accepted in Studio: ${summary}${notes}`, data: { ...data, applied: true, proposal: "accepted" } }, input: next };
+    }
+    const unapplied = { ...data, applied: false, proposal: outcome.status };
+    if (outcome.status === "rejected") {
+      const why = outcome.reason ? ` Their reason: ${outcome.reason}` : " They gave no reason.";
+      return { ok: { text: `The user rejected this change in Studio.${why} Nothing was written.`, data: { ...unapplied, reason: outcome.reason } }, input };
+    }
+    if (outcome.status === "pending") {
+      return {
+        ok: {
+          text: `Proposed in Studio as ${outcome.id}; the user hasn't decided yet, so nothing is written. Don't send it again. Carry on with other work, and read the scene later to see whether it landed.`,
+          data: { ...unapplied, proposalId: outcome.id },
+        },
+        input,
+      };
+    }
+    return { ok: { text: "The proposal was withdrawn (the project was closed in Studio). Nothing was written.", data: unapplied }, input };
+  }
   if (!dryRun) {
     for (const [file, text] of changes) {
       if (text === null) ctx.fs.remove(file);
       else ctx.fs.write(file, text);
     }
   }
-  const notes = here.length ? `\n${describeDiagnostics(here)}` : "";
   return { ok: { text: `${dryRun ? "Dry run (nothing written): " : ""}${summary}${notes}`, data }, input: next };
 }
 
@@ -113,7 +143,7 @@ export const createScene = defineTool({
   description:
     "Add new scenes from .hws text: one `scene name:` block, or several that jump to each other (a branching chapter must be created together). Line IDs are assigned for you; don't write #line: tags. By default they go into script/<first scene>.hws; give file to append to an existing script. Validated before writing; use dry_run first for anything long.",
   kind: "write",
-  input: z.object({
+  input: z.object({ rationale: Rationale,
     hws: z.string().min(1).describe("The scene's .hws source, starting with `scene name:`"),
     file: z.string().regex(/^script\/[^\\]+\.hws$/).optional().describe("A script file under script/, e.g. script/ch2.hws"),
     dry_run: DryRun,
@@ -137,7 +167,7 @@ export const createScene = defineTool({
     const existing = ctx.fs.exists(file) ? ctx.fs.read(file) : null;
     const text = existing === null ? formatted.text : `${ensureNewline(existing)}\n${formatted.text}`;
     const what = names.length > 1 ? `scenes ${names.join(", ")}` : `scene ${name}`;
-    const r = commit(ctx, input, new Map([[file, text]]), args.dry_run, `Created ${what} in ${file} with ${formatted.added.length} new line(s).`);
+    const r = await commit(ctx, input, new Map([[file, text]]), args.dry_run, `Created ${what} in ${file} with ${formatted.added.length} new line(s).`);
     if (r.ok.data["applied"]) stampAi(ctx.fs, "lines", lineTexts(r.input, formatted.added));
     r.ok.data["scene"] = name;
     r.ok.data["scenes"] = names;
@@ -153,7 +183,7 @@ export const updateScene = defineTool({
   description:
     "Replace a whole scene with new .hws text (for drafts and small scenes; for targeted changes prefer patch_scene). Keep the #line: tags of lines you keep, so translations, voice, and saves stay attached; new lines get IDs automatically.",
   kind: "write",
-  input: z.object({ scene: Ident, hws: z.string().min(1), base_revision: BaseRevision, dry_run: DryRun }),
+  input: z.object({ rationale: Rationale, scene: Ident, hws: z.string().min(1), base_revision: BaseRevision, dry_run: DryRun }),
   output: z.looseObject({ applied: z.boolean(), revision: z.string().optional() }),
   annotations: { destructiveHint: true },
   async run(ctx, args) {
@@ -174,7 +204,7 @@ export const updateScene = defineTool({
     }
     const source = ctx.fs.read(loc.file);
     const text = source.slice(0, loc.start) + ensureNewline(formatted.text) + (loc.end < source.length ? `\n${source.slice(loc.end).replace(/^\n+/, "")}` : "");
-    const r = commit(ctx, input, new Map([[loc.file, text]]), args.dry_run, `Replaced scene ${args.scene}.`);
+    const r = await commit(ctx, input, new Map([[loc.file, text]]), args.dry_run, `Replaced scene ${args.scene}.`);
     if (r.ok.data["applied"]) {
       const before = new Map(collectLines(c.parsed).filter((l) => own.has(l.id)).map((l) => [l.id, l.text]));
       const after = lineTexts(r.input, idsIn(formatted.text));
@@ -205,7 +235,7 @@ export const patchScene = defineTool({
   description:
     "Targeted edits anchored on #line: IDs from read_scene: insert_after/insert_before (new statements; to add a menu option, insert it after another option's ID), append_to_scene, replace_text (just the quoted text), set_attrs (a speaker's expression), delete, move. Applied together, or not at all. Never use line numbers.",
   kind: "write",
-  input: z.object({ scene: Ident, ops: z.array(EditOpSchema).min(1), base_revision: BaseRevision, dry_run: DryRun }),
+  input: z.object({ rationale: Rationale, scene: Ident, ops: z.array(EditOpSchema).min(1), base_revision: BaseRevision, dry_run: DryRun }),
   output: z.looseObject({ applied: z.boolean(), revision: z.string().optional() }),
   annotations: { destructiveHint: true },
   async run(ctx, args) {
@@ -227,7 +257,7 @@ export const patchScene = defineTool({
     if (!result.ok) {
       return { text: `Not applied: ${result.error ?? "the edits don't fit"}`, data: { applied: false, error: result.error }, isError: true };
     }
-    const r = commit(ctx, input, new Map([[loc.file, result.text]]), args.dry_run, `Applied ${args.ops.length} edit(s) to ${args.scene}${result.addedIds.length ? `; new line IDs ${result.addedIds.join(", ")}` : ""}.`);
+    const r = await commit(ctx, input, new Map([[loc.file, result.text]]), args.dry_run, `Applied ${args.ops.length} edit(s) to ${args.scene}${result.addedIds.length ? `; new line IDs ${result.addedIds.join(", ")}` : ""}.`);
     if (r.ok.data["applied"]) {
       stampAi(ctx.fs, "lines", lineTexts(r.input, result.addedIds));
       const replaced = args.ops.filter((o) => o.op === "replace_text").map((o) => (o as { lineId: string }).lineId);
@@ -243,10 +273,6 @@ export const patchScene = defineTool({
   },
 });
 
-function splitCharacter(text: string): { yaml: string; bible: string } {
-  const m = /^﻿?---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)([\s\S]*)$/.exec(text);
-  return m ? { yaml: m[1] ?? "", bible: m[2] ?? "" } : { yaml: "", bible: text };
-}
 
 export const upsertCharacter = defineTool({
   name: "upsert_character",
@@ -254,7 +280,7 @@ export const upsertCharacter = defineTool({
   description:
     "Create characters/<id>.md or change it: display name (a string, or names per language like {en: \"Hana\", ja: \"花\"}), color (#rrggbb), the sprite definition (groups, presets, rules), and the prose bible (personality, speech style, \"Must never\"). Fields you leave out are kept. A character without art shows as a placeholder.",
   kind: "write",
-  input: z.object({
+  input: z.object({ rationale: Rationale,
     id: Ident,
     name: z.union([z.string(), z.record(z.string(), z.string())]).optional(),
     color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
@@ -267,7 +293,7 @@ export const upsertCharacter = defineTool({
     const { input } = check(ctx.fs);
     const file = `characters/${args.id}.md`;
     const exists = ctx.fs.exists(file);
-    const { yaml, bible } = exists ? splitCharacter(ctx.fs.read(file)) : { yaml: `id: ${args.id}\n`, bible: "\n## Personality\n\n## Speech style\n\n## Must never\n" };
+    const { yaml, bible } = exists ? splitFrontmatter(ctx.fs.read(file)) : { yaml: `id: ${args.id}\n`, bible: "\n## Personality\n\n## Speech style\n\n## Must never\n" };
     const doc = parseDocument(yaml);
     doc.set("id", args.id);
     if (args.name !== undefined) doc.set("name", args.name);
@@ -275,7 +301,7 @@ export const upsertCharacter = defineTool({
     if (args.sprite !== undefined) doc.set("sprite", args.sprite);
     const body = args.bible !== undefined ? `\n${args.bible.trim()}\n` : bible.startsWith("\n") ? bible : `\n${bible}`;
     const text = `---\n${doc.toString().trimEnd()}\n---\n${body.replace(/^\n+/, "\n")}`;
-    const r = commit(ctx, input, new Map([[file, text]]), args.dry_run, `${exists ? "Updated" : "Created"} ${file}.`);
+    const r = await commit(ctx, input, new Map([[file, text]]), args.dry_run, `${exists ? "Updated" : "Created"} ${file}.`);
     if (r.ok.data["applied"] && args.bible !== undefined) stampAi(ctx.fs, "characters", new Map([[args.id, args.bible.trim()]]));
     return r.ok;
   },
@@ -286,18 +312,18 @@ export const setPreset = defineTool({
   title: "Set an expression preset",
   description: "Define or change a character's expression preset: which attribute each sprite group shows, e.g. {eyes: \"smile\", mouth: \"smile\"}. Writers then type `hana happy`.",
   kind: "write",
-  input: z.object({ character: Ident, preset: Ident, layers: z.record(z.string(), z.string()), dry_run: DryRun }),
+  input: z.object({ rationale: Rationale, character: Ident, preset: Ident, layers: z.record(z.string(), z.string()), dry_run: DryRun }),
   output: z.looseObject({ applied: z.boolean() }),
   annotations: { idempotentHint: true },
   async run(ctx, args) {
     const { input } = check(ctx.fs);
     const file = `characters/${args.character}.md`;
     if (!ctx.fs.exists(file)) throw new ToolError(`there is no character "${args.character}"`);
-    const { yaml, bible } = splitCharacter(ctx.fs.read(file));
+    const { yaml, bible } = splitFrontmatter(ctx.fs.read(file));
     const doc = parseDocument(yaml);
     doc.setIn(["sprite", "presets", args.preset], args.layers);
     const text = `---\n${doc.toString().trimEnd()}\n---\n${bible.startsWith("\n") ? bible.slice(1) : bible}`;
-    return commit(ctx, input, new Map([[file, text]]), args.dry_run, `Set preset ${args.preset} on ${args.character}.`).ok;
+    return (await commit(ctx, input, new Map([[file, text]]), args.dry_run, `Set preset ${args.preset} on ${args.character}.`)).ok;
   },
 });
 
@@ -307,7 +333,7 @@ export const declareVariable = defineTool({
   description:
     "Add or change a variable in himawari.json. Types: int, bool, str (string enums: give enum). Scope: save (per playthrough) or global (shared across saves, e.g. endings seen).",
   kind: "write",
-  input: z.object({
+  input: z.object({ rationale: Rationale,
     name: Ident,
     type: z.enum(["int", "bool", "str"]),
     default: z.union([z.number().int(), z.boolean(), z.string()]),
@@ -323,7 +349,7 @@ export const declareVariable = defineTool({
     const decl: Record<string, unknown> = { type: args.type, default: args.default, scope: args.scope };
     if (args.enum) decl["enum"] = args.enum;
     manifest.variables = { ...(manifest.variables ?? {}), [args.name]: decl };
-    return commit(ctx, input, new Map([["himawari.json", `${JSON.stringify(manifest, null, 2)}\n`]]), args.dry_run, `Declared ${args.name}: ${args.type} = ${JSON.stringify(args.default)} (${args.scope}).`).ok;
+    return (await commit(ctx, input, new Map([["himawari.json", `${JSON.stringify(manifest, null, 2)}\n`]]), args.dry_run, `Declared ${args.name}: ${args.type} = ${JSON.stringify(args.default)} (${args.scope}).`)).ok;
   },
 });
 
@@ -333,56 +359,24 @@ export const rename = defineTool({
   description:
     "Refactor-safe rename across every script, himawari.json, and the character file. When it touches more than three files, the user is asked to confirm first.",
   kind: "write",
-  input: z.object({ kind: z.enum(["scene", "character", "variable"]), from: Ident, to: Ident, dry_run: DryRun }),
+  input: z.object({ rationale: Rationale, kind: z.enum(["scene", "character", "variable"]), from: Ident, to: Ident, dry_run: DryRun }),
   output: z.looseObject({ applied: z.boolean(), files: z.array(z.string()) }),
   annotations: { destructiveHint: true },
   async run(ctx, args) {
     const { input, check: c } = check(ctx.fs);
-    if (args.from === args.to) throw new ToolError("the new name is the same as the old one");
-    const kinds =
-      args.kind === "scene" ? new Set(["sceneDecl", "scene"]) : args.kind === "character" ? new Set(["speaker", "character"]) : new Set(["variable"]);
-    if (args.kind === "scene" && !findScene(c, args.from)) throw new ToolError(`there is no scene "${args.from}"`);
-    if (args.kind === "scene" && findScene(c, args.to)) throw new ToolError(`a scene named "${args.to}" already exists`);
-    if (args.kind === "character" && !c.characters.has(args.from)) throw new ToolError(`there is no character "${args.from}"`);
-    if (args.kind === "character" && c.characters.has(args.to)) throw new ToolError(`a character named "${args.to}" already exists`);
-    if (args.kind === "variable" && !c.manifest?.variables[args.from]) throw new ToolError(`there is no variable "${args.from}"`);
-    if (args.kind === "variable" && c.manifest?.variables[args.to]) throw new ToolError(`a variable named "${args.to}" already exists`);
-
-    const changes: Changes = new Map();
-    let count = 0;
-    for (const [file, r] of c.parsed) {
-      const spans = r.refs.filter((ref) => kinds.has(ref.kind) && ref.name === args.from).map((ref) => ref.span).sort((a, b) => b.start - a.start);
-      if (!spans.length) continue;
-      let text = ctx.fs.read(file);
-      for (const sp of spans) text = text.slice(0, sp.start) + args.to + text.slice(sp.end);
-      changes.set(file, text);
-      count += spans.length;
+    let plan;
+    try {
+      plan = planRename(c, args.kind, args.from, args.to, (f) => ctx.fs.read(f));
+    } catch (e) {
+      if (e instanceof RenameError) throw new ToolError(e.message);
+      throw e;
     }
-    if (args.kind !== "character") {
-      const m = JSON.parse(ctx.fs.read("himawari.json")) as Record<string, unknown> & { entry?: string; variables?: Record<string, unknown> };
-      let touched = false;
-      if (args.kind === "scene" && m.entry === args.from) {
-        m.entry = args.to;
-        touched = true;
-      }
-      if (args.kind === "variable" && m.variables && args.from in m.variables) {
-        m.variables = Object.fromEntries(Object.entries(m.variables).map(([k, v]) => [k === args.from ? args.to : k, v]));
-        touched = true;
-      }
-      if (touched) changes.set("himawari.json", `${JSON.stringify(m, null, 2)}\n`);
-    } else {
-      const old = `characters/${args.from}.md`;
-      const doc = splitCharacter(ctx.fs.read(old));
-      const yaml = parseDocument(doc.yaml);
-      yaml.set("id", args.to);
-      changes.set(old, null);
-      changes.set(`characters/${args.to}.md`, `---\n${yaml.toString().trimEnd()}\n---\n${doc.bible.replace(/^\n/, "")}`);
-    }
+    const { changes, count } = plan;
     const files = [...changes.keys()];
     if (files.length > 3 && !ctx.confirmed && !args.dry_run) {
       return { confirm: { message: `Rename ${args.kind} "${args.from}" to "${args.to}"? This changes ${count} place(s) in ${files.length} files: ${files.join(", ")}.` } };
     }
-    const r = commit(ctx, input, changes, args.dry_run, `Renamed ${args.kind} ${args.from} → ${args.to}: ${count} reference(s) in ${files.length} file(s).`);
+    const r = await commit(ctx, input, changes, args.dry_run, `Renamed ${args.kind} ${args.from} → ${args.to}: ${count} reference(s) in ${files.length} file(s).`);
     r.ok.data["files"] = files;
     return r.ok;
   },
@@ -394,7 +388,7 @@ export const setTranslation = defineTool({
   description:
     "Write the translation of one line (by line ID) into locales/<lang>.json. Use the same markup as the source: keep every [variable], {tag}, and {select} (ruby may differ). Lands as needs-review for a human translator. Refused if placeholders don't match.",
   kind: "write",
-  input: z.object({ lang: z.string().min(2), id: z.string().regex(/^[0-9a-hjkmnp-tv-z]{6}$/), text: z.string() }),
+  input: z.object({ rationale: Rationale, lang: z.string().min(2), id: z.string().regex(/^[0-9a-hjkmnp-tv-z]{6}$/), text: z.string() }),
   output: z.looseObject({ applied: z.boolean() }),
   annotations: { idempotentHint: true },
   async run(ctx, args) {
@@ -413,7 +407,7 @@ export const setTranslation = defineTool({
       const problems = res.refused.flatMap((x) => x.problems);
       return { text: `Not written: the translation ${problems.join("; ")}.`, data: { applied: false, problems }, isError: true };
     }
-    const r = commit(ctx, input, new Map([[file, stringifyTable(res.table)]]), false, `Translated #${args.id} into ${args.lang} (needs review).`);
+    const r = await commit(ctx, input, new Map([[file, stringifyTable(res.table)]]), false, `Translated #${args.id} into ${args.lang} (needs review).`);
     if (r.ok.data["applied"]) stampAi(ctx.fs, "translations", new Map([[`${args.lang}:${args.id}`, args.text]]));
     return r.ok;
   },

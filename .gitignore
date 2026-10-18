@@ -18,5 +18,9 @@ out/
 Thumbs.db
 .DS_Store
 
+# Studio packaging (staged resources and installers)
+packages/studio/build-resources/
+packages/studio/release/
+
 # Compiled example projects (hwc build output)
 examples/*/build/

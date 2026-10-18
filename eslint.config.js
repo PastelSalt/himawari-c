@@ -6,8 +6,14 @@ export const himawariPlugin = {
 };
 
 export default tseslint.config(
-  { ignores: ["**/dist/", "**/node_modules/", "runtime/", "out/"] },
+  { ignores: ["**/dist/", "**/node_modules/", "runtime/", "**/out/", "**/release/", "**/build-resources/"] },
   ...tseslint.configs.recommended,
+  {
+    rules: {
+      // `_name` marks a parameter that is deliberately unused (an interface's shape).
+      "@typescript-eslint/no-unused-vars": ["error", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
+    },
+  },
   {
     files: ["packages/studio/**/*.{ts,tsx}"],
     languageOptions: { parserOptions: { ecmaFeatures: { jsx: true } } },

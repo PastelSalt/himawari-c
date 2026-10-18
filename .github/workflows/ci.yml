@@ -1,6 +1,6 @@
 # CI skeleton (plan §14.6). Windows only (plan v0.5): every job runs on windows-latest.
-# Jobs: ts, i18n, runtime-win (shipping build), runtime-asan (ASan/UBSan + libFuzzer).
-# Later phases add: e2e, ux-budget, release.
+# Jobs: ts, i18n, runtime-win (shipping build), runtime-asan (ASan/UBSan + libFuzzer),
+# studio (Playwright e2e with the P1 budgets, and the Windows installer). Later: release.
 name: CI
 
 on:
@@ -35,7 +35,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm lint
-      - run: pnpm test
+      - name: Tests (the assistant's prompt-cache check runs only when the ANTHROPIC_API_KEY secret is set)
+        run: pnpm test
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
   i18n:
     name: Studio UI strings (EN/JA in sync)
@@ -142,6 +145,7 @@ jobs:
           cmake --build --preset win64-fuzz
           ctest --preset win64-fuzz
           ./build/win64-fuzz/fuzz_utf8.exe -max_total_time=60
+          ./build/win64-fuzz/fuzz_json.exe -max_total_time=60
           mkdir -p corpus-hwb
           for c in ../tests/conformance/cases/*/; do
             if [ -f "$c/expected.hwb" ]; then cp "$c/expected.hwb" "corpus-hwb/$(basename "$c").hwb"; fi
@@ -149,3 +153,32 @@ jobs:
           ./build/win64-fuzz/fuzz_hwb.exe -max_total_time=60 corpus-hwb
           mkdir -p corpus-save && HW_WRITE_SAVE=corpus-save/basic.hwsav ./build/win64-fuzz/test_save.exe
           ./build/win64-fuzz/fuzz_save.exe -max_total_time=60 corpus-save
+
+  studio:
+    name: Studio (e2e + P1 budgets, Windows installer)
+    runs-on: windows-latest
+    needs: runtime-win
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v8
+        with:
+          name: spikes-windows-x64
+          path: runtime
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          package-manager-cache: false
+      - run: corepack enable
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec tsc -b
+      - name: Fetch the Electron binary
+        run: node packages/studio/node_modules/electron/install.js
+      - name: End to end (first run, edit → preview under 1 s, export, Japanese UI)
+        run: pnpm --filter @himawari/studio e2e
+      - name: Package (NSIS installer and portable)
+        run: pnpm --filter @himawari/studio package
+      - uses: actions/upload-artifact@v7
+        with:
+          name: himawari-studio-windows-x64
+          path: |
+            packages/studio/release/*.exe

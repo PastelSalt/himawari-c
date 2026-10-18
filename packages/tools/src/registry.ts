@@ -20,7 +20,29 @@ export interface ToolContext {
   confirmed?: boolean;
   /** Line IDs for new lines (tests pass a deterministic source). */
   random?: RandomSource;
+  /** The tool being run (set by the host; names the proposal). */
+  tool?: string;
+  /** The AI's one-line explanation of a write (the `rationale` argument), shown with the proposal (P12). */
+  rationale?: string;
+  /**
+   * When set, validated writes become proposals for a human (plan §4.2, §11.4):
+   * Studio is running and owns writes. Called instead of writing; resolves with
+   * the decision, or "pending" when nobody has decided yet.
+   */
+  propose?: (p: ProposalRequest) => Promise<ProposalOutcome>;
 }
+
+export interface ProposalRequest {
+  tool: string;
+  /** The one-line rationale shown with the diff (P12). */
+  summary: string;
+  /** New text per file; null deletes it. */
+  changes: ReadonlyMap<string, string | null>;
+  /** Warnings and notes the change brings (errors are refused before this). */
+  diagnostics: { file: string; code: string; severity: string; message: string; line: number }[];
+}
+
+export type ProposalOutcome = { status: "accepted" } | { status: "rejected"; reason: string } | { status: "pending"; id: string } | { status: "withdrawn" };
 
 export interface ToolOk {
   /** A short, readable summary (or .hws text) for the model. */

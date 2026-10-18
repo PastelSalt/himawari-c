@@ -1,0 +1,54 @@
+# Himawari Studio for Windows (plan §14.5): an NSIS installer and a portable build.
+# Run `corepack pnpm --filter @himawari/studio package` (it builds, stages resources, and packs).
+appId: dev.moesoft.himawari.studio
+productName: Himawari Studio
+copyright: Copyright © 2026 Moesoft
+directories:
+  output: release
+  buildResources: build-resources
+# Everything the app needs is bundled into out/ (no node_modules ship).
+files:
+  - out/**
+  - package.json
+asar: true
+# Studio ships no node_modules (everything is bundled), so skip collecting and rebuilding them.
+beforeBuild: scripts/before-build.cjs
+extraResources:
+  - from: build-resources/runtime
+    to: runtime
+  - from: build-resources/templates
+    to: templates
+  - from: build-resources/examples
+    to: examples
+  - from: build-resources/spec
+    to: spec
+  - from: build-resources/mcp
+    to: mcp
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+    - target: portable
+      arch: [x64]
+  # Code signing is planned before the public v1.0 (plan §14.5).
+  signAndEditExecutable: false
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  artifactName: Himawari-Studio-Setup-${version}.${ext}
+portable:
+  artifactName: Himawari-Studio-${version}-portable.${ext}
+# Electron fuses (plan §11.1): no running as plain Node, no NODE_OPTIONS or --inspect,
+# the app only from its integrity-checked asar, and file:// without extra privileges
+# (the renderer is served from app://).
+electronFuses:
+  runAsNode: false
+  enableCookieEncryption: true
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+  loadBrowserProcessSpecificV8Snapshot: false
+  grantFileProtocolExtraPrivileges: false

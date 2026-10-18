@@ -8,9 +8,10 @@
  */
 import { existsSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
-import { findRuntime } from "@himawari/tools";
+import { ProjectFs, findRuntime } from "@himawari/tools";
 import { StdioServerTransport } from "@modelcontextprotocol/server/stdio";
 import { createServer } from "./server.js";
+import { callThroughStudio, readSession } from "./studio-link.js";
 
 function arg(name: string): string | undefined {
   const i = process.argv.indexOf(name);
@@ -33,6 +34,23 @@ if (!project || !existsSync(join(project, "himawari.json"))) {
   process.exit(2);
 }
 const runtime = arg("--runtime") ? resolve(arg("--runtime") as string) : findRuntime();
-const server = createServer({ project, runtime, allowBuild: process.argv.includes("--allow-build") });
+const fs = new ProjectFs(project);
+const server = createServer({
+  project,
+  runtime,
+  allowBuild: process.argv.includes("--allow-build"),
+  // Mode A live sync: while Studio has this project open, writes go there as proposals (plan §4.2).
+  async forwardWrite(name, args) {
+    const session = readSession(fs);
+    if (!session) return null;
+    try {
+      return await callThroughStudio(session, name, args);
+    } catch (e) {
+      process.stderr.write(`himawari-mcp: Studio didn't answer (${String(e)}); writing directly
+`);
+      return null;
+    }
+  },
+});
 await server.connect(new StdioServerTransport());
 process.stderr.write(`himawari-mcp: serving ${project}${runtime ? ` (runtime ${runtime})` : " (no runtime: playtest and render_line unavailable)"}\n`);

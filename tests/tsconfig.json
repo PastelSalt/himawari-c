@@ -9,5 +9,7 @@
     "checkJs": false,
     "types": ["node"]
   },
-  "include": ["**/*.ts", "../packages/*/src/**/*.test.ts", "../vitest.config.ts"]
+  "include": ["**/*.ts", "../packages/*/src/**/*.test.ts", "../vitest.config.ts"],
+  // Studio's renderer tests use bundler resolution; packages/studio/tsconfig.web.json checks them.
+  "exclude": ["../packages/studio/**"]
 }

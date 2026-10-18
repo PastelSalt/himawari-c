@@ -17,8 +17,8 @@ import {
   writeHwb,
 } from "@himawari/core";
 import { CommandError, aiSetup, graph, packageRelease, playtest, report, run } from "./commands.js";
-import { TEMPLATES, type TemplateName, initProject } from "./init.js";
 import { L10nUsageError, l10n } from "./l10n.js";
+import { TEMPLATES, type TemplateName, initProject } from "@himawari/tools";
 import { findProjectRoot, loadProject } from "./project.js";
 
 // Commands from plan §9.2 that aren't built yet.

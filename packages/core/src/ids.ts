@@ -6,8 +6,6 @@
  * survive edits and moves. They are written as a trailing `#line:xxxxxx`.
  */
 
-import { randomInt } from "node:crypto";
-
 /** Crockford base32, lowercase. Omits i, l, o, u to avoid misreading. */
 export const LINE_ID_ALPHABET = "0123456789abcdefghjkmnpqrstvwxyz";
 export const LINE_ID_LENGTH = 6;
@@ -29,7 +27,11 @@ export type RandomSource = () => number;
 
 const ID_SPACE = 2 ** (5 * LINE_ID_LENGTH);
 
-export const cryptoRandomSource: RandomSource = () => randomInt(0, ID_SPACE);
+/** Web Crypto, which Node and the browser (Studio's renderer) both provide, so Core stays I/O- and platform-free. */
+const webCrypto = (globalThis as unknown as { crypto: { getRandomValues(a: Uint32Array): Uint32Array } }).crypto;
+
+/** 2^30 divides 2^32, so masking a uniform 32-bit value stays uniform. */
+export const cryptoRandomSource: RandomSource = () => webCrypto.getRandomValues(new Uint32Array(1))[0]! & (ID_SPACE - 1);
 
 function encode(n: number): string {
   let out = "";

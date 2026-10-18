@@ -17,3 +17,4 @@ Phase 0 spike results are recorded as RFCs 0001–0003.
 | [0003](0003-text-stack.md) | Text stack: FreeType + libunibreak vs SDL3_ttf (Spike C) | **Accepted** 2026-10-17: FreeType direct |
 | [0004](0004-bytecode-before-freeze.md) | Bytecode additions before the 1.0 freeze (`META`, `LOCL`, prompt IDs, loader rules, RNG) | **Accepted** 2026-10-17 |
 | [0005](0005-layered-sprites-in-bytecode.md) | Layered sprites in bytecode (`SPRT`) and attribute-merge semantics | **Accepted** 2026-10-17 |
+| [0006](0006-studio-preview-and-live-sync.md) | Studio's docked preview, the debug protocol, and AI live sync | **Accepted** 2026-10-18 |

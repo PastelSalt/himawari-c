@@ -1,6 +1,6 @@
 # Using Claude with a Himawari project (Mode A)
 
-Himawari works with the AI app you already use: **Claude Code** or the **Claude desktop app** connect to your project through **himawari-mcp**, an MCP server that ships with Himawari. You use your own Claude plan; Himawari runs no servers and sends nothing anywhere. (Studio's built-in assistant panel, Mode B, comes with Studio in Phase 4.)
+Himawari works with the AI app you already use: **Claude Code** or the **Claude desktop app** connect to your project through **himawari-mcp**, an MCP server that ships with Himawari. You use your own Claude plan; Himawari runs no servers and sends nothing anywhere. Studio also has a built-in assistant panel (Mode B) that uses your own Anthropic API key: Settings → Built-in assistant.
 
 ## What the AI can and can't do
 - **Can:** read your scenes and characters, write and edit scenes (edits are anchored on each line's ID, checked before anything is saved, and refused if they'd break the story), rename things safely, declare variables, translate lines (they land as "needs review"), play every path of your story headlessly to find dead ends and unreachable endings, and take a screenshot of any line to check how it looks.
@@ -35,7 +35,8 @@ Add these to the server's arguments if you need them:
 - Tell the AI about your story in **`AGENTS.md`** at the project root (every template has one): tone, audience, style rules, and files it must not touch. It reads that file and each character's bible (including the "Must never" rules) before writing.
 - Good first requests: *"Read the project and summarize the story so far"*, *"Write a scene where Hana and Mio argue about the festival, with a choice that leads to two endings"*, *"Playtest every path and fix any dead ends"*, *"Translate chapter 1 into Japanese"*.
 - The server also offers ready-made prompts (in clients that show them): **write_scene**, **continuity_check**, **branch_planner**, **translate_scene**, **sprite_direction**.
-- Changes land in your files right away. Use git (or Studio's history, later) to review and undo.
+- **With Himawari Studio open**, the AI's changes don't land directly: each one appears in Studio's **AI Proposals** panel with a diff and the AI's one-line reason, and you accept or reject it (rejecting can tell the AI why). Accepted changes go into Studio's History, where any of them can be undone. Studio shows the exact setup command for the open project in Settings → Use your Claude app.
+- **Without Studio**, changes land in your files right away. Use git to review and undo.
 
 ## Reference
 - Tools, resources, and prompts: DETAILED_PLAN.md §10.3–10.4.
