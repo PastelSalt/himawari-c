@@ -5,6 +5,9 @@ import { LANGUAGE_NAMES } from "../i18n";
 import { useStudio } from "../store";
 import { Icon } from "./Icon";
 
+/** The runtime's screen names (spec/debug-protocol.md, `state` event) that have a label. */
+const SCREENS = new Set(["title", "play", "menu", "slots", "history", "confirm", "end", "error", "config", "controls", "accessibility", "extras", "gallery", "cg", "music"]);
+
 /**
  * The live preview (plan §11.3, P2–P4): the real runtime, docked into this
  * pane as a native child window. This component only reserves the space and
@@ -122,7 +125,7 @@ export function PreviewPane() {
         ) : (
           preview.ready && (
             <span className="muted small">
-              <FormattedMessage id={`preview.screen.${preview.screen || "play"}`} />
+              <FormattedMessage id={`preview.screen.${!preview.screen ? "play" : SCREENS.has(preview.screen) ? preview.screen : "other"}`} />
             </span>
           )
         )}

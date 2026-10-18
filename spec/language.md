@@ -17,7 +17,7 @@ Himawari Script is a **closed, declarative** language for visual novels. It look
 | Comments | `#` to end of line, outside string literals. |
 | Line IDs | A trailing comment of the form `#line:xxxxxx` (§3). |
 | Identifiers | `[a-z_][a-z0-9_]*`, at most 64 characters. Scene, character, variable, attribute, asset, and position names all use this form. |
-| Keywords | `scene` `jump` `call` `return` `end` `if` `elif` `else` `menu` `once` `show` `hide` `move` `bg` `cg` `music` `sfx` `ambient` `voice` `stop` `wait` `shake` `flash` `with` `at` `define` `statement` `true` `false` `and` `or` `not` `me` |
+| Keywords | `scene` `define` `jump` `call` `return` `end` `if` `elif` `else` `menu` `once` `show` `hide` `move` `bg` `cg` `music` `sfx` `ambient` `voice` `stop` `wait` `shake` `flash` `textbox` `with` `at` `true` `false` `and` `or` `not`. `statement` is only special after `define`, and `me` is the player as a speaker; neither is reserved ([grammar.ebnf](grammar.ebnf)). |
 
 A file contains top-level `scene` blocks and `define` blocks. Everything else lives inside a scene.
 
@@ -77,7 +77,7 @@ If control reaches the end of a scene's body without `jump`, `call`, `return`, o
 - Each option is a string, an optional `if <expr>` condition, and an indented body.
 - **Fall-through gather:** when an option's body finishes without transferring control, execution continues with the first statement after the `menu` block (Ink-style).
 - **`once` options** disappear after they have been chosen once in this playthrough (per save). If every option is hidden, the menu is skipped and execution continues after it; the validator warns when that can happen (`HW0331`).
-- An option with an empty body is an error (`HW0330`).
+- An option with an empty body is an error (`HW0005`, like any block statement without its block).
 
 ### 2.4 Stage
 
@@ -154,7 +154,7 @@ The mode is part of the saved state.
 
 ### 2.9 Themes
 
-`theme/theme.json` ([theme.schema.json](theme.schema.json)) restyles the built-in UI without code: colors, the textbox (opacity, height, a nine-slice image), text size, fonts, the title and menu backgrounds and music, the default transition time, and per-language UI strings. Core validates it (`HW0130`, unknown settings `HW0131` with suggestions) and compiles it into the bytecode, so the runtime never reads JSON.
+`theme/theme.json` ([theme.schema.json](theme.schema.json)) restyles the built-in UI without code: colors, the textbox (opacity, height, a nine-slice image), text size, fonts, the title and menu backgrounds, the title music, the default transition time, and per-language UI strings. Core validates it (`HW0130`, unknown settings `HW0131` with suggestions) and compiles it into the bytecode, so the runtime never reads JSON.
 
 ## 3. Line IDs
 

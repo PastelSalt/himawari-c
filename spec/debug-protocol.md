@@ -35,7 +35,7 @@ Every event is an object with a string `ev`.
 | `ev` | Fields | When |
 |---|---|---|
 | `ready` | `protocol` (1), `docked` (bool), `gpu` (bool) | Once, after start-up. |
-| `state` | `screen` (`title`, `play`, `menu`, `slots`, `history`, `confirm`, `end`, `error`), `line` (6-character line ID or `null`), `waiting` (bool: the player is expected to click or choose), `choice` (bool: a menu is shown), `error` (string, only when `screen` is `error`) | Whenever any of these changes. Studio highlights the line (green while playing, yellow while waiting) and follows it. |
+| `state` | `screen` (`title`, `play`, `menu`, `slots`, `history`, `confirm`, `end`, `error`, `config`, `controls`, `accessibility`, `extras`, `gallery`, `cg`, `music`; readers show unknown names generically), `line` (6-character line ID or `null`), `waiting` (bool: the player is expected to click or choose), `choice` (bool: a menu is shown), `error` (string, only when `screen` is `error`) | Whenever any of these changes. Studio highlights the line (green while playing, yellow while waiting) and follows it. |
 | `reloaded` | `result` (`exact`, `remapped`, `fallback`, `restarted`, `title`, `failed`), `message` (string) | After each `reload`. `fallback`: the current line was edited away and play resumed a little earlier. |
 | `warp` | `ok` (bool), `to` (string), `message` (when not ok) | After each `warp`. |
 

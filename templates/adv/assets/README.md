@@ -12,4 +12,4 @@ Put your art and sound here. Anything a script names but can't find is shown as 
 | `rules/` | `with rule(wipe_left, 500)` | `rules/wipe_left.png` |
 | `fonts/` | `himawari.json` → `fonts` | `fonts/NotoSansJP-Regular.otf` |
 
-Himawari never generates art, music, or voices. Everything here comes from you.
+Pictures can be PNG, WebP, JPEG, or BMP; sound can be OGG, Opus, WAV, MP3, or FLAC. Himawari never generates art, music, or voices. Everything here comes from you.

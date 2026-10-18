@@ -16,7 +16,7 @@
 | **Game output** | Windows x64 only |
 | **Studio** | Windows, UI in English (default) + Japanese |
 | **AI role** | Development assistant only. **No media generation** |
-| **Phase** | **Phase 1 done** (session 9): sanitizers; lexer, CST parser, AST + `ast.schema.json`, formatter, validator, edit API, bytecode spec + compiler, conformance (compile half), localization, templates + tutorial, `hwc check/fmt/build/disasm/init/l10n`. Next: Phase 2 |
+| **Phase 1** | **Done** (session 9): sanitizers; lexer, CST parser, AST + `ast.schema.json`, formatter, validator, edit API, bytecode spec + compiler, conformance (compile half), localization, templates + tutorial, `hwc check/fmt/build/disasm/init/l10n` |
 | **Phase 2** | **Done** (session 10): `himawari.exe` (loader, VM, saves, rollback, headless playtests, windowed player with layered sprites, rule wipes, EN/JA), bytecode 1.0 frozen, 2.38 MB release |
 | **Phase 3** | **Done** (session 11): `@himawari/tools` (22 tools) + `himawari-mcp` (spec 2026-07-28, SDK v2), agent guide, `hwc run/playtest/graph/report/ai setup`, `build --release` packaging; **M1 reached** (`examples/festival-eve`) |
 | **Phase 4** | **Built** (session 13): Himawari Studio (Electron), docked preview, Screenplay and Script views, panels, AI proposals, Mode A live sync, Mode B. M2 hallway test pending |
@@ -632,6 +632,46 @@ You then asked to commit and push: `0419238`.
 
 ---
 
+### Session 14d: 2026-10-18 · Docs and code cross-check
+**You asked:** to double-check the documentation and the code for hallucinations and inconsistencies, and fix what I find. I checked every claim I could test against the code: commands and flags, versions, diagnostic codes, tool and prompt names, protocol fields, file formats, counts, and cross-references.
+
+**A real bug:** Studio's preview label had no text for the seven screens Phase 5 added (Config, Controls, Accessibility, Extras, Gallery, a CG, Music room), so it would have shown a raw message ID. Added in English and Japanese, with a generic label for any future screen.
+
+**Docs that said something untrue, now fixed:**
+- `spec/language.md`: an empty menu option is `HW0005`, not `HW0330` (which doesn't exist). The keyword list lacked `textbox` and listed `statement` and `me`, which aren't reserved (the grammar was right).
+- `spec/debug-protocol.md`: the `state` event's screen list lacked the Phase 5 screens.
+- The plan:
+  - `--debug-pipe` (§8.12 and the diagram) is really `--link`.
+  - §10.3 listed a `patch_scene` operation `add_menu_option` that was never built, and missed `insert_before` and `append_to_scene`.
+  - §8.10 promised theme positions and animations (they come with the UI Designer).
+  - §8.11 didn't say that `>`, F4, and the console aren't built.
+  - Phase 5's heading wasn't marked done.
+  - Phase 8 listed `hwc report ai-content`, which exists since Phase 3.
+- My own v0.6 text:
+  - It said "debug protocol 2", but additive commands keep version 1 per the spec.
+  - It cited P6 (errors teach) for "no code".
+- `README.md` still said "Phases 0–4", described Studio as "UI message catalogs", gave the runtime size as 2.4 MB (it's 2.6), and left out Sunflower Days, stb_image, and libwebp.
+- `CLAUDE.md`'s RFC list stopped at 0006, its runtime row lacked stb_image and libwebp, and its `hwc` command list was garbled.
+- The player's `--help` listed half its flags and said it plays `game.hwb` by default (it plays `data.hwp` first).
+- `hwc --version` and `project_info` didn't report the extension, theme, and pack spec versions.
+- The agent guide's `patch_scene` list missed two operations.
+- The `adv` template's `assets/README.md` didn't say which file formats work.
+- LOG's Phase 1 row still said "Next: Phase 2".
+
+**Checked, nothing wrong:**
+- Bytecode opcodes and sections against Core.
+- The pack format (48-byte header, xxHash64, codecs) in the spec, Core, and the runtime.
+- The 22 tools and 5 prompts against the plan.
+- The resources and their templates.
+- The 81 UI string keys in Core, the runtime, and the Chinese theme.
+- The diagnostic codes cited in the LLM reference.
+- The runtime's `core/` (no SDL, no I/O) and `text/hw_layout.c` (no SDL, no font library) rules.
+- The roadmap total (37 weeks).
+
+`corepack pnpm check`: 318 tests, 483 locale messages in sync. Runtime debug tests 10/10. Studio e2e 4/4.
+
+---
+
 ## Decision Register
 
 | ID | Decision | Since | Status |
@@ -686,9 +726,9 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 14c)
+## Next Steps (after session 14d)
 
-1. **Review sessions 14b and 14c and decide on committing them.** Phase 5 itself is committed (`675cf65`); the audit fixes, the Chinese demo, and plan v0.6 are not. Try `examples/sunflower-demo` in Chinese (`hwc run`, then Language).
+1. **Review session 14d and decide on committing it.** Sessions 14b and 14c are committed (`d9dfdd5`); the cross-check fixes are not. Try `examples/sunflower-demo` in Chinese (`hwc run`, then Language).
 2. Watch the first CI run of Phase 5: the golden suite and the budget step run on GPU-less runners for the first time; if the golden tolerance is too tight there, regenerate references from CI's artifacts or widen it per case.
 3. Phase 5 follow-ups: a real gamepad test; the ≈ 200 ms GPU renderer start for games with rule wipes (create the GPU device in the background, or draw rule wipes on D3D11 without the GPU renderer); export icon and version patching (plan §14.4, `resedit`); async image decoding (a 4K JPEG costs one 67 ms frame); human review of the Chinese and Japanese demo text (and its 81 Chinese UI strings) and the 48 new runtime UI strings in Japanese.
 4. **The M2 hallway test** (plan §18): a non-programmer creates, writes, previews, localizes one scene, and exports, in English or Japanese, without docs, while an AI contributes through Mode A (a Claude app) and Mode B (the assistant, with your API key). Its findings decide the first Studio fixes.

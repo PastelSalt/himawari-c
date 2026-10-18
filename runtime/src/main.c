@@ -1,7 +1,7 @@
 /*
  * Himawari-C, the game runtime (plan §8). One executable:
  *
- *   himawari [game.hwb]                       play (default: game.hwb beside the exe)
+ *   himawari [game.hwb]                       play (default: data.hwp beside the exe, else game.hwb)
  *   himawari --project DIR [--dev]            play DIR/build/game.hwb with loose assets
  *   himawari --headless … --playtest | --transcript   no window (plan §8.12)
  */
@@ -24,11 +24,16 @@
 static const char *USAGE =
     "Himawari-C " HW_VERSION_STRING "\n"
     "Usage:\n"
-    "  himawari [game.hwb] [--lang xx]       play (default: game.hwb beside himawari.exe)\n"
-    "  himawari --project DIR [--dev]        play DIR/build/game.hwb, assets from DIR/assets\n"
-    "           [--no-gpu]                   use the default renderer (rule wipes become dissolves)\n"
+    "  himawari [game.hwb] [--lang xx]       play (default: data.hwp and patch*.hwp beside himawari.exe, else game.hwb)\n"
+    "  himawari --project DIR [--dev]        play DIR/build/game.hwb, assets from DIR/assets (dev mode: F3, F5)\n"
+    "           [--no-gpu | --gpu]           renderer: default (rule wipes become dissolves) or GPU\n"
     "           [--warp scene | file:line | #lineid]  start at that line, with a state reconstructed along a real path\n"
     "           [--text-speed N]             characters per second for this run (1000 = instant)\n"
+    "           [--screen config|controls|accessibility|extras|gallery|music|load|menu|history] [--unlock-all]\n"
+    "  Unattended runs (tests; default settings, no player data written):\n"
+    "           --frames N [--start] [--advance N] [--pick K] [--screenshot out.png | --compare golden.png]\n"
+    "           [--save-to FILE] [--perf report.json]\n"
+    "  Studio's preview: --link [--parent-window HWND] (spec/debug-protocol.md)\n"
     "  himawari --headless [game.hwb | --project DIR] --playtest [max_steps=N] [seed=N] [lang=xx] [--out report.json]\n"
     "  himawari --headless [game.hwb | --project DIR] --transcript \"0 1\" [seed=N] [lang=xx] [--out file.txt]\n"
     "  himawari --version\n";

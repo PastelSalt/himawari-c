@@ -6,7 +6,7 @@ Himawari is an open-source, AI-assisted **visual novel engine** for other develo
 - [DETAILED_PLAN.md](DETAILED_PLAN.md): the plan (v0.6). Section numbers are referenced everywhere.
 - [LOG.md](LOG.md): decision history, the decision register (D01–D40), and next steps.
 - [RESEARCH.md](RESEARCH.md): evidence behind decisions (🔬§N in the plan = RESEARCH.md §N).
-- [rfcs/](rfcs/): accepted decisions (0001 static build, 0002 GPU transitions, 0003 text stack, 0004 bytecode before the freeze, 0005 layered sprites, 0006 Studio preview and AI live sync).
+- [rfcs/](rfcs/): accepted decisions (0001 static build, 0002 GPU transitions, 0003 text stack, 0004 bytecode before the freeze, 0005 layered sprites, 0006 Studio preview and AI live sync, 0007 extensions, textbox modes, and themes, 0008 macros, 0009 asset packs).
 
 ## Components
 | Package | Tech | License |
@@ -15,7 +15,7 @@ Himawari is an open-source, AI-assisted **visual novel engine** for other develo
 | `@himawari/tools` (`packages/tools`, the AI tool registry) | TypeScript + Zod 4 | MIT |
 | `himawari-mcp` (`packages/mcp`) | TypeScript, MCP spec 2026-07-28, SDK v2 | MIT |
 | Himawari Studio | Electron + React + CodeMirror 6 | MIT |
-| Himawari-C runtime | C11, SDL 3.4, SDL3_mixer, FreeType (direct), libunibreak | zlib |
+| Himawari-C runtime | C11, SDL 3.4, SDL3_mixer, FreeType (direct), libunibreak, stb_image (JPEG), libwebp | zlib |
 
 ## Non-negotiables
 - **Windows only, for everything** (plan v0.5): games, Studio, CLI, MCP, development, and CI. Linux is a future improvement (§18.9). Don't add Linux presets, jobs, or code paths, but keep `core/` and `text/` portable.
@@ -34,7 +34,7 @@ Himawari is an open-source, AI-assisted **visual novel engine** for other develo
 
 ## Commands
 - TS: `corepack pnpm install`, then `corepack pnpm check` (typecheck, lint, vitest, i18n). pnpm is only reachable through corepack on this PC.
-- CLI (after `corepack pnpm exec tsc -b`): `node packages/cli/dist/main.js check|fmt [--check]|build [--release]|disasm <file.hwb>|init <folder> [--template adv|blank]|l10n sync|export --lang ja|import <file> --lang ja`. Templates and examples must check clean and compile (`tests/projects.test.ts`).
+- CLI (after `corepack pnpm exec tsc -b`): `node packages/cli/dist/main.js check|fmt [--check]|build [--release]|disasm <file.hwb>|init <folder> [--template adv|blank]|l10n sync|l10n export --lang ja|l10n import <file> --lang ja|run|playtest|graph|report ai-content|ai setup`. Templates and examples must check clean and compile (`tests/projects.test.ts`).
 - Conformance: `corepack pnpm vitest run tests/conformance`; regenerate expected files with `UPDATE_CONFORMANCE=1` and review the diff.
 - Runtime: from `runtime/`: `cmake --preset win64-debug`, `cmake --build --preset win64-debug`, `ctest --preset win64-debug`. Regenerate C conformance transcripts with `UPDATE_CONFORMANCE=1 ./build/win64-debug/test_conformance.exe` (TS writes `expected.hwb` first).
 - MCP: `node packages/mcp/dist/main.js --project <dir> [--allow-build]`; `hwc ai setup` prints client configs. Tests start the real server (`packages/mcp/src/server.test.ts`, `live-sync.test.ts`); exec-tool tests skip without a built runtime. While Studio has a project open, write tools are forwarded to it as proposals (`.himawari/session.json`).

@@ -12,6 +12,9 @@ export const SPEC_VERSIONS = {
   character: "1.0.0-draft",
   bytecode: "1.1.0",
   ast: "1.1.0",
+  extension: "1.0.0-draft",
+  theme: "1.0.0-draft",
+  pack: "1.0.0",
 } as const;
 
 export type SpecName = keyof typeof SPEC_VERSIONS;

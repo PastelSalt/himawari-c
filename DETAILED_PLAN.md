@@ -257,7 +257,7 @@ flowchart LR
 
     subgraph Runtime["Himawari-C (C11 + SDL 3.4)"]
         R[game.exe]
-        HL[--headless / --debug-pipe]
+        HL[--headless / --link]
     end
 
     W --> S
@@ -658,7 +658,7 @@ UTF-8 everywhere. Stack decided in RFC 0003: **FreeType directly + libunibreak +
   - CG Gallery, Music Room, Scene Replay (v1.x)
   - Quick Save/Load, Confirm
   - **Accessibility** (§13)
-- **Themes:** `theme/theme.json` (nine-slice images, fonts, colors, positions, animations). The **default theme** ships polished, localized, and accessible (P10).
+- **Themes:** `theme/theme.json` (since Phase 5: colors, the textbox with a nine-slice image, fonts, text size, title and menu backgrounds, title music, transition time, UI strings per language; positions, layouts, and animations come with the UI Designer, §11.6). The **default theme** ships polished, localized, and accessible (P10).
 - **Modes:** ADV (textbox) and NVL (full screen) can be switched per scene.
 - **Input:** keyboard, mouse, and gamepad, fully remappable.
 
@@ -671,13 +671,15 @@ UTF-8 everywhere. Stack decided in RFC 0003: **FreeType directly + libunibreak +
 | Fast-skip to next menu | `>` | Ren'Py-style |
 | Open in Studio | F4 | Jump to the current line in Studio (or `$EDITOR file:line`) |
 | Console (dev only) | `~` | Jump to scene, set variables, toggle attributes |
+
+Built so far: F3, F5, `--warp` and Studio's ▶, and fast-skip as Studio's **Next menu** (the `next_menu` command). The `>` key, F4, and the console are not built yet.
 | Lint | `hwc check` | Same validator as Studio |
 
 ### 8.12 CLI modes
 ```bash
 game                                        # play (finds data.hwp beside the binary)
 game --project ./my-novel --dev             # loose files, placeholders, dev tools
-game --debug-pipe                           # controlled by Studio (JSON-lines over stdio)
+game --project ./my-novel --link           # controlled by Studio (JSON lines over stdio, spec/debug-protocol.md)
 game --headless --playtest strategy=all_paths max_steps=50000 seed=1 --out report.json
 ```
 
@@ -758,7 +760,7 @@ hwc migrate --to 2.0
 | `list_variables`, `list_assets` | read | Unused and missing flags |
 | `validate`, `analyze` | read | Diagnostics with fix suggestions; reachability; stats |
 | `create_scene`, `update_scene` | write | Whole-scene text |
-| `patch_scene` | write | `insert_after(line_id, hws)`, `replace_text(line_id, text)`, `set_attrs(line_id, +/-)`, `delete(ids)`, `add_menu_option(menu_id, …)`, `move(ids, after_id)` |
+| `patch_scene` | write | `insert_after(lineId, hws)`, `insert_before(lineId, hws)`, `append_to_scene(scene, hws)`, `replace_text(lineId, text)`, `set_attrs(lineId, add, remove)`, `delete(lineIds)`, `move(lineIds, afterLineId)`. A menu option is added with `insert_after`/`insert_before` on another option |
 | `upsert_character`, `set_preset` | write | Frontmatter and bible |
 | `declare_variable` | write | |
 | `rename` | write | Refactor-safe. MRTR confirm when it touches many files |
@@ -903,7 +905,7 @@ Per-tool trust settings (e.g., auto-accept `set_translation`). An "autopilot" mo
 
 ### 11.6 UI Designer (your request, 2026-10-18; Phase 6)
 
-Every game should be able to look like its own game, not like "a Himawari game". The **UI Designer** is a Studio panel where writers and artists customize the game's built-in UI **by hand, visually**: move and resize anything, recolor it, restyle it, and see the result in the real game right away. No code and no JSON editing (P6, P7). It writes `theme/theme.json`, which Core validates and compiles (plan §8.10, rfcs/0007), so the runtime still never reads JSON (D01).
+Every game should be able to look like its own game, not like "a Himawari game". The **UI Designer** is a Studio panel where writers and artists customize the game's built-in UI **by hand, visually**: move and resize anything, recolor it, restyle it, and see the result in the real game right away. No code and no JSON editing (P7). It writes `theme/theme.json`, which Core validates and compiles (plan §8.10, rfcs/0007), so the runtime still never reads JSON (D01).
 
 **What can be customized (every screen, every element):**
 | Area | Elements | What can change |
@@ -1204,7 +1206,7 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 - **UI in English + Japanese** (§11.5), Welcome-screen language picker, pseudo-locale checks. Studio packaged for Windows, and export verified.
 - 🎯 **M2:** a non-programmer writer passes the hallway test in **either UI language**: they create, write, preview, localize one scene, and export a Windows game without docs help, while an AI contributes proposals through **both** Mode A and Mode B.
 
-### Phase 5: Runtime feature-complete (⏱ 5)
+### Phase 5: Runtime feature-complete (⏱ 5) ✅ done 2026-10-18
 - Backlog with voice replay, auto/skip, config, gallery, music room, quick save.
 - Rule transitions, NVL mode, theming, gamepad and remapping.
 - **Accessibility baseline (§13)**, `.hwp` + patches, WebP, crash dumps, Tier B extension statements, macros.
@@ -1215,7 +1217,7 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 - Theme schema 2.0 (per-screen layouts, element styles, palette tokens), compiled into `THEM`; an RFC first.
 - A data-driven runtime UI for every screen (§8.10); today's look ships as the **Classic ADV** preset, so existing games look the same.
 - Studio's **UI Designer** panel (§11.6): live preview of any screen with sample content, drag/resize with snapping and safe areas, inspector, color wheel and eyedropper, palette tokens and harmonies, presets and preset palettes, theme packs (export/import), per-language overflow checks, contrast check, color-blindness preview, undo and reset.
-- Debug protocol 2: preview screens, report element rectangles, apply theme changes live.
+- Debug-protocol additions (still version 1, since they're additive): preview screens, report element rectangles, apply theme changes live.
 - Golden images for every preset in all demo languages.
 - ✅ **Exit:** a non-programmer restyles the default game into a visibly different one (move the textbox, shrink the text area, recolor, change fonts) in under 15 minutes without docs, and the result passes the contrast and overflow checks in every language.
 
@@ -1226,11 +1228,11 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 
 ### Phase 8: Open-source launch (⏱ 3)
 - Docs site (Diátaxis, tutorials in EN + JA) on GitHub Pages, the tutorial project, a video walkthrough.
-- Signed Studio installer for Windows, auto-update, itch.io `butler` export, `hwc report ai-content`.
+- Signed Studio installer for Windows, auto-update, itch.io `butler` export (`hwc report ai-content` for store disclosure is already built, Phase 3).
 - Governance and contribution docs, RFC repo, security policy, license audit.
 - 🎯 **M3: public v1.0.**
 
-**Total ≈ 37 weeks to v1.0** (v0.2 was 32: the built-in assistant and Studio UI localization add 2 weeks to Phase 4, and Phase 6 shrinks by 1; v0.6 adds the 4-week UI Designer as Phase 6, and AI depth and the launch become Phases 7 and 8). An AI-to-game slice still works at ≈ week 14.
+**Total ≈ 37 weeks to v1.0** (v0.2 was 32: the built-in assistant and Studio UI localization add 2 weeks to Phase 4, and AI depth and polish shrinks by 1; v0.6 adds the 4-week UI Designer as Phase 6, and AI depth and the launch become Phases 7 and 8). An AI-to-game slice still works at ≈ week 14.
 
 ### 18.9 After v1
 - **Linux (future improvement, v0.5):** Studio on Linux, a Linux runtime build for its live preview and headless playtests, Linux CI (sanitizers, fuzzing), and possibly a tested Proton path for Steam Deck. The portable `core/` and `text/` code and the SDL layer keep this a small change. Phase 0 already proved most of the pieces on Windows.
