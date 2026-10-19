@@ -1,0 +1,13 @@
+# GitHub Pages (Jekyll) settings for the docs site at https://pastelsalt.github.io/himawari-c/
+# Publish from the main branch, /docs folder. Links to other pages end in .md, which the
+# relative-links plugin rewrites. Pages outside docs/ (the spec, policies) are linked by
+# relative path, so copy them into the site at publish time or switch those links to the
+# GitHub URLs.
+title: Himawari docs
+description: A visual novel engine that anyone can use, that coders can open up, and that runs on any Windows PC.
+theme: jekyll-theme-minimal
+plugins:
+  - jekyll-relative-links
+relative_links:
+  enabled: true
+  collections: false
