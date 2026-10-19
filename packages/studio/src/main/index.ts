@@ -8,9 +8,11 @@
 import { existsSync } from "node:fs";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { extname, join, normalize, sep } from "node:path";
+import { TOOLS } from "@himawari/tools";
 import { BrowserWindow, Menu, app, dialog, ipcMain, nativeTheme, protocol, session, shell } from "electron";
 import { type BundledProject, CHANNELS, type MethodName, type PreviewEvent, type ProjectSnapshot, type Settings } from "../shared/api.js";
 import { AssistantHost } from "./assistant.js";
+import { TranslateHost } from "./translate.js";
 import { McpHost } from "./mcp-host.js";
 import { preloadPath, rendererDir, resources } from "./paths.js";
 import { Preview } from "./preview.js";
@@ -92,6 +94,7 @@ proposals.onApplied = (changes, proposal) => {
   if (project) send(CHANNELS.projectChanged, changes, null, { source: "ai", tool: proposal.tool, rationale: proposal.rationale });
 };
 const assistant = new AssistantHost(() => project, proposals, getSettings, (e) => send(CHANNELS.assistantEvent, e), () => resources().runtime);
+const translator = new TranslateHost(assistant, () => project, (e) => send(CHANNELS.translateEvent, e));
 
 function send(channel: string, ...args: unknown[]): void {
   if (win && !win.isDestroyed()) win.webContents.send(channel, ...args);
@@ -124,6 +127,7 @@ async function closeProject(): Promise<void> {
   preview?.stop();
   await mcp.stop();
   assistant.reset();
+  translator.cancel();
   proposals.clear();
   project?.close();
   project = null;
@@ -228,6 +232,32 @@ const handlers: Record<MethodName, (...args: unknown[]) => unknown> = {
     return new Uint8Array(await readFile(p));
   },
   "project.build": () => needProject().build(),
+  "project.playtest": async () => {
+    const runtime = resources().runtime;
+    if (!runtime) throw new Error("The Himawari runtime isn't installed with this Studio.");
+    const tool = TOOLS.find((t) => t.name === "playtest")!;
+    const t0 = performance.now();
+    const out = await tool.run({ fs: needProject().fs, runtime, allowBuild: false }, tool.input.parse({}));
+    if (!("data" in out)) throw new Error("the playtest didn't run");
+    const r = out.data as {
+      ok: boolean;
+      covered?: boolean;
+      stepLimit: boolean;
+      endings: { list: { scene: string }[]; unreached: { scene: string }[] };
+      coverage: { lines: { seen: number; total: number }; options: { chosen: number; total: number }; unseen: string[] };
+      errors: { message: string }[];
+    };
+    return {
+      ok: r.ok,
+      covered: r.covered ?? !r.stepLimit,
+      endings: { reached: r.endings.list.map((e) => e.scene), unreached: r.endings.unreached.map((e) => e.scene) },
+      unseen: r.coverage.unseen,
+      lines: r.coverage.lines,
+      options: r.coverage.options,
+      errors: r.errors.map((e) => e.message),
+      ms: performance.now() - t0,
+    };
+  },
   "project.exportGame": (zip) => {
     const runtime = resources().runtime;
     if (!runtime) throw new Error("The Himawari runtime isn't installed with this Studio.");
@@ -267,6 +297,9 @@ const handlers: Record<MethodName, (...args: unknown[]) => unknown> = {
   "assistant.send": (request) => assistant.send(request),
   "assistant.cancel": () => assistant.cancel(),
   "assistant.reset": () => assistant.reset(),
+  "translate.estimate": (request) => translator.estimate(request),
+  "translate.start": (request) => translator.start(request),
+  "translate.cancel": () => translator.cancel(),
 };
 
 /** Files the user picked in an Open dialog this session (the only outside files Studio reads). */

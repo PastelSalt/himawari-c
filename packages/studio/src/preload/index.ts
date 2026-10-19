@@ -33,6 +33,7 @@ const api: StudioApi = {
     readExternal: call("project.readExternal"),
     build: call("project.build"),
     exportGame: call("project.exportGame"),
+    playtest: call("project.playtest"),
     onChanged: listen(CHANNELS.projectChanged),
   },
   preview: {
@@ -51,6 +52,12 @@ const api: StudioApi = {
     cancel: call("assistant.cancel"),
     reset: call("assistant.reset"),
     onEvent: listen(CHANNELS.assistantEvent),
+  },
+  translate: {
+    estimate: call("translate.estimate"),
+    start: call("translate.start"),
+    cancel: call("translate.cancel"),
+    onEvent: listen(CHANNELS.translateEvent),
   },
 };
 

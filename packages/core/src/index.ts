@@ -33,7 +33,7 @@ export { type Ref } from "./syntax/ast.js";
 export { type FileReport, type ProjectCheck, type ProjectInput, type SourceFile, checkProject } from "./project/check.js";
 export { type Character, type SpriteDef, type SpriteGroup, characterWords, readCharacter } from "./project/character.js";
 export { type SpriteAttr, type SpriteLayer, type SpriteState, applySpriteWords, spriteLayers } from "./project/sprite.js";
-export { type GraphEdge, type GraphNode, type StoryGraph, exprToString, fileFilterGraph, fileGraph, focusGraph, graphToMermaid, storyGraph } from "./project/graph.js";
+export { type GraphEdge, type GraphNode, type StoryGraph, type RouteInfo, exprToString, fileFilterGraph, fileGraph, focusGraph, graphToMermaid, routeBalance, storyGraph } from "./project/graph.js";
 export { DEFAULT_POSITIONS, type Manifest, type VarType, type VariableDecl, readManifest } from "./project/manifest.js";
 export { editDistance, suggest } from "./project/suggest.js";
 export { RenameError, type RenameKind, type RenamePlan, planRename, splitFrontmatter } from "./project/rename.js";
@@ -100,3 +100,14 @@ export {
   endsFlow,
   parseAst,
 } from "./syntax/ast.js";
+export { NOTES_FILE, NOTE_KINDS, type Note, type NoteKind, newNoteId, noteAnchor, readNotes, stringifyNotes } from "./project/notes.js";
+export {
+  GLOSSARY_FILE,
+  type GlossaryTerm,
+  type LineToTranslate,
+  glossaryForPrompt,
+  glossaryMisses,
+  readGlossary,
+  stringifyGlossary,
+  translationInstructions,
+} from "./l10n/glossary.js";

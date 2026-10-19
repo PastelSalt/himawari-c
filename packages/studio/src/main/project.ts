@@ -18,7 +18,8 @@ export function isProjectText(file: string): boolean {
   if (file.startsWith("characters/") && file.endsWith(".md")) return true;
   if (file.startsWith("locales/") && file.endsWith(".json")) return true;
   if (file.startsWith("extensions/") && file.endsWith(".schema.json")) return true;
-  if (file === "theme/theme.json") return true;
+  if (file === "theme/theme.json" || file === "glossary.json") return true;
+  if (file === ".himawari/notes.json") return true; // review notes (rfcs/0011)
   return false;
 }
 
@@ -80,7 +81,7 @@ export class Project {
     for (const f of this.fs.list("characters", (n) => n.endsWith(".md"))) add(f);
     for (const f of this.fs.list("locales", (n) => n.endsWith(".json"))) add(f);
     for (const f of this.fs.list("extensions", (n) => n.endsWith(".schema.json"))) add(f);
-    if (this.fs.exists("theme/theme.json")) add("theme/theme.json");
+    for (const f of ["theme/theme.json", "glossary.json", ".himawari/notes.json"]) if (this.fs.exists(f)) add(f);
     this.assetsCache = this.listAssets();
     return { root: this.root, files, assets: this.assetsCache };
   }
@@ -162,7 +163,7 @@ export class Project {
     this.watcher = watch(this.root, { recursive: true }, (_event, name) => {
       if (!name) return;
       const file = name.replaceAll("\\", "/");
-      if (IGNORED.test(file)) return;
+      if (IGNORED.test(file) && file !== ".himawari/notes.json") return;
       this.pending.add(file);
       if (this.watchTimer) clearTimeout(this.watchTimer);
       this.watchTimer = setTimeout(() => this.flushWatch(), 150);

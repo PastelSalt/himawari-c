@@ -3,6 +3,7 @@
  * in a fixed order (reads, then writes, then execs) so clients can cache the
  * tool list (plan §10.1).
  */
+import { addNote, listNotes, resolveNote } from "./tools/notes.js";
 import type { ToolDef } from "./registry.js";
 import { build, playtest, renderLine } from "./tools/exec.js";
 import {
@@ -49,6 +50,9 @@ export const TOOLS: readonly ToolDef[] = [
   declareVariable,
   rename,
   setTranslation,
+  addNote,
+  listNotes,
+  resolveNote,
   playtest,
   renderLine,
   build,
@@ -61,3 +65,4 @@ export { PROVENANCE_FILE, provenanceNow, readProvenance, stampAi, textHash, type
 export { findRuntime, runRuntime } from "./runtime.js";
 export { compileProject, packageGame, safeName } from "./package.js";
 export { TEMPLATES, initProject, projectId, readTemplate, renderTemplate, templatesDir, type InitOptions, type TemplateName } from "./init.js";
+export { RECIPES, expandCommand, type Recipe, type RecipeArg } from "./recipes.js";

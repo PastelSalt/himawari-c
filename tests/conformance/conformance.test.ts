@@ -20,6 +20,8 @@ import { readHwb } from "../../packages/core/src/bytecode/reader.js";
 import { writeHwb } from "../../packages/core/src/bytecode/writer.js";
 import { LineIndex } from "../../packages/core/src/syntax/position.js";
 
+const STORY_HINTS: ReadonlySet<string> = new Set(["HW0340", "HW0341", "HW0342"]);
+
 const CASES = fileURLToPath(new URL("./cases/", import.meta.url));
 const UPDATE = process.env["UPDATE_CONFORMANCE"] === "1";
 
@@ -55,9 +57,10 @@ describe("conformance (compile half)", () => {
       const diagFile = join(dir, "expected.diagnostics");
       const disasmFile = join(dir, "expected.disasm");
 
+      // The cases test the language, not the stories: the story hints (HW0340–HW0342, unit-tested in Core) are left out.
       const diagnostics = check.files.flatMap((f) => {
         const idx = new LineIndex(f.source);
-        return f.diagnostics.map((d) => {
+        return f.diagnostics.filter((d) => !STORY_HINTS.has(d.code)).map((d) => {
           const { line, col } = idx.at(d.span.start);
           return `${d.code} ${f.file}:${line}:${col}`;
         });

@@ -2306,3 +2306,163 @@ details.asset-section > summary {
   margin: 16px 0 8px;
   cursor: pointer;
 }
+
+/* Review notes (rfcs/0011) */
+.note-badge {
+  flex: none;
+  gap: 3px;
+  padding: 1px 7px;
+  font-size: 11px;
+  border-radius: 999px;
+  background: var(--ai-soft);
+  color: var(--ai);
+  border-color: transparent;
+  box-shadow: none;
+}
+.sp-note-form {
+  flex-basis: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 4px 48px;
+  color: var(--ai);
+}
+.sp-note-form input {
+  flex: 1;
+}
+.sp-row {
+  flex-wrap: wrap;
+}
+.notes-head {
+  padding: 6px 12px;
+  gap: 14px;
+}
+.note-kind {
+  font-size: 11px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--bg-3);
+  white-space: nowrap;
+}
+.note-kind.continuity,
+.note-kind.character {
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+.note-kind.translation {
+  background: var(--info-soft);
+  color: var(--info);
+}
+
+/* Story graph: routes, playtest coverage, editing (Phase 7) */
+.graph-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-2);
+}
+.route-chip {
+  gap: 6px;
+  padding: 2px 10px;
+  font-size: 12px;
+  border-radius: 999px;
+  box-shadow: none;
+}
+.coverage-bar {
+  height: 5px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: var(--bg-3);
+  overflow: hidden;
+}
+.coverage-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+}
+.coverage-bar .full {
+  background: var(--ok);
+}
+.coverage-bar .part {
+  background: var(--warning);
+}
+.coverage-bar .none {
+  background: var(--error);
+}
+.graph-node.not-reached {
+  border-color: var(--error);
+  border-style: dashed;
+}
+/* Connecting scenes: a bigger handle to grab on the right */
+.graph-node .react-flow__handle-right {
+  width: 12px;
+  height: 12px;
+  background: var(--focus);
+  border: 2px solid var(--bg);
+}
+
+/* "Translate with AI" and the glossary (Localization, Phase 7). */
+.ai-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ai);
+  border-color: var(--ai-soft);
+}
+.ai-button:not(:disabled):hover {
+  background: var(--ai-soft);
+}
+.translate-progress {
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  margin: 4px 0 8px;
+  border-radius: var(--radius);
+  background: var(--ai-soft);
+}
+.progress-track {
+  flex: 0 0 180px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--bg);
+  overflow: hidden;
+}
+.progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--ai);
+  transition: width 0.3s ease;
+}
+.glossary-hint {
+  margin-top: 2px;
+  color: var(--info);
+}
+.card.glossary {
+  margin: 4px 0 10px;
+}
+.card.glossary table input {
+  width: 100%;
+}
+.card.glossary form {
+  margin-top: 8px;
+  gap: 6px;
+}
+
+/* The assistant's slash commands: kept inside the panel, descriptions wrap. */
+.mention-menu {
+  max-width: calc(100% - 24px);
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.sp-attr-option.command-option {
+  white-space: normal;
+  text-align: left;
+  align-items: baseline;
+}
+.command-option code {
+  flex: none;
+  white-space: nowrap;
+}

@@ -47,6 +47,7 @@ export function buildModel(files: Record<string, string>, assets: string[]): Pro
     locales: pick(isLocale),
     extensions: pick(isExtension),
     ...(files["theme/theme.json"] !== undefined ? { theme: { file: "theme/theme.json", text: files["theme/theme.json"] } } : {}),
+    ...(files["glossary.json"] !== undefined ? { glossary: { file: "glossary.json", text: files["glossary.json"] } } : {}),
   });
   const lines = new Map<string, LineLocation>();
   const scenes: SceneLocation[] = [];

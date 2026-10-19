@@ -62,6 +62,7 @@ const GOOD = `scene start:
 
 scene talk:
     "Talking."
+    $ met = true
     return
 
 scene ending:

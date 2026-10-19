@@ -562,7 +562,7 @@ Reveal her transfer plans before ch4_rooftop.
 | **Layout** | **Tier 1** (v1): Latin, Cyrillic, Greek, Japanese, Chinese (Simplified and Traditional), Korean. This covers UAX #14 line breaking via libunibreak, **JLREQ kinsoku overrides**, ruby per **W3C Simple Ruby** (no overhang onto neighbors), and CJK punctuation compression (optional). **Tier 2** (v1.x, with HarfBuzz and bidi): Arabic, Hebrew, Thai, Devanagari. |
 | **Runtime switching** | Change language in Config without restarting. The backlog re-renders in the new language. The first launch defaults to the OS locale when available. |
 | **Studio** | Localization table: filter by status, side-by-side with the source, a **context preview** (rendered screenshot of the line in-game), and a length warning when text overflows the textbox at the current font size. |
-| **AI translation** | MCP `translate_scene` prompt plus a `set_translation` tool, with a glossary (`locales/glossary.<lang>.json`), tag preservation, and character-bible voice notes. Entries are marked `provenance: ai` and land as `needs-review`. |
+| **AI translation** | MCP `translate_scene` prompt plus a `set_translation` tool, and Studio's **"Translate with AI"** for many lines at once (Claude Haiku 5.5 by default, structured outputs, about 40 lines per request; rfcs/0011). Both follow the glossary (`glossary.json`; `HW0407` notes a translation that doesn't), keep tags, and use character-bible voice notes. Entries are marked `provenance: ai` and land as `needs-review`. |
 
 ---
 
@@ -758,13 +758,14 @@ hwc migrate --to 2.0
 | `get_story_graph` | read | json \| mermaid, with conditions |
 | `list_characters`, `get_character` | read | Includes **bible prose, presets, available attributes** |
 | `list_variables`, `list_assets` | read | Unused and missing flags |
-| `validate`, `analyze` | read | Diagnostics with fix suggestions; reachability; stats |
+| `validate`, `analyze` | read | Diagnostics with fix suggestions; reachability; stats; route balance and continuity hints (rfcs/0011) |
 | `create_scene`, `update_scene` | write | Whole-scene text |
 | `patch_scene` | write | `insert_after(lineId, hws)`, `insert_before(lineId, hws)`, `append_to_scene(scene, hws)`, `replace_text(lineId, text)`, `set_attrs(lineId, add, remove)`, `delete(lineIds)`, `move(lineIds, afterLineId)`. A menu option is added with `insert_after`/`insert_before` on another option |
 | `upsert_character`, `set_preset` | write | Frontmatter and bible |
 | `declare_variable` | write | |
 | `rename` | write | Refactor-safe. MRTR confirm when it touches many files |
 | `set_translation` | write | Lands as `needs-review` |
+| `add_note`, `list_notes`, `resolve_note` | write / read | Review notes anchored on line IDs (`.himawari/notes.json`, rfcs/0011): findings the AI leaves instead of editing. Written directly (they change no game file) |
 | `playtest` | exec | `choices[]` or `strategy`; seed; returns transcript, endings, coverage, errors. Long runs use the tasks extension |
 | `render_line` | exec | Headless screenshot of a line (PNG) so the AI can *see* composition |
 | `build` | exec | Gated by config |
@@ -772,13 +773,14 @@ hwc migrate --to 2.0
 All tools have annotations (`readOnlyHint`, `destructiveHint`, `idempotentHint`) and output schemas.
 
 ### 10.4 Resources and prompts
-- **Resources:** `himawari://project/manifest`, `…/scene/{id}`, `…/character/{id}`, `…/graph`, **`…/spec/llm-reference`** (compact language guide for models), **`…/agent-guide`** (the Himawari agent instructions, §10.8), **`…/project/agents-md`** (the project's `AGENTS.md`).
-- **Prompts:** `write_scene`, `continuity_check`, `branch_planner`, `translate_scene`, `sprite_direction` (suggests expression changes for a scene given the presets).
+- **Resources:** `himawari://project/manifest`, `…/scene/{id}`, `…/character/{id}`, `…/graph`, **`…/spec/llm-reference`** (compact language guide for models), **`…/agent-guide`** (the Himawari agent instructions, §10.8), **`…/project/agents-md`** (the project's `AGENTS.md`), `…/project/glossary`.
+- **Prompts:** `write_scene`, `continuity_check` (leaves review notes), `branch_planner`, `translate_scene` (follows the glossary), `sprite_direction` (suggests expression changes for a scene given the presets), `proofread`, `route_balance`, `playtest_report`. They are the **recipes** in `@himawari/tools`, which are also the Studio assistant's slash commands (`/write`, `/continuity`, `/branches`, `/translate`, `/sprites`, `/proofread`, `/balance`, `/playtest`).
 
 ### 10.5 Optional MCP Apps UI (`io.modelcontextprotocol/ui`) 🔬§6.3
 - `ui://himawari/story-graph`: an interactive branch graph in the AI chat. Clicking a node asks the agent about it.
 - `ui://himawari/scene-preview`: rendered dialogue screenshots with sprites, from `render_line`.
 - Shown only when the client supports the extension. App-only tools are hidden from the model.
+- ✅ **Built, experimental** (Phase 7, rfcs/0011): `get_story_graph` and `render_line` carry `_meta.ui.resourceUri`; each view is one self-contained page (no network). The SDK has no built-in support yet, so the hint is always sent; hosts without MCP Apps ignore it. A click on a scene asks the host to call `get_story_graph` for it.
 
 ### 10.6 Example agent loop
 `get_character(hana)` → `create_scene(dry_run)` → fix diagnostics → `create_scene` (proposal accepted in Studio) → `playtest(all_paths)` reports a dead end → `patch_scene` → `playtest` shows 100% of endings reachable → `render_line` to check sprite choices.
@@ -1126,9 +1128,10 @@ himawari-c/                 # github.com/PastelSalt/himawari-c
 | i18n | Placeholder parity, glyph coverage, CSV/XLIFF round-trip |
 | End to end | `all_paths` playtest of examples in the Windows runtime, locally and on the CI Windows runner |
 | MCP | Schema contract tests, sandbox escapes, stale revisions, dry-run purity, deterministic tool order |
-| AI quality | Eval set: validation pass rate, playtest success, bible consistency (tracked over time, non-blocking) |
+| AI quality | Eval set: validation pass rate, playtest success, bible consistency (tracked over time, non-blocking). `packages/evals`: 5 tasks, deterministic scores, results by date, `TREND.md` (rfcs/0011) |
 | Studio | Playwright-Electron e2e for the first-run flow, Screenplay ↔ Script round-trip, preview sync |
 | UX | P1/P2 timing budgets in CI. A **hallway usability test** each milestone with 3 non-programmer writers doing scripted tasks |
+| Scale | A generated ≈ 36 000-line game in CI (`tests/scale.test.ts`) and timing scripts for Studio and the AI tools (§16.5) |
 
 ### 16.2 Conformance suite
 Shared cases bind the TS compiler and the C VM: input `.hws` → expected diagnostics, `.hwb`, and **headless playtest transcript**. If they drift, CI fails.
@@ -1142,6 +1145,37 @@ Budgets from §8.1 are measured in CI on every merge, with a trend dashboard.
 - `hwc report ai-content` produces a store-ready summary of AI-assisted *text*: counts, categories, and files. Himawari games are **pre-generated only** by design, with no AI at runtime.
 
 ---
+
+### 16.5 Big projects (stress testing, 2026-10-19)
+Real visual novels reach tens of thousands of lines and hundreds of assets, so every release is tested at that size (LOG session 16, D44, D45).
+
+**Try it yourself:** make a big test game, then open its folder in Studio:
+```bash
+node scripts/stress/make-project.mjs C:/Temp/big-test
+```
+The defaults give ≈ 36 000 lines in 134 files: 12 routes of 10 chapters, a common folder, one 6 000-line file, 1 123 scenes, 368 procedural images (layered sprites, backgrounds, CGs), and a 33 000-line Japanese table. Options: `--routes`, `--files`, `--scenes`, `--lines`, `--bgs`, `--cgs`, `--big`, `--lang`.
+
+**Measure it:** `node scripts/stress/tools.mjs <folder>` times every AI tool; `node scripts/stress/studio.mjs <folder> <out>` opens it in Studio (a throwaway home folder), times opening, typing, every panel, and search, records the longest freeze of each, and saves screenshots. `tests/scale.test.ts` runs in CI: the big game compiles, a second check is faster than the first, a playtest covers every ending, line, and choice, and the AI tools answer with summaries.
+
+**What a big project gets** (so writers don't scroll through everything):
+- **Explorer:** scripts grouped by folder (one per route); folders start closed past 20 scripts; a file shows its scenes when opened; a find box for files and scenes; "Fold everything".
+- **Screenplay:** only scenes near the screen are drawn, and a "Go to a scene" bar sits at the top of long files. Revealing a place scrolls to it.
+- **Story graph:** past 150 scenes it opens as an overview, one box per route folder (or per file), with "Find a scene" for a scene and its neighbors.
+- **Localization, Problems, Assets:** filters by route folder or file, search, pages of 100, and folded asset folders.
+- **AI tools:** `list_scenes` and `get_story_graph` summarize past 200 scenes or 150 nodes and take `file`, `query`, and `scene` filters.
+- **Playtests and warps:** a coverage pass first, then every combination; the step budget grows with the story.
+
+**Measured on the default big game** (this PC, release builds):
+
+| What | Time |
+|---|---|
+| `hwc check` / `build` / `build --release` | 1.1 s / 1.7 s / 3.3 s |
+| A check after editing one file (Studio, AI tools) | 0.12 s |
+| Headless playtest, full coverage | 2.4 s |
+| Runtime: load 4.4 MB of bytecode / start from `data.hwp` | 14 ms / 0.65 s |
+| Studio: open the project (first check after the workspace appears) | 1.1 s |
+| Studio: longest freeze while typing, switching panels, or searching | ≤ 0.2 s |
+| Studio renderer memory | ≈ 200 MB |
 
 ## 17. Open-Source Project Setup (your answers #3, #4)
 
@@ -1222,10 +1256,11 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 - ✅ **Exit:** a non-programmer restyles the default game into a visibly different one (move the textbox, shrink the text area, recolor, change fonts) in under 15 minutes without docs, and the result passes the contrast and overflow checks in every language.
 - ✅ **Built** (2026-10-19, LOG session 15): theme schema 2.0 with 7 presets and 9 palettes (rfcs/0010); a data-driven runtime UI (rounded, bordered, shadowed panels; every screen placed from the theme; the default look pixel-identical); the debug pipe's `screen` command and `overflow` event; Studio's UI Designer (a draggable mock of five screens with snapping and a safe area, number fields, presets, palettes, a color wheel with eyedropper and harmonies, contrast badges with one-click fixes, a color-blindness preview, theme pack export and import); 12 preset golden images. Also: Studio's own light (default), dark, and match-Windows themes. Open: the hallway test; the mock can't show per-language fonts yet (the docked game does).
 
-### Phase 7: AI depth and polish (⏱ 2)
+### Phase 7: AI depth and polish (⏱ 2) ✅ built 2026-10-19
 - Continuity checks, route balance, coverage overlay on the graph, graph editing.
 - AI batch translation with glossary (Haiku-class model by default for cost). Assistant slash-command recipes. MCP Apps (story graph, scene preview).
 - AI eval suite trending.
+- ✅ **Built** (2026-10-19, LOG session 17, rfcs/0011): review notes (`.himawari/notes.json`, three new tools, Studio's Notes panel); continuity checks HW0340–HW0342; route balance in `analyze` and on the graph; the graph's playtest coverage overlay, drag-to-link, and New scene; the glossary (`glossary.json`, HW0407) and "Translate with AI" (Claude Haiku 5.5 by default); eight recipes as MCP prompts and assistant slash commands; experimental MCP Apps views; `packages/evals` with a trend report. Open: the first real eval runs need an API key.
 
 ### Phase 8: Open-source launch (⏱ 3)
 - Docs site (Diátaxis, tutorials in EN + JA) on GitHub Pages, the tutorial project, a video walkthrough.

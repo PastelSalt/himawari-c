@@ -58,6 +58,8 @@ export function isTrivia(kind: TokenKind): boolean {
 
 /** A line tag at the start of a comment, followed by end of line or whitespace. */
 const LINE_TAG_PREFIX = /^#line:[0-9a-hjkmnp-tv-z]{6}(?=\s|$)/;
+/** `#line:` followed by anything that isn't a valid ID (checked after LINE_TAG_PREFIX fails). */
+const MALFORMED_LINE_TAG = /^#line:\S*/i;
 
 const OPERATORS: ReadonlyArray<readonly [string, TokenKind]> = [
   ["==", "EqEq"],
@@ -146,6 +148,13 @@ export function lex(source: string): LexResult {
       if (tag) {
         push("LineTag", i + tag[0].length);
         continue;
+      }
+      // Something meant as a line tag that isn't one (`#line:evl001`, `#line:K3F9A1`): it would silently become a
+      // comment and the line would get a new ID. Not after a real tag, where tools leave the old text as a comment.
+      const bad = MALFORMED_LINE_TAG.exec(source.slice(i, j));
+      const prev = tokens.at(-1)?.kind === "Whitespace" ? tokens.at(-2) : tokens.at(-1);
+      if (bad && prev?.kind !== "LineTag") {
+        diagnostics.push(diagnostic("HW0022", { start: i, end: i + bad[0].length }, { tag: bad[0] }, { help: "line IDs are 6 characters from 0-9 and a-z without i, l, o, u; tools assign them, so delete this and the line gets a new ID when saved" }));
       }
       push("Comment", j);
       continue;

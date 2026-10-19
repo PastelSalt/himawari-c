@@ -55,6 +55,7 @@ export const SYNTAX_DIAGNOSTICS = {
   HW0019: { severity: "error", message: "Expected a variable name inside [ ]." },
   HW0020: { severity: "error", message: "Invalid select: {reason}." },
   HW0021: { severity: "error", message: "The tag \"{tag}\" needs a value, like {{tag}=…}." },
+  HW0022: { severity: "warning", message: "\"{tag}\" isn't a valid line ID, so it's read as an ordinary comment." },
 } as const satisfies Record<string, { severity: Severity; message: string }>;
 
 /** Project and semantic diagnostics, HW0100–HW0399. */
@@ -98,6 +99,9 @@ export const SEMANTIC_DIAGNOSTICS = {
   HW0310: { severity: "warning", message: "\"return\" in the scene \"{scene}\", which is never called." },
   HW0320: { severity: "warning", message: "The scene \"{name}\" can reach its end without jump, return, or end; the game would stop there." },
   HW0321: { severity: "info", message: "The scene \"{name}\" is never reached from the entry scene." },
+  HW0340: { severity: "info", message: "{name} speaks here, but was hidden earlier in this scene." },
+  HW0341: { severity: "info", message: "The variable {name} is set ({count} time(s)) but nothing reads it." },
+  HW0342: { severity: "info", message: "The variable {name} is used in a condition but never set, so it's always {value}." },
   HW0331: { severity: "warning", message: "Every option in this menu is \"once\", so it can run out of choices (it is then skipped)." },
   HW0332: { severity: "error", message: "A menu can have at most {max} options (this one has {count})." },
   HW0333: { severity: "error", message: "One statement can change at most {max} sprite attributes (this one changes {count})." },
@@ -107,6 +111,7 @@ export const SEMANTIC_DIAGNOSTICS = {
   HW0404: { severity: "info", message: "{count} {lang} translation(s) need review." },
   HW0405: { severity: "warning", message: "Line {id} is in the {lang} table but no longer in the scripts." },
   HW0406: { severity: "error", message: "This string table can't be read: {reason}." },
+  HW0407: { severity: "info", message: "The {lang} translation of line {id} doesn't use the glossary's \"{want}\" for \"{term}\"." },
 } as const satisfies Record<string, { severity: Severity; message: string }>;
 
 export const DIAGNOSTICS = { ...SYNTAX_DIAGNOSTICS, ...SEMANTIC_DIAGNOSTICS };

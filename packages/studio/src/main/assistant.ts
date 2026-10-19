@@ -6,7 +6,7 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
-import { check, findScene } from "@himawari/tools";
+import { check, expandCommand, findScene } from "@himawari/tools";
 import { app, safeStorage } from "electron";
 import { readSpecDoc } from "himawari-mcp";
 import type { AssistantEvent, AssistantKeyStatus, AssistantRequest, Settings } from "../shared/api.js";
@@ -48,7 +48,8 @@ export class AssistantHost {
     return this.keyStatus();
   }
 
-  private client(): Anthropic {
+  /** A client with the stored key (the assistant and "Translate with AI"). */
+  apiClient(): Anthropic {
     if (!existsSync(keyFile())) throw new Error("Add your Anthropic API key in Settings first.");
     return new Anthropic({ apiKey: safeStorage.decryptString(readFileSync(keyFile())) });
   }
@@ -90,7 +91,7 @@ export class AssistantHost {
     const project = this.project();
     if (!project) throw new Error("No project is open.");
     if (this.abort) throw new Error("The assistant is still answering.");
-    const client = this.client();
+    const client = this.apiClient();
     const settings = this.settings();
     const turn = `t${++this.turns}`;
     if (!this.system) {
@@ -109,7 +110,10 @@ export class AssistantHost {
       ...(r.context?.selection ? { selection: r.context.selection.slice(0, 4000) } : {}),
       mentions: this.expandMentions(Array.isArray(r.context?.mentions) ? r.context.mentions.filter((m): m is string => typeof m === "string") : []),
     };
-    const messages = [...this.messages, userTurn(r.text, ctx)];
+    // A slash command (/continuity ch1) becomes its recipe, the same instructions as the MCP prompt.
+    const command = expandCommand(r.text);
+    if (command && "missing" in command) throw new Error(`/${command.recipe.command} needs: ${command.missing.join(", ")}`);
+    const messages = [...this.messages, userTurn(command ? command.prompt : r.text, ctx)];
     const tools = sdkTools(
       (def, args) => ({
         fs: project.fs,
@@ -131,7 +135,7 @@ export class AssistantHost {
       })
       .catch((e: unknown) => {
         this.messages = messages;
-        this.emit({ kind: "error", turn, message: describe(e) });
+        this.emit({ kind: "error", turn, message: describeApiError(e) });
         this.emit({ kind: "done", turn, stop: "error" });
       })
       .finally(() => {
@@ -159,7 +163,7 @@ function summarize(args: Record<string, unknown>): string {
 }
 
 /** Errors in plain words (the API's typed errors, most specific first). */
-function describe(e: unknown): string {
+export function describeApiError(e: unknown): string {
   if (e instanceof Anthropic.AuthenticationError) return "The API key was rejected. Check it in Settings.";
   if (e instanceof Anthropic.PermissionDeniedError) return "This API key isn't allowed to use that model.";
   if (e instanceof Anthropic.RateLimitError) return "Anthropic's rate limit was reached. Wait a moment and try again.";

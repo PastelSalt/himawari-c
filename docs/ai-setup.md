@@ -3,7 +3,7 @@
 Himawari works with the AI app you already use: **Claude Code** or the **Claude desktop app** connect to your project through **himawari-mcp**, an MCP server that ships with Himawari. You use your own Claude plan; Himawari runs no servers and sends nothing anywhere. Studio also has a built-in assistant panel (Mode B) that uses your own Anthropic API key: Settings → Built-in assistant.
 
 ## What the AI can and can't do
-- **Can:** read your scenes and characters, write and edit scenes (edits are anchored on each line's ID, checked before anything is saved, and refused if they'd break the story), rename things safely, declare variables, translate lines (they land as "needs review"), play every path of your story headlessly to find dead ends and unreachable endings, and take a screenshot of any line to check how it looks.
+- **Can:** read your scenes and characters, write and edit scenes (edits are anchored on each line's ID, checked before anything is saved, and refused if they'd break the story), rename things safely, declare variables, translate lines (they land as "needs review" and follow your glossary), leave review notes on lines instead of rewriting them, play every path of your story headlessly to find dead ends and unreachable endings, and take a screenshot of any line to check how it looks.
 - **Can't:** create images, music, sound effects, voices, or video. Ever. Missing art shows as labeled placeholders until you add your own.
 - **You stay in control:** wide changes (like a rename across many files) ask you first, and building a game folder is off unless you allow it. Everything the AI writes is recorded in `.himawari/provenance.json`; `hwc report ai-content` summarizes it for store disclosure.
 
@@ -34,7 +34,10 @@ Add these to the server's arguments if you need them:
 ## Working with it
 - Tell the AI about your story in **`AGENTS.md`** at the project root (every template has one): tone, audience, style rules, and files it must not touch. It reads that file and each character's bible (including the "Must never" rules) before writing.
 - Good first requests: *"Read the project and summarize the story so far"*, *"Write a scene where Hana and Mio argue about the festival, with a choice that leads to two endings"*, *"Playtest every path and fix any dead ends"*, *"Translate chapter 1 into Japanese"*.
-- The server also offers ready-made prompts (in clients that show them): **write_scene**, **continuity_check**, **branch_planner**, **translate_scene**, **sprite_direction**.
+- The server also offers ready-made prompts (in clients that show them): **write_scene**, **continuity_check** (leaves review notes), **branch_planner**, **translate_scene**, **sprite_direction**, **proofread**, **route_balance**, **playtest_report**. Studio's assistant has the same recipes as slash commands: type `/` in its box.
+- Review notes appear in Studio's **Notes** panel and on their lines in the Screenplay; resolve them there when you've dealt with them.
+- In clients that support **MCP Apps** (experimental), the story graph and line screenshots show as small views in the chat.
+- To translate a whole language at once, use **Translate with AI** in Studio's Localization view: it's much cheaper than translating line by line in chat (Claude Haiku 5.5 by default, with your API key).
 - **With Himawari Studio open**, the AI's changes don't land directly: each one appears in Studio's **AI Proposals** panel with a diff and the AI's one-line reason, and you accept or reject it (rejecting can tell the AI why). Accepted changes go into Studio's History, where any of them can be undone. Studio shows the exact setup command for the open project in Settings → Use your Claude app.
 - **Without Studio**, changes land in your files right away. Use git to review and undo.
 

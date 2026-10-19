@@ -45,7 +45,7 @@ describe("himawari-mcp", () => {
     expect(tools.map((t) => t.name)).toEqual([
       "project_info", "list_scenes", "read_scene", "search_dialogue", "get_story_graph", "list_characters", "get_character",
       "list_variables", "list_assets", "validate", "analyze", "create_scene", "update_scene", "patch_scene", "upsert_character",
-      "set_preset", "declare_variable", "rename", "set_translation", "playtest", "render_line", "build",
+      "set_preset", "declare_variable", "rename", "set_translation", "add_note", "list_notes", "resolve_note", "playtest", "render_line", "build",
     ]);
     const read = tools.find((t) => t.name === "read_scene");
     expect(read?.annotations?.readOnlyHint).toBe(true);
@@ -136,6 +136,20 @@ describe("himawari-mcp", () => {
     expect(table.lines.find((l) => l.id === "k3f9a1")?.status).toBe("needs-review");
   });
 
+  test("review notes: left on a line, listed, resolved (rfcs/0011); never on a line that doesn't exist", async () => {
+    const bad = await call("add_note", { line_id: "zzzzzz", kind: "continuity", text: "x" });
+    expect(bad.isError).toBe(true);
+    const added = await call("add_note", { line_id: "k3f9a1", kind: "continuity", text: "Hana was at the station a scene ago; here she's at school." });
+    const id = added.structuredContent?.["id"] as string;
+    expect(id).toMatch(/^n[0-9a-z]{7}$/);
+    const listed = await call("list_notes", {});
+    expect((listed.content[0] as { text: string }).text).toContain(`${id}  continuity  #k3f9a1  (ai)`);
+    await call("resolve_note", { id });
+    expect((await call("list_notes", {})).structuredContent?.["notes"]).toEqual([]);
+    const file = JSON.parse(readFileSync(join(dir, ".himawari/notes.json"), "utf8")) as { notes: { resolved?: boolean }[] };
+    expect(file.notes[0]?.resolved).toBe(true);
+  });
+
   test("a rename across more than three files asks the user first (MRTR), then applies", async () => {
     for (const n of [3, 4, 5]) writeFileSync(join(dir, `script/extra${n}.hws`), `scene extra${n}:\n    jump ch1_hub\n`);
     const before = elicitations;
@@ -161,9 +175,30 @@ describe("himawari-mcp", () => {
     const scene = await client.readResource({ uri: "himawari://scene/ch1_intro" });
     expect(JSON.stringify(scene.contents)).toContain("scene ch1_intro:");
     const { prompts } = await client.listPrompts();
-    expect(prompts.map((p) => p.name)).toEqual(["write_scene", "continuity_check", "branch_planner", "translate_scene", "sprite_direction"]);
+    expect(prompts.map((p) => p.name)).toEqual(["write_scene", "continuity_check", "branch_planner", "translate_scene", "sprite_direction", "proofread", "route_balance", "playtest_report"]);
     const p = await client.getPrompt({ name: "translate_scene", arguments: { scene: "ch1_intro", lang: "ja" } });
     expect(JSON.stringify(p.messages)).toContain("set_translation");
+    expect(JSON.stringify(p.messages)).toContain("glossary");
+    const c = await client.getPrompt({ name: "continuity_check", arguments: { scene: "ch1_intro" } });
+    expect(JSON.stringify(c.messages)).toContain("add_note");
+    const g = await client.readResource({ uri: "himawari://project/glossary" });
+    expect(JSON.parse((g.contents[0] as { text: string }).text)).toEqual({ terms: [] });
+  });
+
+  test("MCP Apps (experimental): the graph and preview tools point at self-contained views", async () => {
+    const { tools } = await client.listTools();
+    const meta = (name: string) => (tools.find((t) => t.name === name)?._meta as { ui?: { resourceUri?: string } } | undefined)?.ui?.resourceUri;
+    expect(meta("get_story_graph")).toBe("ui://himawari/story-graph");
+    expect(meta("render_line")).toBe("ui://himawari/scene-preview");
+    expect(meta("read_scene")).toBeUndefined();
+    for (const uri of ["ui://himawari/story-graph", "ui://himawari/scene-preview"]) {
+      const r = await client.readResource({ uri });
+      const c = r.contents[0] as { mimeType: string; text: string };
+      expect(c.mimeType).toBe("text/html;profile=mcp-app");
+      expect(c.text).toContain("ui/initialize");
+      // No network: nothing loaded from elsewhere.
+      expect(c.text).not.toMatch(/src="http|href="http|fetch\(/);
+    }
   });
 
   test("errors the project already had don't block a write; scenes that jump to each other are created together", async () => {

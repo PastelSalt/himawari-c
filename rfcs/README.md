@@ -22,3 +22,4 @@ Phase 0 spike results are recorded as RFCs 0001–0003.
 | [0008](0008-macros.md) | Macros (`define statement`) | **Accepted** 2026-10-18 |
 | [0009](0009-asset-packs.md) | Asset packs (`.hwp`) and patches | **Accepted** 2026-10-18 |
 | [0010](0010-theme-2-and-ui-designer.md) | Theme 2.0 (layout, shapes, presets) and the UI Designer | **Accepted** 2026-10-18 |
+| [0011](0011-ai-depth.md) | Review notes, the glossary, and AI depth (Phase 7) | **Accepted** 2026-10-19 |

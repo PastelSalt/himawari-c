@@ -13,7 +13,7 @@ The specifications every Himawari tool agrees on (plan §5). `@himawari/core` im
 | [ast.schema.json](ast.schema.json) | The AST as JSON (`read_scene` with `format: ast`) | 1.1 |
 | [bytecode.md](bytecode.md) | The compiled `.hwb` format the runtime loads | 1.1 (1.0 frozen) |
 | [pack.md](pack.md) | `.hwp` asset packs and patches (rfcs/0009) | 1.0 |
-| [agent-guide.md](agent-guide.md) | What AI assistants are told (layer 1 instructions) | 1.1 |
+| [agent-guide.md](agent-guide.md) | What AI assistants are told (layer 1 instructions) | 1.2 |
 | [llm-reference.md](llm-reference.md) | The script language on two pages, for language models | with the language |
 | [debug-protocol.md](debug-protocol.md) | How Studio drives the runtime in its preview (stdin/stdout JSON lines) | 1 |
 

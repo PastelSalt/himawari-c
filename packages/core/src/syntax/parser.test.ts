@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { addLineIds } from "../edit.js";
 import { type CstNode, childNodes, isNode, textOf, tokensOf, walk } from "./cst.js";
 import { parse } from "./parser.js";
 
@@ -194,6 +195,25 @@ describe("diagnostics and recovery", () => {
   ])("%s", (code, src) => {
     expect(codes(src)).toContain(code);
     expect(textOf(parse(src).root)).toBe(src);
+  });
+
+  test("HW0022: a line tag that isn't a valid ID is a warning, then an ordinary comment", () => {
+    for (const bad of ["#line:evl001", "#line:K3F9A1", "#line:k3f9", "#line:k3f9a1x", "#LINE:k3f9a1", "#line:"]) {
+      const src = `scene s:\n    "Hi."   ${bad}\n    end\n`;
+      const d = parse(src).diagnostics;
+      expect(d.map((x) => [x.code, x.severity]), bad).toEqual([["HW0022", "warning"]]);
+      expect(src.slice(d[0]!.span.start, d[0]!.span.end)).toBe(bad);
+      expect(textOf(parse(src).root)).toBe(src);
+    }
+    // Real tags, comments that only mention lines, and an old bad tag left behind a new one are fine.
+    for (const ok of ["#line:k3f9a1", "#line:k3f9a1  # note", "# line: fix later", "#lines are long", "#line:k3f9a1  #line:evl001"]) {
+      expect(codes(`scene s:\n    "Hi."   ${ok}\n    end\n`), ok).toEqual([]);
+    }
+    // Saving gives the line a real ID in front of the bad one, which settles it.
+    const src = 'scene s:\n    "Hi."   #line:evl001\n    end\n';
+    const fixed = addLineIds(src, { start: 0, end: src.length }, new Set()).text;
+    expect(fixed).toMatch(/"Hi\." {3}#line:[0-9a-hjkmnp-tv-z]{6} {2}#line:evl001\n/);
+    expect(codes(fixed)).toEqual([]);
   });
 
   test("one diagnostic per broken line; later lines still parse", () => {

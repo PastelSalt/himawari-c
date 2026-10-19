@@ -130,6 +130,8 @@ export interface Ref {
   channel?: string;
   /** variable: the target of an assignment. */
   assign?: boolean;
+  /** variable: shown in a line's text (`[name]`, `{select}`), not used in logic. */
+  inText?: boolean;
   /** variable: used by `{select …}`, with its case keys. */
   selectCases?: string[];
   /** transition: number of arguments given. */
@@ -336,8 +338,8 @@ class Builder {
     for (const ref of r.refs) {
       this.textRefs.push(
         ref.selectCases
-          ? { kind: "variable", name: ref.name, span: ref.span, selectCases: ref.selectCases }
-          : { kind: "variable", name: ref.name, span: ref.span },
+          ? { kind: "variable", name: ref.name, span: ref.span, selectCases: ref.selectCases, inText: true }
+          : { kind: "variable", name: ref.name, span: ref.span, inText: true },
       );
     }
     return r.parts;

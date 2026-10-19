@@ -16,7 +16,7 @@ export function findProjectRoot(from: string): string | undefined {
 }
 
 /**
- * Reads himawari.json, characters/*.md, script/**\/*.hws, locales/*.json, extensions/*.schema.json, theme/theme.json,
+ * Reads himawari.json, characters/*.md, script/**\/*.hws, locales/*.json, extensions/*.schema.json, theme/theme.json, glossary.json,
  * and the assets/ listing (the same loader the AI tools use).
  */
 export function loadProject(root: string): ProjectInput {

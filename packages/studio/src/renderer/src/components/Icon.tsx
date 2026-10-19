@@ -32,6 +32,7 @@ const PATHS: Record<string, string> = {
   chevron: "M9 6l6 6-6 6",
   back: "M15 6l-6 6 6 6",
   down: "M6 9l6 6 6-6",
+  note: "M5 3h10l4 4v14H5zM14 3v5h5M8 12h8M8 16h5",
   collapse: "M7 10l5-5 5 5M7 19l5-5 5 5",
   file: "M6 3h8l5 5v13H6zM14 3v5h5",
   scene: "M4 5h16v14H4zM4 9h16M9 5v4",

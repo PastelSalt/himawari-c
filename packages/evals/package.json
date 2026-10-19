@@ -1,0 +1,19 @@
+{
+  "name": "@himawari/evals",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The AI eval suite (plan §16.1 \"AI quality\"): tasks on the example projects, deterministic scores, results by date, and a trend report",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "0.135.0",
+    "@himawari/core": "workspace:*",
+    "@himawari/tools": "workspace:*",
+    "zod": "4.6.7"
+  }
+}

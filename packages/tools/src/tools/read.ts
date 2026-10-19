@@ -1,5 +1,17 @@
 /** Read tools (plan §10.3): nothing here writes. Scenes come back as .hws text. */
-import { CORE_VERSION, SPEC_VERSIONS, collectLines, fileFilterGraph, fileGraph, focusGraph, graphToMermaid, storyGraph } from "@himawari/core";
+import {
+  CORE_VERSION,
+  SPEC_VERSIONS,
+  collectLines,
+  fileFilterGraph,
+  fileGraph,
+  focusGraph,
+  glossaryForPrompt,
+  graphToMermaid,
+  readGlossary,
+  routeBalance,
+  storyGraph,
+} from "@himawari/core";
 import { z } from "zod";
 import { check, describeDiagnostics, diagnosticsJson, findScene, revisionOf } from "../project.js";
 import { ToolError, defineTool } from "../registry.js";
@@ -109,7 +121,7 @@ export const searchDialogue = defineTool({
   name: "search_dialogue",
   title: "Search dialogue",
   description:
-    "Find dialogue, narration, menu options, and prompts by text, speaker, or scene. With lang, also returns each line's translation and its status from locales/<lang>.json.",
+    "Find dialogue, narration, menu options, and prompts by text, speaker, or scene. With lang, also returns each line's translation and its status from locales/<lang>.json, and the glossary's agreed translations for that language (glossary.json: always use them).",
   kind: "read",
   input: z.object({
     query: z.string().optional().describe("Case-insensitive text to look for"),
@@ -120,7 +132,7 @@ export const searchDialogue = defineTool({
   }),
   output: z.object({ total: z.number(), lines: z.array(z.looseObject({ id: z.string(), text: z.string() })) }),
   async run(ctx, args) {
-    const { check: c } = check(ctx.fs);
+    const { check: c, input } = check(ctx.fs);
     const table = args.lang ? c.locales.find((t) => t.language === args.lang) : undefined;
     const tr = new Map((table?.lines ?? []).map((e) => [e.id, e]));
     const q = args.query?.toLowerCase();
@@ -137,7 +149,11 @@ export const searchDialogue = defineTool({
     const text = lines
       .map((l) => `#${l.id} [${l.scene}] ${l.speaker ? `${l.speaker}: ` : ""}"${l.text}"${"translation" in l ? `  →  "${l.translation}" (${l.status})` : ""}`)
       .join("\n");
-    return { text: `${hits.length} match(es)${hits.length > lines.length ? `, showing ${lines.length}` : ""}\n${text}`, data: { total: hits.length, lines } };
+    const glossary = args.lang ? glossaryForPrompt(readGlossary(input.glossary?.text), args.lang) : "";
+    return {
+      text: `${hits.length} match(es)${hits.length > lines.length ? `, showing ${lines.length}` : ""}\n${text}${glossary ? `\n\nGlossary (${args.lang}; always use these):\n${glossary}` : ""}`,
+      data: { total: hits.length, lines, ...(glossary ? { glossary } : {}) },
+    };
   },
 });
 
@@ -313,7 +329,8 @@ export const validate = defineTool({
 export const analyze = defineTool({
   name: "analyze",
   title: "Analyze the story",
-  description: "Static analysis: reachable and unreachable scenes, scenes that can end the story, choices, and dialogue lines per character. For dynamic coverage (every path actually played), use playtest.",
+  description:
+    "Static analysis: reachable and unreachable scenes, scenes that can end the story, choices, dialogue lines per character, route balance (each ending's own scenes and lines, and the choices that commit to it), and continuity notes (a character speaking after being hidden, variables set but never read, or used in conditions but never set). For dynamic coverage (every path actually played), use playtest.",
   kind: "read",
   input: z.object({}),
   output: z.looseObject({ unreachable: z.array(z.string()), endings: z.array(z.string()) }),
@@ -321,6 +338,7 @@ export const analyze = defineTool({
     const { check: c } = check(ctx.fs);
     const g = storyGraph(c);
     const lines = collectLines(c.parsed);
+    const balance = routeBalance(g);
     const perCharacter: Record<string, number> = {};
     for (const l of lines) if (l.kind === "say") perCharacter[l.speaker] = (perCharacter[l.speaker] ?? 0) + 1;
     const data = {
@@ -330,13 +348,22 @@ export const analyze = defineTool({
       choices: lines.filter((l) => l.kind === "option").length,
       narration: lines.filter((l) => l.kind === "narration").length,
       linesPerCharacter: perCharacter,
-      flowWarnings: diagnosticsJson(c).filter((d) => d.code.startsWith("HW03")),
+      flowWarnings: diagnosticsJson(c).filter((d) => d.code.startsWith("HW03") && !["HW0340", "HW0341", "HW0342"].includes(d.code)),
+      continuity: diagnosticsJson(c).filter((d) => ["HW0340", "HW0341", "HW0342"].includes(d.code)),
+      routes: balance.routes,
+      shortRoutes: balance.short,
     };
     const text = [
       `${data.scenes} scenes; can end in: ${data.endings.join(", ") || "(none)"}`,
       data.unreachable.length ? `Unreachable from the entry scene: ${data.unreachable.join(", ")}` : "Every scene is reachable.",
       `${data.choices} choices, ${data.narration} narration lines; dialogue: ${Object.entries(perCharacter).map(([k, v]) => `${k} ${v}`).join(", ") || "(none)"}`,
       data.flowWarnings.length ? `Flow problems:\n${describeDiagnostics(data.flowWarnings)}` : "",
+      balance.routes.length > 1
+        ? `Routes (own lines / shared lines, choices that commit to it):\n${balance.routes
+            .map((r) => `  ${r.ending}: ${r.lines} / ${r.shared}${r.choices.length ? `; via ${r.choices.slice(0, 3).join("; ")}${r.choices.length > 3 ? ` (+${r.choices.length - 3})` : ""}` : ""}${balance.short.includes(r.ending) ? "  ← much shorter than the others" : ""}`)
+            .join("\n")}`
+        : "",
+      data.continuity.length ? `Continuity notes:\n${describeDiagnostics(data.continuity.slice(0, 30))}${data.continuity.length > 30 ? `\n(+${data.continuity.length - 30} more)` : ""}` : "",
     ].filter(Boolean).join("\n");
     return { text, data };
   },

@@ -28,6 +28,7 @@ export function loadInput(fs: ProjectFs): ProjectInput {
     locales: fs.list("locales", (n) => n.endsWith(".json")).map(read),
     extensions: fs.list("extensions", (n) => n.endsWith(".schema.json")).map(read),
     ...(fs.exists("theme/theme.json") ? { theme: read("theme/theme.json") } : {}),
+    ...(fs.exists("glossary.json") ? { glossary: read("glossary.json") } : {}),
   };
 }
 
@@ -61,6 +62,9 @@ export function withChanges(input: ProjectInput, changes: ReadonlyMap<string, st
   const theme = changes.get("theme/theme.json");
   if (typeof theme === "string") next.theme = { file: "theme/theme.json", text: theme };
   else if (theme === undefined && input.theme) next.theme = input.theme;
+  const glossary = changes.get("glossary.json");
+  if (typeof glossary === "string") next.glossary = { file: "glossary.json", text: glossary };
+  else if (glossary === undefined && input.glossary) next.glossary = input.glossary;
   return next;
 }
 

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FormattedMessage, FormattedNumber, useIntl } from "react-intl";
+import { RECIPES, expandCommand } from "@himawari/tools/recipes";
 import type { AssistantKeyStatus } from "../../../shared/api";
 import { studio } from "../api";
 import { useStudio } from "../store";
@@ -36,18 +37,35 @@ export function Assistant() {
     for (const c of model?.check.characters.values() ?? []) out.push({ token: `@character:${c.id}`, label: c.displayName });
     return out;
   }, [model]);
+  // Slash commands (recipes): /continuity, /translate, /playtest, …
+  const commandQuery = /^\/([a-z]*)$/.exec(chat.draft)?.[1];
+  const commands = commandQuery === undefined ? [] : RECIPES.filter((r) => r.command.startsWith(commandQuery));
   const matches = mentionQuery === null ? [] : candidates.filter((c) => c.label.toLowerCase().includes(mentionQuery.toLowerCase()) || c.token.includes(mentionQuery)).slice(0, 8);
 
   const send = () => {
     const text = chat.draft.trim();
     if (!text || chat.running) return;
     const s = useStudio.getState();
+    const command = expandCommand(text);
+    if (text.startsWith("/") && (!command || "missing" in command)) {
+      const message = command
+        ? intl.formatMessage({ id: "assistant.commandNeeds" }, { command: `/${command.recipe.command}`, args: command.missing.map((a) => `<${a}>`).join(" ") })
+        : intl.formatMessage({ id: "assistant.commandUnknown" }, { command: text.split(/\s/)[0] ?? text });
+      useStudio.setState((st) => ({ chat: { ...st.chat, items: [...st.chat.items, { kind: "error", turn: "", message }] } }));
+      return;
+    }
     const mentions = [...text.matchAll(MENTION)].map((m) => `${m[1]}:${m[2]}`);
     void s.askAssistant(text, {
       ...(center?.kind === "file" ? { openFile: center.file } : {}),
       ...(s.chat.selection ? { selection: s.chat.selection.text } : {}),
       mentions,
     });
+  };
+
+  const pickCommand = (command: string) => {
+    const r = RECIPES.find((x) => x.command === command);
+    useStudio.getState().setDraft(`/${command}${r?.args.some((a) => a.required) ? " " : ""}`);
+    input.current?.focus();
   };
 
   const insertMention = (token: string) => {
@@ -161,6 +179,22 @@ export function Assistant() {
             </div>
           )}
           <div className="chat-input">
+            {commands.length > 0 && (
+              <div className="mention-menu">
+                {commands.map((r) => (
+                  <button key={r.command} className="sp-attr-option command-option" onMouseDown={(e) => (e.preventDefault(), pickCommand(r.command))}>
+                    <code>
+                      /{r.command}
+                      {r.args
+                        .filter((a) => a.required)
+                        .map((a) => ` <${a.name}>`)
+                        .join("")}
+                    </code>
+                    <span className="muted">{intl.formatMessage({ id: `assistant.command.${r.command}` })}</span>
+                  </button>
+                ))}
+              </div>
+            )}
             {matches.length > 0 && (
               <div className="mention-menu">
                 {matches.map((m) => (
@@ -185,7 +219,8 @@ export function Assistant() {
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
                   e.preventDefault();
-                  if (matches.length > 0 && mentionQuery !== null) insertMention(matches[0]!.token);
+                  if (commands.length > 0 && !RECIPES.some((r) => `/${r.command}` === chat.draft && r.args.every((a) => !a.required))) pickCommand(commands[0]!.command);
+                  else if (matches.length > 0 && mentionQuery !== null) insertMention(matches[0]!.token);
                   else send();
                 }
                 if (e.key === "Escape") setMentionQuery(null);

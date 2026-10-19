@@ -3,6 +3,7 @@
  * contents and the asset list; Core does no I/O, so the CLI, Studio, and MCP
  * all get identical results.
  */
+import { checkSpeakers, checkVariableUse } from "./continuity.js";
 import { pushAll } from "../arrays.js";
 import { type AstResult, type Expr, type MenuOption, type Ref, type Stmt, endsFlow, parseAst } from "../syntax/ast.js";
 import { type Diagnostic, type DiagnosticCode, type Span, diagnostic } from "../syntax/diagnostics.js";
@@ -13,6 +14,7 @@ import { type ExtensionDef, type MacroEntry, collectMacros, expandInvokes, readE
 import { type ThemeEntries, readTheme } from "./theme.js";
 import { DEFAULT_POSITIONS, type Manifest, type VarType, readManifest } from "./manifest.js";
 import { listNames, suggest } from "./suggest.js";
+import { type GlossaryTerm, glossaryMisses, readGlossary } from "../l10n/glossary.js";
 import { type L10nTable, type SourceLine, collectLines, parityProblems, parseTable } from "../l10n/table.js";
 
 export interface SourceFile {
@@ -36,6 +38,8 @@ export interface ProjectInput {
   extensions?: SourceFile[];
   /** theme/theme.json (rfcs/0007). */
   theme?: SourceFile;
+  /** glossary.json: agreed translations of the game's own words (rfcs/0011). */
+  glossary?: SourceFile;
 }
 
 export interface FileReport {
@@ -190,6 +194,16 @@ export function checkProject(input: ProjectInput): ProjectCheck {
     checkRefs(expansion.expandedRefs.get(s.file) ?? [], ctx, fromMacros);
     pushAll(out, fromMacros.map((d) => ({ ...d, fixes: [], note: d.note ? `${d.note} (from a macro)` : "from a macro" })));
     checkTypesAndFlow({ ...r, ast: expansion.asts.get(s.file) ?? r.ast }, s.text, ctx, out);
+    checkSpeakers(expansion.asts.get(s.file) ?? r.ast, characters, out);
+  }
+  // Variables set but never read, or used in conditions but never set (continuity).
+  if (manifest && input.manifest) {
+    const refs: Ref[] = [];
+    for (const s of input.scripts) {
+      pushAll(refs, (parsed.get(s.file) as AstResult).refs);
+      pushAll(refs, expansion.expandedRefs.get(s.file) ?? []);
+    }
+    checkVariableUse(manifest, input.manifest.text, refs, report(input.manifest.file, input.manifest.text).diagnostics);
   }
 
   // Project-level flow: the entry scene and reachability.
@@ -213,8 +227,9 @@ export function checkProject(input: ProjectInput): ProjectCheck {
   const locales: L10nTable[] = [];
   if (input.locales?.length) {
     const lines = new Map(collectLines(parsed).map((l) => [l.id, l]));
+    const glossary = readGlossary(input.glossary?.text);
     for (const lf of input.locales) {
-      const table = checkLocale(lf, lines, report(lf.file, lf.text).diagnostics);
+      const table = checkLocale(lf, lines, glossary, report(lf.file, lf.text).diagnostics);
       if (table) locales.push(table);
     }
   }
@@ -239,7 +254,7 @@ function parityCached(source: string, text: string): readonly string[] {
   return p;
 }
 
-function checkLocale(lf: SourceFile, lines: ReadonlyMap<string, SourceLine>, out: Diagnostic[]): L10nTable | null {
+function checkLocale(lf: SourceFile, lines: ReadonlyMap<string, SourceLine>, glossary: readonly GlossaryTerm[], out: Diagnostic[]): L10nTable | null {
   let cached = tables.get(lf.file);
   if (!cached || cached.text !== lf.text) {
     try {
@@ -279,6 +294,9 @@ function checkLocale(lf: SourceFile, lines: ReadonlyMap<string, SourceLine>, out
       continue;
     }
     for (const problem of parityCached(src.text, e.text)) out.push(diagnostic("HW0401", at(e.id), { lang, id: e.id, problem }));
+    if (glossary.length > 0)
+      for (const t of glossaryMisses(glossary, lang, src.text, e.text))
+        out.push(diagnostic("HW0407", at(e.id), { id: e.id, lang, term: t.source, want: t.translations[lang] ?? "" }, { help: "edit glossary.json if the glossary is what changed" }));
   }
   const inTable = new Set(table.lines.map((e) => e.id));
   missing += [...lines.keys()].filter((id) => !inTable.has(id)).length;

@@ -792,6 +792,63 @@ How each surface handles size now:
 
 **Checked:** `corepack pnpm check` (364 tests, 643 messages in both languages), Studio e2e 5/5, runtime debug 10/10 and ASan 10/10, golden images 19/19.
 
+## Session 17: 2026-10-19 · Phase 7: AI depth and polish
+**You asked:** to add the big-project notes to the plan (now §16.5 and a "Scale" row in §16.1), then to go on with Phase 7.
+
+**Review notes** (rfcs/0011). The AI can now point at a problem without rewriting your work:
+- Notes live in `.himawari/notes.json` and are anchored on a line ID (or a scene or file). Kinds: continuity, character, style, translation, to-do.
+- Three new tools: `add_note`, `list_notes`, `resolve_note` (25 tools now). Notes are written directly, not as proposals, because they change no game file.
+- Studio: a **Notes** tab (with a count, "show resolved", and click to go to the line), a note badge on lines in the Screenplay, and **Add a note** on any line for your own to-dos.
+
+**Continuity hints** (info, with every check):
+- `HW0340`: a character speaks after being hidden earlier in the scene. Branches are followed: after a menu or `if`, a character counts as hidden only if hidden on every branch that carries on.
+- `HW0341`: a variable is set but nothing reads it. Global counters (endings seen) are left alone.
+- `HW0342`: a variable is used in a condition but never set, so that condition can never change. A name only shown in text (`[player_name]`) is just a constant and isn't flagged.
+- These hints are about stories, not the language, so the conformance cases leave them out.
+
+**Route balance and the story graph:**
+- `analyze` lists each ending's own lines, its shared lines, and the choices into it. A route under half the median length is flagged.
+- The graph can color scenes **by route** or **by playtest**. "Playtest every path" adds coverage bars and "not reached" badges.
+- The graph is editable. Drag from one scene to another: the scene ends in a jump, or in a choice that keeps the old way as a second option. **New scene** adds one. Both are ordinary edits with undo.
+
+**The glossary and "Translate with AI":**
+- `glossary.json` at the project root holds the game's own words and their translations. It isn't in `locales/`, where every file is a string table.
+- `HW0407` notes a translation that doesn't use the agreed word. `search_dialogue` with a language lists the glossary, and MCP serves it as `himawari://project/glossary`. Localization has a glossary editor, and a hint appears under any translation that misses a term.
+- **Translate with AI** (Localization) takes the untranslated lines shown, narrowed by route or search first. It uses Claude Haiku 5.5 by default, or Sonnet 5.5 for more care.
+  - About 40 lines per request, with structured outputs, low effort, and a cached prompt (the rules, character names, the glossary, and `AGENTS.md`).
+  - A dialog shows the count, the model, and the estimated cost before anything is sent.
+  - Each batch is one undo step and lands as needs-review, marked as AI-written. Cancel keeps what came back.
+  - It uses the assistant's stored key.
+
+**Recipes:** one set of instructions (`packages/tools/src/recipes.ts`) behind both the MCP prompts and the assistant's new **slash commands**: `/write`, `/continuity`, `/branches`, `/translate`, `/sprites`, `/proofread`, `/balance`, `/playtest`.
+- Type `/` for a menu. A missing argument is named in plain words.
+- The reviewing recipes leave notes; the fixing ones propose edits.
+
+**MCP Apps (experimental):** `get_story_graph` and `render_line` point at two self-contained views, `ui://himawari/story-graph` and `ui://himawari/scene-preview`.
+- I checked the graph view in a stand-in host, in light and dark.
+- Hosts without MCP Apps ignore it.
+
+**The eval suite** (`packages/evals`): five tasks on copies of Festival Eve:
+- write a scene
+- find a planted contradiction
+- translate with a glossary
+- fix an unreachable ending
+- proofread planted typos
+
+Each run gets deterministic scores: the task itself, no errors afterwards, every ending reached in a headless playtest, and the character rules kept in new lines.
+- `run` (Claude, needs `ANTHROPIC_API_KEY`, costs money) saves JSON results by date, and `trend --write` writes `TREND.md`.
+- The tests check that the built-in reference answers score 100 % and that doing nothing scores 0.
+- **No real run yet:** this PC has no key in the environment.
+
+**Fixed along the way:**
+- Studio didn't load `.himawari/notes.json` when opening a project (only on later changes).
+- Route balance missed scenes inside loops (a hub scene that menus return to): reach is now found by searching backwards from each ending.
+- After a menu where every branch hid a character, HW0340 forgot she was hidden.
+
+**Malformed line tags** (added after the session's first report, at your request): a comment that starts with `#line:` but isn't a valid ID (`#line:evl001`, uppercase, too short or long) was silently read as an ordinary comment, so the line got a new ID on save. It's now a warning, `HW0022`, unless it sits behind a real tag (where tools leave the old text). The Phase 7 codes HW0340–HW0342 and HW0407 were also missing from Studio's messages, so the Japanese UI showed them in English; all five are now in both languages. HW0342 now reads "used in a condition but never set", which matches what it checks.
+
+**Checked:** `corepack pnpm check` (396 tests, 725 messages in both languages); the MCP server tests (prompts, the glossary resource, the MCP Apps views); the eval harness with the reference and do-nothing agents; screenshots of the glossary editor, the translate dialog, and the slash-command menu (with a throwaway home and a fake key; nothing was sent). Studio e2e 5/5. No runtime C code changed this session, so ctest and the golden images weren't rerun.
+
 ---
 
 ## Decision Register
@@ -843,6 +900,13 @@ How each surface handles size now:
 | D43 | The UI Designer edits a mock of each screen beside the real docked game (HTML can't draw over the native preview window); changes are ordinary edits of theme.json, one undo step per drag | session 15 | ✅ Active |
 | D44 | Playtests and warps run a coverage pass first (every menu once, every unchosen option), then every combination with the rest of the budget, which scales with the story (40 events per line, 50 000–20 000 000); a step limit after full coverage isn't a problem | session 16 | ✅ Active |
 | D45 | Big projects in Studio: the Screenplay draws only nearby scenes, the Explorer folds folders, long lists page by 100, the story graph opens as a folder or file overview past 150 scenes; Core caches parses and tables by exact text; the AI tools summarize past 200 scenes or 150 graph nodes | session 16 | ✅ Active |
+| D46 | Review notes (`.himawari/notes.json`, rfcs/0011) anchored on line IDs; written directly (not proposals) because they change no game file; the AI's reviewing recipes leave notes instead of edits | session 17 | ✅ Active |
+| D47 | Continuity hints are info and deliberately narrow: HW0340 per scene with branch joins; HW0341 for save-scoped variables only; HW0342 only for variables used in conditions. Conformance compile cases ignore these story hints | session 17 | ✅ Active |
+| D48 | The glossary is `glossary.json` at the project root (not `locales/glossary.<lang>.json` as plan §7 first said); HW0407 (info) notes a translation that doesn't use it | session 17 | ✅ Active |
+| D49 | "Translate with AI" runs in Studio's main process with the assistant's key: Claude Haiku 5.5 by default (Sonnet 5.5 optional), structured outputs, about 40 lines per request, low effort, cached instructions; each batch is one undo step and lands as needs-review | session 17 | ✅ Active |
+| D50 | Recipes are defined once in `@himawari/tools` and served as both MCP prompts and the assistant's slash commands | session 17 | ✅ Active |
+| D51 | MCP Apps views (story graph, scene preview) are experimental and always advertised through `_meta.ui` (the SDK has no capability negotiation for them yet) | session 17 | ✅ Active |
+| D52 | AI quality is measured by `packages/evals`: deterministic scores, JSON results by date, `TREND.md`; real runs are started by hand with a key (never by default in CI) | session 17 | ✅ Active |
 
 Also: **D13** (games export for Windows x64 only) stays active; its "internal Linux runtime" clause is superseded by D21.
 
@@ -853,14 +917,14 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 16)
+## Next Steps (after session 17)
 
-1. **Review session 16 and decide on committing it** (Phase 6 is committed as `49bd3c7`). Try a big project: `node scripts/stress/make-project.mjs <folder>`, then open it in Studio. Try Studio in light and dark (Settings → Studio → Appearance), and the UI Designer (the palette icon) on Sunflower Days: a preset, a palette, dragging the textbox, the color wheel.
-2. Watch the first CI run of Phase 5: the golden suite and the budget step run on GPU-less runners for the first time; if the golden tolerance is too tight there, regenerate references from CI's artifacts or widen it per case.
-3. Phase 5 follow-ups: a real gamepad test; the ≈ 200 ms GPU renderer start for games with rule wipes (create the GPU device in the background, or draw rule wipes on D3D11 without the GPU renderer); export icon and version patching (plan §14.4, `resedit`); async image decoding (a 4K JPEG costs one 67 ms frame); human review of the Chinese and Japanese demo text (and its 81 Chinese UI strings) and the 48 new runtime UI strings in Japanese.
-4. **The M2 hallway test** (plan §18): a non-programmer creates, writes, previews, localizes one scene, and exports, in English or Japanese, without docs, while an AI contributes through Mode A (a Claude app) and Mode B (the assistant, with your API key). Its findings decide the first Studio fixes.
-5. **Try Mode B with your key** (Settings → Built-in assistant), and add `ANTHROPIC_API_KEY` as a repository secret if you want CI's prompt-cache check to run (a few cents per run).
-6. Follow-ups: a real PSD/ORA from an artist through the importer; the Screenplay block palette and multi-select (§11.3 "later"); a pseudo-locale screenshot diff in CI; the agent loop in a utility process if long turns ever stutter the UI; watching for a hung preview (rfcs/0006 open question); app icon and code signing before v1.0. Earlier follow-ups stand: the MCP tasks extension, MCP Apps UI, runtime items from session 10.
-7. Human review of AI-written Japanese: `examples/tutorial` (30 lines), `examples/festival-eve` (45 lines), and Studio's own UI and diagnostic messages (`packages/studio/locales/ja.json`, 453 messages, written by the AI).
-8. **Phase 6 follow-ups:** the hallway test (restyle a game in 15 minutes without docs); a "look" step in the New Project wizard (start a game as pastel, say); the game's own fonts and languages in the Designer's mock; per-language layout overrides if projects ask (rfcs/0010 open question).
-9. **Phase 7: AI depth and polish**, on your go-ahead.
+1. **Review session 17 and decide on committing it.** Try it on Festival Eve or Sunflower Days: the Notes tab, the story graph's "Color by" and "Playtest every path", dragging between scenes, Localization's Glossary and "Translate with AI" (with your key: a few lines on Haiku cost well under a cent), and `/` in the assistant.
+2. **The first real eval runs:** `node packages/evals/dist/main.js run --model claude-haiku-5-5` (and Sonnet, Opus), then `trend --write`. Each run costs a few cents to a dollar. Expect to tune the tasks once real answers come in.
+3. Watch the first CI run of Phase 5: the golden suite and the budget step run on GPU-less runners for the first time; if the golden tolerance is too tight there, regenerate references from CI's artifacts or widen it per case.
+4. **The M2 hallway test** (plan §18): a non-programmer creates, writes, previews, localizes one scene, and exports, in English or Japanese, without docs, while an AI contributes through Mode A (a Claude app) and Mode B (the assistant, with your API key). Its findings decide the first Studio fixes. The Phase 6 hallway test (restyle a game in 15 minutes) can run in the same sitting.
+5. Phase 5 follow-ups: a real gamepad test; the ≈ 200 ms GPU renderer start for games with rule wipes; export icon and version patching (plan §14.4, `resedit`); async image decoding; human review of the Chinese and Japanese demo text and the runtime UI strings in Japanese.
+6. Human review of AI-written Japanese: `examples/tutorial`, `examples/festival-eve`, and Studio's own UI and diagnostic messages (`packages/studio/locales/ja.json`, now 720 messages, written by the AI).
+7. Phase 7 follow-ups: glossary matching for inflected forms; serving MCP Apps only to hosts that support them once the SDK says so; an eval task on a big generated project (scripts/stress); the assistant's agent loop in a utility process if long turns ever stutter the UI.
+8. Earlier follow-ups stand: a real PSD/ORA through the importer; the Screenplay block palette and multi-select; a pseudo-locale screenshot diff in CI; the MCP tasks extension; app icon and code signing before v1.0.
+9. **Phase 8: open-source launch** (docs site, signed installer, auto-update, governance), on your go-ahead.

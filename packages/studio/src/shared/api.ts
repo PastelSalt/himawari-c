@@ -47,7 +47,7 @@ export interface ProjectFile {
 
 export interface ProjectSnapshot {
   root: string;
-  /** himawari.json, script/**\/*.hws, characters/*.md, locales/*.json, extensions/*.schema.json, theme/theme.json, AGENTS.md. */
+  /** himawari.json, script/**\/*.hws, characters/*.md, locales/*.json, extensions/*.schema.json, theme/theme.json, glossary.json, .himawari/notes.json, AGENTS.md. */
   files: ProjectFile[];
   /** Everything under assets/, relative to assets/. */
   assets: string[];
@@ -113,6 +113,20 @@ export type PreviewCommand =
   /** Shows a built-in screen (the UI Designer): title, play, menu, load, history, config, controls, accessibility, extras, gallery, music. */
   | { cmd: "screen"; name: string };
 
+/** A headless playtest's result, as the story graph shows it. */
+export interface PlaytestSummary {
+  ok: boolean;
+  /** Every menu and option was tried. */
+  covered: boolean;
+  endings: { reached: string[]; unreached: string[] };
+  /** Line IDs no path showed. */
+  unseen: string[];
+  lines: { seen: number; total: number };
+  options: { chosen: number; total: number };
+  errors: string[];
+  ms: number;
+}
+
 export interface Rect {
   x: number;
   y: number;
@@ -169,6 +183,28 @@ export interface AssistantRequest {
   context: { openFile?: string; selection?: string; mentions: string[] };
 }
 
+/** "Translate with AI" (Localization): lines to translate into one language. */
+export interface TranslateRequest {
+  lang: string;
+  /** claude-haiku-5-5 (the default) or claude-sonnet-5-5. */
+  model: string;
+  lines: { id: string; speaker: string; kind: string; text: string }[];
+}
+
+export interface TranslateEstimate {
+  lines: number;
+  model: string;
+  /** In US dollars, a rough guess from the text length. */
+  cost: number;
+  hasKey: boolean;
+}
+
+export type TranslateEvent =
+  | { kind: "progress"; job: string; done: number; total: number }
+  | { kind: "batch"; job: string; lang: string; translations: { id: string; text: string }[]; cost: number }
+  | { kind: "done"; job: string; missed: number; refusals: number; cancelled: boolean; cost: number }
+  | { kind: "error"; job: string; message: string };
+
 export interface McpStatus {
   /** Studio's own MCP endpoint is listening (Mode A live sync). */
   listening: boolean;
@@ -212,6 +248,8 @@ export interface StudioApi {
     build(): Promise<BuildReport>;
     /** Packages build/windows/<Game>/ (plan §14.4). */
     exportGame(zip: boolean): Promise<BuildReport>;
+    /** Plays every path headlessly (the coverage overlay on the story graph). */
+    playtest(): Promise<PlaytestSummary>;
     /** Files changed outside the renderer: on disk (another program), or by an accepted AI proposal (`origin`). `assets` is null when unchanged. */
     onChanged(listener: (changes: FileChange[], assets: string[] | null, origin?: ChangeOrigin) => void): () => void;
   };
@@ -241,6 +279,12 @@ export interface StudioApi {
     reset(): Promise<void>;
     onEvent(listener: (event: AssistantEvent) => void): () => void;
   };
+  translate: {
+    estimate(request: TranslateRequest): Promise<TranslateEstimate>;
+    start(request: TranslateRequest): Promise<string>;
+    cancel(): Promise<void>;
+    onEvent(listener: (event: TranslateEvent) => void): () => void;
+  };
 }
 
 /** IPC channel names: one place, so main and preload can't drift apart. */
@@ -250,6 +294,7 @@ export const CHANNELS = {
   previewEvent: "himawari:preview-event",
   proposalsChanged: "himawari:proposals-changed",
   assistantEvent: "himawari:assistant-event",
+  translateEvent: "himawari:translate-event",
 } as const;
 
 /** "project.write" style method names, for the single invoke channel. */

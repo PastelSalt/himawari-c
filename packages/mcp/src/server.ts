@@ -8,9 +8,10 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { CORE_VERSION, graphToMermaid, storyGraph } from "@himawari/core";
-import { ProjectFs, SandboxError, TOOLS, type ToolContext, ToolError, check, findScene, isConfirm } from "@himawari/tools";
+import { ProjectFs, RECIPES, SandboxError, TOOLS, type ToolContext, ToolError, check, findScene, isConfirm } from "@himawari/tools";
 import { McpServer, ResourceTemplate, acceptedContent, inputRequired } from "@modelcontextprotocol/server";
 import { z } from "zod";
+import { APPS, APP_MIME, appMeta } from "./apps.js";
 import type { ToolResultLike } from "./studio-link.js";
 
 export interface ServerOptions {
@@ -57,9 +58,18 @@ export function createServer(options: ServerOptions): McpServer {
 
   // Tools, in the registry's fixed order (plan §10.1).
   for (const def of TOOLS) {
+    const meta = appMeta(def.name);
     server.registerTool(
       def.name,
-      { title: def.title, description: def.description, inputSchema: def.input, outputSchema: def.output, annotations: { title: def.title, ...def.annotations } },
+      {
+        title: def.title,
+        description: def.description,
+        inputSchema: def.input,
+        outputSchema: def.output,
+        annotations: { title: def.title, ...def.annotations },
+        // MCP Apps (experimental): a view for this tool's result, for hosts that show them.
+        ...(meta ? { _meta: meta } : {}),
+      },
       async (args: Record<string, unknown>, ctx) => {
         if (def.kind === "write" && options.forwardWrite && args["dry_run"] !== true) {
           const forwarded = await options.forwardWrite(def.name, args);
@@ -100,6 +110,9 @@ export function createServer(options: ServerOptions): McpServer {
   server.registerResource("agents-md", "himawari://project/agents-md", { title: "The project's AGENTS.md (layer 2 instructions)", mimeType: "text/markdown" }, (uri) =>
     text(uri, fs.exists("AGENTS.md") ? fs.read("AGENTS.md") : "This project has no AGENTS.md.", "text/markdown"),
   );
+  server.registerResource("glossary", "himawari://project/glossary", { title: "The glossary: agreed translations of the game's own words", mimeType: "application/json" }, (uri) =>
+    text(uri, fs.exists("glossary.json") ? fs.read("glossary.json") : '{ "terms": [] }', "application/json"),
+  );
   server.registerResource("agent-guide", "himawari://agent-guide", { title: "Himawari agent guide (layer 1)", mimeType: "text/markdown" }, (uri) =>
     text(uri, guide, "text/markdown"),
   );
@@ -133,47 +146,15 @@ export function createServer(options: ServerOptions): McpServer {
     (uri, vars) => text(uri, fs.read(`characters/${String(vars["id"]).replace(/[^a-z0-9_]/g, "")}.md`), "text/markdown"),
   );
 
-  // Prompts (plan §10.4).
-  const prompt = (body: string) => ({ messages: [{ role: "user" as const, content: { type: "text" as const, text: body } }] });
-  server.registerPrompt(
-    "write_scene",
-    { title: "Write a scene", description: "Draft a new scene from a premise, in the project's voice.", argsSchema: z.object({ premise: z.string(), scene: z.string().optional() }) },
-    (a) =>
-      prompt(
-        `Write a new scene${a.scene ? ` named ${a.scene}` : ""} for this visual novel. Premise: ${a.premise}\n\nFirst call project_info, read AGENTS.md (himawari://project/agents-md), and get_character for everyone who speaks, respecting their "Must never" rules. Use only existing presets and positions. Create it with create_scene (dry_run first), fix any diagnostics, then playtest. Explain the result in one sentence.`,
-      ),
-  );
-  server.registerPrompt(
-    "continuity_check",
-    { title: "Continuity check", description: "Look for contradictions with the character bibles and earlier scenes.", argsSchema: z.object({ scene: z.string() }) },
-    (a) =>
-      prompt(
-        `Check scene ${a.scene} for continuity: read it, the scenes that lead to it (get_story_graph), and each speaker's bible. Report contradictions (facts, names, relationships, speech style, "Must never" rules, variables set or read inconsistently) as a list with line IDs. Don't edit anything unless asked.`,
-      ),
-  );
-  server.registerPrompt(
-    "branch_planner",
-    { title: "Plan branches", description: "Propose routes and choices for a chapter.", argsSchema: z.object({ goal: z.string() }) },
-    (a) =>
-      prompt(
-        `Plan the branching for: ${a.goal}\n\nRead get_story_graph and list_variables first. Propose routes, the choices that split them, the variables they need (declare_variable), and how each route reaches an ending. Keep it a plan until the user agrees; then write it with create_scene and check with playtest that every ending is reached.`,
-      ),
-  );
-  server.registerPrompt(
-    "translate_scene",
-    { title: "Translate a scene", description: "Translate a scene's lines into a target language.", argsSchema: z.object({ scene: z.string(), lang: z.string() }) },
-    (a) =>
-      prompt(
-        `Translate scene ${a.scene} into ${a.lang}. Use search_dialogue (scene: ${a.scene}, lang: ${a.lang}) to get each line and any existing translation, then set_translation for each untranslated line. Keep every [variable], {tag}, and {select} exactly; ruby may change. Match each character's speech style from their bible. Translations land as needs-review.`,
-      ),
-  );
-  server.registerPrompt(
-    "sprite_direction",
-    { title: "Sprite direction", description: "Suggest expression changes for a scene from the characters' presets.", argsSchema: z.object({ scene: z.string() }) },
-    (a) =>
-      prompt(
-        `Suggest sprite direction for scene ${a.scene}: read it and get_character for each speaker to see their presets and attributes. Propose expression changes as patch_scene set_attrs edits (by line ID), one short reason each, using only words the character has. Use render_line to check a few. Apply them only if asked.`,
-      ),
-  );
+  // MCP Apps views (experimental, apps.ts).
+  for (const app of APPS) server.registerResource(app.name, app.uri, { title: app.title, mimeType: APP_MIME }, (uri) => text(uri, app.html, APP_MIME));
+
+  // Prompts (plan §10.4): the same recipes as the Studio assistant's slash commands.
+  for (const r of RECIPES) {
+    const shape = Object.fromEntries(r.args.map((a) => [a.name, a.required ? z.string().describe(a.description) : z.string().describe(a.description).optional()]));
+    server.registerPrompt(r.name, { title: r.title, description: r.description, argsSchema: z.object(shape) }, (a) => ({
+      messages: [{ role: "user" as const, content: { type: "text" as const, text: r.prompt(a as Record<string, string | undefined>) } }],
+    }));
+  }
   return server;
 }

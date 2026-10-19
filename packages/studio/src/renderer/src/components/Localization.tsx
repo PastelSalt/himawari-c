@@ -1,9 +1,14 @@
 import {
+  GLOSSARY_FILE,
+  type GlossaryTerm,
   type L10nTable,
   type SourceLine,
   applyTranslations,
   collectLines,
+  glossaryMisses,
   parseTable,
+  readGlossary,
+  stringifyGlossary,
   stringifyTable,
   syncTable,
   toCsv,
@@ -17,6 +22,7 @@ import { studio } from "../api";
 import { LANGUAGE_NAMES } from "../i18n";
 import { useStudio } from "../store";
 import { Icon } from "./Icon";
+import { Modal } from "./Modal";
 import { PAGE_SIZE, Pager, pathChoices } from "./Pager";
 import { playFrom } from "./ScriptEditor";
 
@@ -57,6 +63,11 @@ export function Localization({ initial }: { initial?: string | undefined }) {
   const stored = useMemo(() => new Map((existing?.lines ?? []).map((e) => [e.id, e])), [existing]);
   const entries = useMemo(() => new Map((synced?.table.lines ?? []).map((e) => [e.id, e])), [synced]);
   const places = useMemo(() => pathChoices(new Set(lines.map((l) => l.file))), [lines]);
+  const glossaryText = files[GLOSSARY_FILE];
+  const glossary = useMemo(() => readGlossary(glossaryText), [glossaryText]);
+  const [glossaryOpen, setGlossaryOpen] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const run = useStudio((s) => s.translation);
 
   const write = (table: L10nTable, label: string, values: Record<string, string> = {}) => {
     if (!file || !lang) return;
@@ -139,6 +150,9 @@ export function Localization({ initial }: { initial?: string | undefined }) {
   const count = (st: string) => counts[st] ?? 0;
   const shown = rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
   const pending = synced && (synced.added > 0 || synced.changed > 0 || synced.removed > 0 || !existing);
+  // "Translate with AI" takes the untranslated lines among those shown (narrow by route or words first).
+  const untranslated = useMemo(() => rows.filter((l) => !entries.get(l.id)?.text), [rows, entries]);
+  const running = !!run?.job;
 
   return (
     <div className="tool-page l10n-page">
@@ -223,6 +237,13 @@ export function Localization({ initial }: { initial?: string | undefined }) {
                 <FormattedMessage id="l10n.sync" values={{ added: synced.added, changed: synced.changed, removed: synced.removed }} />
               </button>
             )}
+            <button onClick={() => setGlossaryOpen((o) => !o)} aria-expanded={glossaryOpen}>
+              <FormattedMessage id="l10n.glossary" values={{ count: glossary.length }} />
+            </button>
+            <button className="ai-button" disabled={untranslated.length === 0 || running} onClick={() => setAsking(true)}>
+              <Icon name="assistant" size={13} />
+              <FormattedMessage id="l10n.ai.button" values={{ count: untranslated.length }} />
+            </button>
             <button onClick={() => exportAs("csv")}>
               <FormattedMessage id="l10n.exportCsv" />
             </button>
@@ -234,6 +255,9 @@ export function Localization({ initial }: { initial?: string | undefined }) {
             </button>
           </div>
           {message && <p className="muted small">{message}</p>}
+          {run && run.lang === lang && <TranslationProgress />}
+          {glossaryOpen && <GlossaryEditor terms={glossary} lang={lang} />}
+          {asking && <TranslateDialog lang={lang} lines={untranslated} onClose={() => setAsking(false)} />}
           <table className="data-table l10n-table">
             <thead>
               <tr>
@@ -277,6 +301,12 @@ export function Localization({ initial }: { initial?: string | undefined }) {
                     </td>
                     <td>
                       <TranslationCell id={l.id} value={e?.text ?? ""} onCommit={(t) => setText(l.id, t)} />
+                      {glossary.length > 0 &&
+                        glossaryMisses(glossary, lang, l.text, e?.text ?? "").map((t) => (
+                          <div key={t.source} className="glossary-hint small">
+                            <FormattedMessage id="l10n.glossaryHint" values={{ term: t.source, want: t.translations[lang] }} />
+                          </div>
+                        ))}
                       {problems[l.id] && (
                         <div className="error-text small">
                           <FormattedMessage id="l10n.refused" values={{ problems: problems[l.id]!.join("; ") }} />
@@ -339,5 +369,256 @@ function TranslationCell({ id, value, onCommit }: { id: string; value: string; o
         }
       }}
     />
+  );
+}
+
+const MODELS = [
+  { id: "claude-haiku-5-5", label: "l10n.ai.model.haiku" },
+  { id: "claude-sonnet-5-5", label: "l10n.ai.model.sonnet" },
+] as const;
+
+/** Before a run: how many lines, which model, about what it costs. Nothing is sent until "Translate". */
+function TranslateDialog({ lang, lines, onClose }: { lang: string; lines: SourceLine[]; onClose: () => void }) {
+  const intl = useIntl();
+  const characters = useStudio((s) => s.model?.check.characters);
+  const [model, setModel] = useState<string>(MODELS[0].id);
+  const [estimate, setEstimate] = useState<{ cost: number; hasKey: boolean } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const request = useMemo(
+    () => ({
+      lang,
+      model,
+      lines: lines.map((l) => ({ id: l.id, speaker: l.speaker ? (characters?.get(l.speaker)?.displayName ?? l.speaker) : "", kind: l.kind, text: l.text })),
+    }),
+    [lang, model, lines, characters],
+  );
+  useEffect(() => {
+    let live = true;
+    studio.translate
+      .estimate(request)
+      .then((e) => live && setEstimate(e))
+      .catch((e: unknown) => live && setError(e instanceof Error ? e.message : String(e)));
+    return () => {
+      live = false;
+    };
+  }, [request]);
+  const start = async () => {
+    try {
+      const job = await studio.translate.start(request);
+      useStudio.setState({ translation: { job, lang, done: 0, total: request.lines.length, cost: 0, written: 0, refused: 0, finished: null, error: null } });
+      onClose();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+  return (
+    <Modal title={<FormattedMessage id="l10n.ai.title" values={{ language: LANGUAGE_NAMES[lang] ?? lang }} />} onClose={onClose}>
+      <p>
+        <FormattedMessage id="l10n.ai.what" values={{ count: lines.length, language: LANGUAGE_NAMES[lang] ?? lang }} />
+      </p>
+      <label className="field">
+        <span>
+          <FormattedMessage id="l10n.ai.model" />
+        </span>
+        <select value={model} onChange={(e) => setModel(e.target.value)}>
+          {MODELS.map((m) => (
+            <option key={m.id} value={m.id}>
+              {intl.formatMessage({ id: m.label })}
+            </option>
+          ))}
+        </select>
+      </label>
+      <p className="muted small">
+        <FormattedMessage id="l10n.ai.review" />
+      </p>
+      {estimate && (
+        <p className="muted small">
+          <FormattedMessage id="l10n.ai.cost" values={{ cost: estimate.cost < 0.01 ? "< $0.01" : `≈ $${estimate.cost.toFixed(2)}` }} />
+        </p>
+      )}
+      {estimate && !estimate.hasKey && (
+        <div className="row wrap">
+          <span className="error-text small grow">
+            <FormattedMessage id="l10n.ai.noKey" />
+          </span>
+          <button
+            className="small-button"
+            onClick={() => {
+              onClose();
+              useStudio.getState().open({ kind: "tool", tool: "settings" });
+            }}
+          >
+            <FormattedMessage id="assistant.openSettings" />
+          </button>
+        </div>
+      )}
+      {error && <p className="error-text small">{error}</p>}
+      <div className="row modal-actions">
+        <div className="grow" />
+        <button onClick={onClose}>
+          <FormattedMessage id="common.cancel" />
+        </button>
+        <button className="primary" disabled={!estimate?.hasKey || lines.length === 0} onClick={() => void start()}>
+          <FormattedMessage id="l10n.ai.start" />
+        </button>
+      </div>
+    </Modal>
+  );
+}
+
+/** The run in progress (a bar and Cancel), then how it went. */
+function TranslationProgress() {
+  const run = useStudio((s) => s.translation)!;
+  const cost = run.cost < 0.01 ? "< $0.01" : `$${run.cost.toFixed(2)}`;
+  return (
+    <div className="translate-progress row wrap small">
+      {run.job ? (
+        <>
+          <div className="progress-track" role="progressbar" aria-valuemin={0} aria-valuemax={run.total} aria-valuenow={run.done}>
+            <div className="progress-fill" style={{ width: `${run.total ? (100 * run.done) / run.total : 0}%` }} />
+          </div>
+          <span>
+            <FormattedMessage id="l10n.ai.running" values={{ done: run.done, total: run.total, cost }} />
+          </span>
+          <button className="small-button" onClick={() => void studio.translate.cancel()}>
+            <FormattedMessage id="common.cancel" />
+          </button>
+        </>
+      ) : run.error ? (
+        <span className="error-text">
+          <FormattedMessage id="l10n.ai.failed" values={{ reason: run.error, written: run.written }} />
+        </span>
+      ) : (
+        <span>
+          <FormattedMessage
+            id={run.finished?.cancelled ? "l10n.ai.cancelled" : "l10n.ai.finished"}
+            values={{ written: run.written, refused: run.refused, missed: run.finished?.missed ?? 0, cost }}
+          />
+        </span>
+      )}
+      {!run.job && (
+        <button className="small-button" onClick={() => useStudio.setState({ translation: null })}>
+          <FormattedMessage id="common.close" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** glossary.json: the game's own words and how they're translated. The checker and the AI translator both follow it. */
+function GlossaryEditor({ terms, lang }: { terms: GlossaryTerm[]; lang: string }) {
+  const intl = useIntl();
+  const [source, setSource] = useState("");
+  const [target, setTarget] = useState("");
+  const save = (next: GlossaryTerm[], label: string, term: string) =>
+    useStudio.getState().edit(GLOSSARY_FILE, stringifyGlossary(next), "you", { id: label, values: { term } });
+  const setTerm = (i: number, patch: Partial<GlossaryTerm>) => {
+    const t = terms[i]!;
+    save(
+      terms.map((x, j) => (j === i ? { ...t, ...patch } : x)),
+      "history.glossaryEdited",
+      t.source,
+    );
+  };
+  const add = () => {
+    const s = source.trim();
+    if (!s) return;
+    const i = terms.findIndex((t) => t.source.toLowerCase() === s.toLowerCase());
+    const next =
+      i >= 0
+        ? terms.map((t, j) => (j === i ? { ...t, translations: { ...t.translations, [lang]: target.trim() } } : t))
+        : [...terms, { source: s, translations: target.trim() ? { [lang]: target.trim() } : {} }];
+    save(next, "history.glossaryEdited", s);
+    setSource("");
+    setTarget("");
+  };
+  return (
+    <div className="card glossary">
+      <p className="muted small">
+        <FormattedMessage id="l10n.glossaryAbout" />
+      </p>
+      {terms.length > 0 && (
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>
+                <FormattedMessage id="l10n.glossaryTerm" />
+              </th>
+              <th>{LANGUAGE_NAMES[lang] ?? lang}</th>
+              <th>
+                <FormattedMessage id="l10n.glossaryNote" />
+              </th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {terms.map((t, i) => (
+              <tr key={`${t.source}-${i}`}>
+                <td>{t.source}</td>
+                <td>
+                  <input
+                    key={t.translations[lang] ?? ""}
+                    defaultValue={t.translations[lang] ?? ""}
+                    aria-label={intl.formatMessage({ id: "l10n.glossaryTranslation" }, { term: t.source })}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v === (t.translations[lang] ?? "")) return;
+                      const { [lang]: _drop, ...rest } = t.translations;
+                      setTerm(i, { translations: v ? { ...rest, [lang]: v } : rest });
+                    }}
+                  />
+                </td>
+                <td>
+                  <input
+                    key={t.note ?? ""}
+                    defaultValue={t.note ?? ""}
+                    aria-label={intl.formatMessage({ id: "l10n.glossaryNote" })}
+                    onBlur={(e) => {
+                      const v = e.target.value.trim();
+                      if (v === (t.note ?? "")) return;
+                      const { note: _n, ...rest } = t;
+                      save(
+                        terms.map((x, j) => (j === i ? (v ? { ...rest, note: v } : rest) : x)),
+                        "history.glossaryEdited",
+                        t.source,
+                      );
+                    }}
+                  />
+                </td>
+                <td>
+                  <button
+                    className="small-button"
+                    title={intl.formatMessage({ id: "common.delete" })}
+                    aria-label={intl.formatMessage({ id: "common.delete" })}
+                    onClick={() =>
+                      save(
+                        terms.filter((_, j) => j !== i),
+                        "history.glossaryRemoved",
+                        t.source,
+                      )
+                    }
+                  >
+                    ×
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <form
+        className="row wrap"
+        onSubmit={(e) => {
+          e.preventDefault();
+          add();
+        }}
+      >
+        <input value={source} onChange={(e) => setSource(e.target.value)} placeholder={intl.formatMessage({ id: "l10n.glossaryTerm" })} />
+        <input value={target} onChange={(e) => setTarget(e.target.value)} placeholder={LANGUAGE_NAMES[lang] ?? lang} />
+        <button type="submit" disabled={!source.trim()}>
+          <FormattedMessage id="common.add" />
+        </button>
+      </form>
+    </div>
   );
 }

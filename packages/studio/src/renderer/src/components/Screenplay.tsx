@@ -1,4 +1,4 @@
-import { type MenuOption, type Scene, type Stmt, characterWords, parseAst } from "@himawari/core";
+import { type MenuOption, NOTES_FILE, type Note, type Scene, type Stmt, characterWords, newNoteId, parseAst, readNotes, stringifyNotes } from "@himawari/core";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import {
@@ -25,6 +25,8 @@ let pendingFocus: { at: number; raw: boolean } | null = null;
 type Ctx = {
   file: string;
   text: string;
+  /** Open review notes by line ID (rfcs/0011). */
+  notes: ReadonlyMap<string, Note[]>;
   edit: (next: string, label?: string) => void;
   play: (lineId: string) => void;
   lastSpeaker: string | null;
@@ -43,6 +45,12 @@ export function Screenplay({ file, onPlay }: { file: string; onPlay: (lineId: st
   const model = useStudio((s) => s.model);
   const parsed = useMemo(() => parseAst(text, file), [text, file]);
   const hasErrors = parsed.diagnostics.some((d) => d.severity === "error");
+  const notesText = useStudio((s) => s.files[NOTES_FILE]);
+  const notes = useMemo(() => {
+    const m = new Map<string, Note[]>();
+    for (const n of readNotes(notesText)) if (n.line && !n.resolved) m.set(n.line, [...(m.get(n.line) ?? []), n]);
+    return m;
+  }, [notesText]);
   const root = useRef<HTMLDivElement>(null);
   // Scenes that must be drawn even when off screen: the one being revealed, and the one the game is playing.
   const [goTo, setGoTo] = useState<{ scene: string; seq: number } | null>(null);
@@ -63,6 +71,7 @@ export function Screenplay({ file, onPlay }: { file: string; onPlay: (lineId: st
   const ctx: Ctx = {
     file,
     text,
+    notes,
     edit: (next, label) => useStudio.getState().edit(file, next, "you", label ? { id: label, values: { file } } : undefined),
     play: onPlay,
     lastSpeaker: null,
@@ -112,6 +121,42 @@ export function Screenplay({ file, onPlay }: { file: string; onPlay: (lineId: st
         </LazyScene>
       ))}
     </div>
+  );
+}
+
+/** A one-line note on a line (the writer's own to-do), saved to .himawari/notes.json. */
+function NoteForm({ lineId, onDone }: { lineId: string; onDone: () => void }) {
+  const intl = useIntl();
+  const [text, setText] = useState("");
+  const save = () => {
+    const t = text.trim();
+    if (t) {
+      const s = useStudio.getState();
+      const notes = readNotes(s.files[NOTES_FILE]);
+      const note: Note = { id: newNoteId(notes.map((n) => n.id)), line: lineId, kind: "todo", text: t, author: "human", created: new Date().toISOString() };
+      s.edit(NOTES_FILE, stringifyNotes([...notes, note]), "you", { id: "history.noteAdded" });
+    }
+    onDone();
+  };
+  return (
+    <form
+      className="sp-note-form"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save();
+      }}
+    >
+      <Icon name="note" size={13} />
+      <input
+        autoFocus
+        value={text}
+        placeholder={intl.formatMessage({ id: "notes.placeholder" })}
+        aria-label={intl.formatMessage({ id: "notes.add" })}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => e.key === "Escape" && onDone()}
+      />
+    </form>
   );
 }
 
@@ -177,6 +222,7 @@ const Row = memo(function Row({ s, ctx, depth }: { s: Stmt; ctx: Ctx; depth: num
   const preview = useStudio((st) => st.preview);
   const ref = useRef<HTMLDivElement>(null);
   const [drop, setDrop] = useState<"before" | "after" | null>(null);
+  const [noting, setNoting] = useState(false);
   const lineId = s.kind === "Say" || s.kind === "Narration" || s.kind === "Invoke" ? s.lineId : s.kind === "Menu" ? s.promptLineId : null;
   const active = lineId !== null && preview.line === lineId;
   const line = lineAt(ctx.text, s.span.start);
@@ -226,8 +272,27 @@ const Row = memo(function Row({ s, ctx, depth }: { s: Stmt; ctx: Ctx; depth: num
       <Icon name="drag" size={14} />
     </span>
   );
+  const myNotes = lineId ? (ctx.notes.get(lineId) ?? []) : [];
+  const noteBadge =
+    myNotes.length > 0 ? (
+      <button
+        className="note-badge"
+        title={myNotes.map((n) => `${n.author === "ai" ? "AI: " : ""}${n.text}`).join("\n")}
+        aria-label={intl.formatMessage({ id: "notes.onLine" }, { count: myNotes.length })}
+        onClick={() => useStudio.getState().setBottom("notes")}
+      >
+        <Icon name="note" size={12} />
+        {myNotes.length}
+      </button>
+    ) : null;
+  const noteForm = noting && lineId ? <NoteForm lineId={lineId} onDone={() => setNoting(false)} /> : null;
   const tools = (
     <span className="sp-tools">
+      {lineId && (
+        <button className="icon-button" title={intl.formatMessage({ id: "notes.add" })} aria-label={intl.formatMessage({ id: "notes.add" })} onClick={() => setNoting(true)}>
+          <Icon name="note" size={13} />
+        </button>
+      )}
       <button className="icon-button" title={intl.formatMessage({ id: "screenplay.duplicate" })} aria-label={intl.formatMessage({ id: "screenplay.duplicate" })} onClick={duplicate}>
         <Icon name="plus" size={13} />
       </button>
@@ -252,7 +317,9 @@ const Row = memo(function Row({ s, ctx, depth }: { s: Stmt; ctx: Ctx; depth: num
         {handle}
         <SpeakerPicker s={s} ctx={ctx} />
         <LineText at={s.span.start} ctx={ctx} onDuplicate={duplicate} speaker={s.kind === "Say" ? s.speaker : null} attrsSource={s} />
+        {noteBadge}
         {tools}
+        {noteForm}
       </div>
     );
   }
@@ -267,7 +334,9 @@ const Row = memo(function Row({ s, ctx, depth }: { s: Stmt; ctx: Ctx; depth: num
             <FormattedMessage id="screenplay.choice" />
           </span>
           {s.prompt ? <LineText at={s.span.start} ctx={ctx} speaker={null} /> : <span className="muted small"><FormattedMessage id="screenplay.noPrompt" /></span>}
+          {noteBadge}
           {tools}
+          {noteForm}
         </div>
         {s.options.map((o) => (
           <OptionRow key={o.lineId ?? o.span.start} o={o} ctx={ctx} depth={depth + 1} />

@@ -4,16 +4,16 @@
  * gives new script lines their hidden line IDs, re-checks the project with
  * Core, and records the change in the unified history (P9).
  */
-import { addLineIds } from "@himawari/core";
+import { addLineIds, applyTranslations, collectLines, parseTable, stringifyTable, syncTable } from "@himawari/core";
 import { create } from "zustand";
-import type { AppInfo, AssistantEvent, AssistantUsage, FileChange, PreviewEvent, ProjectSnapshot, Proposal, Settings } from "../../shared/api";
+import type { AppInfo, AssistantEvent, AssistantUsage, FileChange, PreviewEvent, ProjectSnapshot, Proposal, Settings, TranslateEvent } from "../../shared/api";
 import { studio } from "./api";
 import { type ProjectModel, buildModel, isScript } from "./model";
 import { applyPatch } from "../../shared/patch";
 
 export type Tool = "characters" | "assets" | "variables" | "localization" | "graph" | "designer" | "build" | "settings";
 export type Center = { kind: "file"; file: string } | { kind: "tool"; tool: Tool; arg?: string } | null;
-export type BottomTab = "problems" | "proposals" | "output" | "history";
+export type BottomTab = "problems" | "notes" | "proposals" | "output" | "history";
 export type Source = "you" | "ai" | "refactor" | "outside" | "fix";
 
 export interface HistoryEntry {
@@ -66,6 +66,20 @@ export interface ChatState {
   selection: { file: string; text: string } | null;
 }
 
+/** "Translate with AI" (Localization): the run in progress, or how the last one went. */
+export interface TranslationRun {
+  job: string | null;
+  lang: string;
+  done: number;
+  total: number;
+  cost: number;
+  /** Lines written so far, and lines whose markup broke (left untranslated). */
+  written: number;
+  refused: number;
+  finished: { missed: number; refusals: number; cancelled: boolean } | null;
+  error: string | null;
+}
+
 const NO_USAGE: AssistantUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, cost: 0 };
 
 export interface OutputLine {
@@ -97,6 +111,7 @@ interface State {
   output: OutputLine[];
   searchOpen: boolean;
   chat: ChatState;
+  translation: TranslationRun | null;
   /** The Script view's selection, for "ask about selection". */
   selection: { file: string; text: string } | null;
 
@@ -217,6 +232,7 @@ export const useStudio = create<State>((set, get) => {
     output: [],
     searchOpen: false,
     chat: { items: [], running: null, last: null, session: NO_USAGE, draft: "", selection: null },
+    translation: null,
     selection: null,
 
     async init() {
@@ -317,6 +333,41 @@ export const useStudio = create<State>((set, get) => {
         }
         set({ chat: { ...c, items } });
       });
+      studio.translate.onEvent((e: TranslateEvent) => {
+        const t = get().translation;
+        if (!t || t.job !== e.job) return;
+        switch (e.kind) {
+          case "progress":
+            set({ translation: { ...t, done: e.done, total: e.total } });
+            break;
+          case "batch": {
+            // Applied to the table as it is now (the writer may have edited meanwhile): one undo step per batch.
+            const s = get();
+            const m = s.model?.check.manifest;
+            const file = `locales/${e.lang}.json`;
+            if (!m || !s.model) break;
+            let existing = null;
+            try {
+              existing = s.files[file] ? parseTable(s.files[file]) : null;
+            } catch {
+              // A broken table: Problems shows it, and nothing is written over it.
+              set({ translation: { ...t, cost: e.cost, refused: t.refused + e.translations.length } });
+              break;
+            }
+            const table = syncTable(existing, collectLines(s.model.check.parsed), e.lang, m.sourceLanguage).table;
+            const r = applyTranslations(table, new Map(e.translations.map((x) => [x.id, x.text])), "ai");
+            if (r.updated > 0) s.edit(file, stringifyTable(r.table), "ai", { id: "history.aiTranslated", values: { lang: e.lang, count: String(r.updated) } });
+            set({ translation: { ...get().translation!, cost: e.cost, written: t.written + r.updated, refused: t.refused + r.refused.length } });
+            break;
+          }
+          case "done":
+            set({ translation: { ...t, job: null, cost: e.cost, finished: { missed: e.missed, refusals: e.refusals, cancelled: e.cancelled } } });
+            break;
+          case "error":
+            set({ translation: { ...t, job: null, error: e.message } });
+            break;
+        }
+      });
       studio.proposals.onChanged((proposals) => {
         // A new proposal brings the AI Proposals tab forward (P12: the AI's changes wait for you there).
         const known = new Set(get().proposals.map((p) => p.id));
@@ -362,6 +413,7 @@ export const useStudio = create<State>((set, get) => {
         preview: initialPreview,
         selection: null,
         chat: { items: [], running: null, last: null, session: NO_USAGE, draft: "", selection: null },
+        translation: null,
       });
     },
 

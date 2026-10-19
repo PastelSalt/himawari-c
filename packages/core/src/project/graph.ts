@@ -213,3 +213,73 @@ export function fileGraph(g: StoryGraph, groupOf: (file: string) => string = (f)
     edges: [...links.values()].map((l) => ({ from: l.from, to: l.to, kind: l.kind, ...(l.count > 1 ? { choice: `${l.count} links` } : {}) })),
   };
 }
+
+/** One ending's route: what leads only there, what it shares with other routes, and the choices that commit to it. */
+export interface RouteInfo {
+  ending: string;
+  /** Scenes and lines from which only this ending can be reached. */
+  scenes: number;
+  lines: number;
+  /** Lines in scenes that lead here and to other endings too (the common part). */
+  shared: number;
+  /** Choices that commit the player to this route ("scene: choice text"). */
+  choices: string[];
+  /** The scenes that lead only here. */
+  members: string[];
+}
+
+/**
+ * Route balance (plan §18 Phase 7): each ending's own scenes and lines. A route much shorter than the
+ * others (under half the median) is listed in `short`, as a hint for the writer, not a problem.
+ */
+export function routeBalance(g: StoryGraph): { routes: RouteInfo[]; median: number; short: string[] } {
+  const endings = g.nodes.filter((n) => n.ending && n.reachable).map((n) => n.scene);
+  const into = new Map<string, string[]>();
+  for (const e of g.edges) {
+    const list = into.get(e.to);
+    if (list) list.push(e.from);
+    else into.set(e.to, [e.from]);
+  }
+  // The endings each scene can lead to (following jumps and calls): a search backwards from each ending,
+  // so loops (a hub scene the menus come back to) count fully.
+  const reach = new Map<string, Set<string>>();
+  for (const ending of endings) {
+    const seen = new Set([ending]);
+    const queue = [ending];
+    while (queue.length > 0) {
+      const s = queue.pop()!;
+      for (const from of into.get(s) ?? []) {
+        if (seen.has(from)) continue;
+        seen.add(from);
+        queue.push(from);
+      }
+    }
+    for (const s of seen) {
+      const set = reach.get(s);
+      if (set) set.add(ending);
+      else reach.set(s, new Set([ending]));
+    }
+  }
+  const routes = endings.map((ending): RouteInfo => {
+    let scenes = 0;
+    let own = 0;
+    let shared = 0;
+    const members: string[] = [];
+    for (const n of g.nodes) {
+      const r = reach.get(n.scene);
+      if (!r?.has(ending) || !n.reachable) continue;
+      if (r.size === 1) {
+        scenes++;
+        own += n.lines;
+        members.push(n.scene);
+      } else shared += n.lines;
+    }
+    const exclusive = (s: string) => reach.get(s)?.size === 1 && reach.get(s)?.has(ending);
+    const choices = g.edges.filter((e) => e.choice && exclusive(e.to) && !exclusive(e.from)).map((e) => `${e.from}: ${e.choice}`);
+    return { ending, scenes, lines: own, shared, choices, members };
+  });
+  const sorted = routes.map((r) => r.lines).sort((a, b) => a - b);
+  const median = sorted.length ? (sorted[Math.floor((sorted.length - 1) / 2)] ?? 0) : 0;
+  const short = routes.length >= 3 ? routes.filter((r) => r.lines < median / 2).map((r) => r.ending) : [];
+  return { routes, median, short };
+}

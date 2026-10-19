@@ -166,6 +166,7 @@ A theme can start from a `preset` (`himawari`, `pastel`, `minimal`, `paper`, `ni
 
 - Every dialogue line, narration line, menu option, menu prompt (`menu "Where to?":`), and extension statement with a quoted text has a **line ID**: a trailing `#line:xxxxxx` comment.
 - An ID is **6 characters of lowercase Crockford base32**: `0123456789abcdefghjkmnpqrstvwxyz` (no `i`, `l`, `o`, `u`). That gives 2³⁰ ≈ 1.07 billion IDs.
+- A comment that starts with `#line:` but isn't a valid ID (`#line:evl001`, `#line:K3F9A1`) is a warning (`HW0022`) and is read as an ordinary comment, so tools give the line a new ID in front of it.
 - IDs are **persistent tags, not hashes.** Tooling (`hwc fmt`, Studio, MCP) assigns them; writers never type them, and Studio hides them.
 - Moving a line keeps its ID. Editing keeps the ID, but a large change marks translations and voice as `needs-review`. Duplicated IDs (from copy-paste) are reassigned on the copy.
 - IDs anchor AI edits, translations (`locales/<lang>.json`), voice files (`voice/<lang>/<id>.ogg`), saves, read tracking, and provenance.

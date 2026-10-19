@@ -1,4 +1,4 @@
-import { LineIndex } from "@himawari/core";
+import { LineIndex, NOTES_FILE, type Note, noteAnchor, readNotes, stringifyNotes } from "@himawari/core";
 import { useMemo, useState } from "react";
 import { FormattedMessage, FormattedTime, useIntl } from "react-intl";
 import { applyFix, useDiagnosticText } from "../diagnostics";
@@ -14,8 +14,11 @@ export function BottomPanel({ height }: { height: number | undefined }) {
   const model = useStudio((s) => s.model);
   const proposals = useStudio((s) => s.proposals.length);
   const count = (model?.errors ?? 0) + (model?.warnings ?? 0);
+  const notes = useStudio((s) => s.files[NOTES_FILE]);
+  const openNotes = useMemo(() => readNotes(notes).filter((n) => !n.resolved).length, [notes]);
   const tabs: { id: BottomTab; label: React.ReactNode }[] = [
     { id: "problems", label: <FormattedMessage id="panel.problems" values={{ count }} /> },
+    { id: "notes", label: <FormattedMessage id="panel.notes" values={{ count: openNotes }} /> },
     { id: "proposals", label: <FormattedMessage id="panel.proposals" values={{ count: proposals }} /> },
     { id: "output", label: <FormattedMessage id="panel.output" /> },
     { id: "history", label: <FormattedMessage id="panel.history" /> },
@@ -32,6 +35,7 @@ export function BottomPanel({ height }: { height: number | undefined }) {
       {open && (
         <div className="panel-body">
           {tab === "problems" && <Problems />}
+          {tab === "notes" && <Notes />}
           {tab === "proposals" && <Proposals />}
           {tab === "output" && <Output />}
           {tab === "history" && <History />}
@@ -96,6 +100,73 @@ function Problems() {
     </ul>
     <Pager page={page} total={rows.length} onPage={setPage} />
     </>
+  );
+}
+
+/** Review notes (rfcs/0011): the AI's continuity pass and the writer's own to-dos. */
+function Notes() {
+  const text = useStudio((s) => s.files[NOTES_FILE]);
+  const model = useStudio((s) => s.model);
+  const [showResolved, setShowResolved] = useState(false);
+  const notes = useMemo(() => readNotes(text), [text]);
+  const shown = notes.filter((n) => !!n.resolved === showResolved).reverse();
+  const save = (next: Note[], label: string) => useStudio.getState().edit(NOTES_FILE, stringifyNotes(next), "you", { id: label });
+  const go = (n: Note) => {
+    const s = useStudio.getState();
+    const line = n.line ? model?.lines.get(n.line) : undefined;
+    const scene = n.scene ? model?.scenes.find((x) => x.id === n.scene) : undefined;
+    if (line) s.revealAt(line.file, line.start);
+    else if (scene) s.revealAt(scene.file, scene.start);
+    else if (n.file) s.open({ kind: "file", file: n.file });
+  };
+  return (
+    <div className="notes-panel">
+      <div className="row small notes-head">
+        <label className="check">
+          <input type="checkbox" checked={showResolved} onChange={(e) => setShowResolved(e.target.checked)} />
+          <FormattedMessage id="notes.showResolved" />
+        </label>
+        <span className="muted">
+          <FormattedMessage id="notes.hint" />
+        </span>
+      </div>
+      {shown.length === 0 ? (
+        <p className="muted empty">
+          <FormattedMessage id={showResolved ? "notes.noneResolved" : "notes.none"} />
+        </p>
+      ) : (
+        <ul className="problem-list">
+          {shown.map((n) => {
+            const where = n.line ? model?.lines.get(n.line) : undefined;
+            return (
+              <li key={n.id} className="problem note">
+                <button className="problem-main" onClick={() => go(n)}>
+                  <span className={`note-kind ${n.kind}`}>
+                    <FormattedMessage id={`notes.kind.${n.kind}`} />
+                  </span>
+                  <span className="problem-message">{n.text}</span>
+                  <span className="problem-where muted">
+                    {where ? `${where.scene} · ` : ""}
+                    {noteAnchor(n)}
+                    {n.author === "ai" && (
+                      <span className="source-badge ai">
+                        <FormattedMessage id="history.source.ai" />
+                      </span>
+                    )}
+                  </span>
+                </button>
+                <button
+                  className="small-button"
+                  onClick={() => save(notes.map((x) => (x.id === n.id ? { ...x, resolved: !n.resolved } : x)), n.resolved ? "history.noteReopened" : "history.noteResolved")}
+                >
+                  <FormattedMessage id={n.resolved ? "notes.reopen" : "notes.resolve"} />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
   );
 }
 
