@@ -20,7 +20,7 @@ import { readHwb } from "../../packages/core/src/bytecode/reader.js";
 import { writeHwb } from "../../packages/core/src/bytecode/writer.js";
 import { LineIndex } from "../../packages/core/src/syntax/position.js";
 
-const STORY_HINTS: ReadonlySet<string> = new Set(["HW0340", "HW0341", "HW0342"]);
+const STORY_HINTS: ReadonlySet<string> = new Set(["HW0340", "HW0341", "HW0342", "HW0350", "HW0351", "HW0352", "HW0353", "HW0354", "HW0355", "HW0356", "HW0357", "HW0358", "HW0359"]);
 
 const CASES = fileURLToPath(new URL("./cases/", import.meta.url));
 const UPDATE = process.env["UPDATE_CONFORMANCE"] === "1";

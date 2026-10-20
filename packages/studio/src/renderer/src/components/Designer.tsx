@@ -4,6 +4,7 @@ import {
   THEME_COLORS,
   THEME_PALETTES,
   THEME_PRESET_NAMES,
+  THEME_STRING_KEYS,
   type ThemeColor,
   contrastRatio,
   resolveTheme,
@@ -484,6 +485,8 @@ export function Designer() {
           )}
         </section>
 
+        <WordsSection current={current} change={change} languages={manifest?.languages ?? []} />
+
         <section className="row wrap">
           <button
             className="small-button"
@@ -868,5 +871,66 @@ function MockScreen({
           })()}
       </div>
     </div>
+  );
+}
+
+/** Formats a few UI words keep: where the number or detail goes. */
+const WORD_FORMATS: Readonly<Record<string, string>> = { slot: "%d", load_failed: "%s", reload_failed: "%s" };
+
+/** The game's own words on its buttons and menus (theme.strings), per language (FINALIZATION.md NC-13). */
+function WordsSection({ current, change, languages }: { current: Raw; change: (path: string[], value: unknown, done?: boolean) => void; languages: string[] }) {
+  const intl = useIntl();
+  const [open, setOpen] = useState(false);
+  const [lang, setLang] = useState(languages[0] ?? "en");
+  const [query, setQuery] = useState("");
+  const strings = isObject(current["strings"]) && isObject(current["strings"][lang]) ? (current["strings"][lang] as Record<string, unknown>) : {};
+  const human = (k: string) => k.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+  const keys = THEME_STRING_KEYS.filter((k) => !query.trim() || k.includes(query.trim().toLowerCase().replace(/ /g, "_")) || String(strings[k] ?? "").toLowerCase().includes(query.trim().toLowerCase()));
+  return (
+    <section>
+      <button className="link-button" aria-expanded={open} onClick={() => setOpen(!open)}>
+        <h3>
+          <FormattedMessage id="designer.words" />
+        </h3>
+      </button>
+      {open && (
+        <>
+          <p className="muted small">
+            <FormattedMessage id="designer.wordsHint" />
+          </p>
+          <div className="row wrap">
+            {languages.length > 1 && (
+              <select value={lang} onChange={(e) => setLang(e.target.value)} aria-label={intl.formatMessage({ id: "l10n.language" })}>
+                {languages.map((l) => (
+                  <option key={l} value={l}>
+                    {l}
+                  </option>
+                ))}
+              </select>
+            )}
+            <input type="search" value={query} placeholder={intl.formatMessage({ id: "designer.wordsSearch" })} aria-label={intl.formatMessage({ id: "designer.wordsSearch" })} onChange={(e) => setQuery(e.target.value)} />
+          </div>
+          <div className="words-list">
+            {keys.map((k) => (
+              <label key={`${lang}.${k}`} className="field">
+                <span className="muted small">
+                  {human(k)}
+                  {WORD_FORMATS[k] ? ` (${intl.formatMessage({ id: "designer.wordsKeep" }, { code: WORD_FORMATS[k] })})` : ""}
+                </span>
+                <input
+                  defaultValue={typeof strings[k] === "string" ? (strings[k] as string) : ""}
+                  placeholder={intl.formatMessage({ id: "designer.wordsDefault" })}
+                  onBlur={(e) => {
+                    const v = e.target.value.trim();
+                    if (v === (typeof strings[k] === "string" ? strings[k] : "")) return;
+                    change(["strings", lang, k], v || undefined);
+                  }}
+                />
+              </label>
+            ))}
+          </div>
+        </>
+      )}
+    </section>
   );
 }

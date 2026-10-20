@@ -76,7 +76,8 @@ if (parsed[SOURCE]) {
     for (const name of readdirSync(dir)) {
       const full = join(dir, name);
       if (statSync(full).isDirectory()) visit(full);
-      else if (/\.tsx?$/.test(name)) {
+      // Tests hold sample data ("id": "a.b" in a manifest), not UI messages.
+      else if (/\.tsx?$/.test(name) && !/\.test\.tsx?$/.test(name)) {
         const text = readFileSync(full, "utf8");
         const seen = new Set();
         // Any literal in a known namespace ("panel.problems"), and any literal passed as a message id, whatever its namespace.

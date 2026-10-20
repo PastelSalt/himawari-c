@@ -1,4 +1,4 @@
-import { type MenuOption, NOTES_FILE, type Note, type Scene, type Stmt, characterWords, newNoteId, parseAst, readNotes, stringifyNotes } from "@himawari/core";
+import { type Expr, type MenuOption, NOTES_FILE, type Note, type Scene, type Stmt, characterWords, newNoteId, parseAst, readNotes, stringifyNotes } from "@himawari/core";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import {
@@ -12,15 +12,21 @@ import {
   quotedOn,
   rawToDisplay,
   setLineBody,
+  setOptionHead,
   setQuoted,
   setSayHead,
 } from "../screenplay-edit";
+import { conditionOf, conditionSource, formOf, formSource } from "../stage-forms";
 import { useStudio } from "../store";
 import { Icon } from "./Icon";
+import { ConditionEditor, InvokeEditor, StageEditor, describeCondition, describeForm, describeInvoke, firstCondition, slug } from "./StageEditor";
+import { invokeFormOf, invokeSource } from "../invoke-form";
 import { SpriteThumb } from "./SpriteThumb";
+import { StyledPreview, TextToolbar } from "./TextTools";
+import { hasMarkup } from "../text-style";
 
-/** Where to put the cursor after the next render: a line start offset, and whether to edit its raw text. */
-let pendingFocus: { at: number; raw: boolean } | null = null;
+/** Where to put the cursor after the next render: a line start offset, and whether to edit its raw text or open its form. */
+let pendingFocus: { at: number; raw: boolean; form?: boolean } | null = null;
 
 type Ctx = {
   file: string;
@@ -207,7 +213,8 @@ function Body({ stmts, ctx, depth }: { stmts: Stmt[]; ctx: Ctx; depth: number })
     <div className="sp-body" style={{ marginLeft: depth ? 18 : 0 }}>
       {stmts.map((s, i) => {
         if (s.kind === "Say") ctx.lastSpeaker = s.speaker;
-        const key = ("lineId" in s && s.lineId) || `${s.kind}@${s.span.start}@${i}`;
+        // Keyed by place, so a row's open form stays open while its kind changes (go to → visit).
+        const key = ("lineId" in s && s.lineId) || `${s.span.start}@${i}`;
         return <Row key={key} s={s} ctx={ctx} depth={depth} />;
       })}
     </div>
@@ -369,7 +376,7 @@ const Row = memo(function Row({ s, ctx, depth }: { s: Stmt; ctx: Ctx; depth: num
               <div className={cls}>
                 <span className="sp-play-space" />
                 {i === 0 ? handle : <span className="sp-handle" />}
-                <RawLine at={at} ctx={ctx} icon="variables" />
+                <ConditionLine at={at} cond={c.cond} first={i === 0} ctx={ctx} />
                 {i === 0 && tools}
               </div>
               <Body stmts={c.body} ctx={ctx} depth={depth + 1} />
@@ -384,11 +391,97 @@ const Row = memo(function Row({ s, ctx, depth }: { s: Stmt; ctx: Ctx; depth: num
     <div ref={ref} className={cls} {...dragProps}>
       <span className="sp-play-space" />
       {handle}
-      <RawLine at={s.span.start} ctx={ctx} icon={iconFor(s)} summary={summary(s, intl)} />
+      <StageLine s={s} ctx={ctx} icon={iconFor(s)} summary={summary(s, intl)} />
       {tools}
     </div>
   );
 });
+
+/** A stage direction, flow, or value row: a plain sentence that opens a form (FINALIZATION.md §3.1). */
+function StageLine({ s, ctx, icon, summary: sum }: { s: Stmt; ctx: Ctx; icon: string; summary?: string | undefined }) {
+  const intl = useIntl();
+  const model = useStudio((st) => st.model);
+  const chars = useMemo(() => (model ? [...model.check.characters.values()] : []), [model]);
+  const form = useMemo(() => formOf(s), [s]);
+  const call = useMemo(() => (model ? invokeFormOf(s, model.check) : null), [s, model]);
+  const l = lineAt(ctx.text, s.span.start);
+  const [mode, setMode] = useState<"closed" | "form" | "script">("closed");
+  useEffect(() => {
+    if (pendingFocus && pendingFocus.form && pendingFocus.at === l.start) {
+      pendingFocus = null;
+      setMode(form || call ? "form" : "script");
+    }
+  });
+  if (call && mode !== "script") {
+    return (
+      <>
+        <button className={mode === "form" ? "sp-stage open" : "sp-stage"} aria-expanded={mode === "form"} onClick={() => setMode(mode === "form" ? "closed" : "form")}>
+          <Icon name={icon} size={13} />
+          <span className="sp-stage-text">{describeInvoke(intl, call, chars)}</span>
+        </button>
+        {mode === "form" && (
+          <InvokeEditor
+            form={call}
+            onChange={(f) => ctx.edit(setLineBody(ctx.text, s.span.start, invokeSource(f)), "history.editedStage")}
+            onScript={() => setMode("script")}
+            onClose={() => setMode("closed")}
+          />
+        )}
+      </>
+    );
+  }
+  if (!form || mode === "script") return <RawLine at={s.span.start} ctx={ctx} icon={icon} summary={sum} startEditing={mode === "script"} onDone={() => setMode("closed")} />;
+  return (
+    <>
+      <button className={mode === "form" ? "sp-stage open" : "sp-stage"} aria-expanded={mode === "form"} onClick={() => setMode(mode === "form" ? "closed" : "form")}>
+        <Icon name={icon} size={13} />
+        <span className="sp-stage-text">{describeForm(intl, form, chars)}</span>
+      </button>
+      {mode === "form" && (
+        <StageEditor
+          form={form}
+          onChange={(f) => ctx.edit(setLineBody(ctx.text, s.span.start, formSource(f)), "history.editedStage")}
+          onScript={() => setMode("script")}
+          onClose={() => setMode("closed")}
+        />
+      )}
+    </>
+  );
+}
+
+/** A branch's header: "Only if …", "Otherwise, if …", or "Otherwise", with a form for the condition. */
+function ConditionLine({ at, cond, first, ctx }: { at: number; cond: Expr | null; first: boolean; ctx: Ctx }) {
+  const intl = useIntl();
+  const form = useMemo(() => (cond ? conditionOf(cond) : null), [cond]);
+  const [mode, setMode] = useState<"closed" | "form" | "script">("closed");
+  if (!cond) {
+    return (
+      <span className="sp-stage static">
+        <Icon name="variables" size={13} />
+        <span className="sp-stage-text">
+          <FormattedMessage id="stage.cond.otherwise" />
+        </span>
+      </span>
+    );
+  }
+  if (!form || mode === "script") return <RawLine at={at} ctx={ctx} icon="variables" startEditing={mode === "script"} onDone={() => setMode("closed")} />;
+  return (
+    <>
+      <button className={mode === "form" ? "sp-stage open" : "sp-stage"} aria-expanded={mode === "form"} onClick={() => setMode(mode === "form" ? "closed" : "form")}>
+        <Icon name="variables" size={13} />
+        <span className="sp-stage-text">{intl.formatMessage({ id: first ? "stage.cond.onlyIf" : "stage.cond.otherwiseIf" }, { cond: describeCondition(intl, form) })}</span>
+      </button>
+      {mode === "form" && (
+        <ConditionEditor
+          cond={form}
+          onChange={(c) => ctx.edit(setLineBody(ctx.text, at, `${first ? "if" : "elif"} ${conditionSource(c)}:`), "history.editedStage")}
+          onScript={() => setMode("script")}
+          onClose={() => setMode("closed")}
+        />
+      )}
+    </>
+  );
+}
 
 function iconFor(s: Stmt): string {
   switch (s.kind) {
@@ -526,10 +619,14 @@ function LineText({ at, ctx, onDuplicate, speaker }: { at: number; ctx: Ctx; onD
       el.style.height = `${el.scrollHeight}px`;
     }
   }, [value]);
+  const [focused, setFocused] = useState(false);
   if (!q) return <span className="muted">{l.body}</span>;
   return (
+    <div className="sp-text-wrap">
     <textarea
       ref={ref}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
       className="sp-text"
       rows={1}
       value={value}
@@ -550,14 +647,33 @@ function LineText({ at, ctx, onDuplicate, speaker }: { at: number; ctx: Ctx; onD
         }
       }}
     />
+    {focused && (
+      <TextToolbar
+        target={() => ref.current}
+        value={value}
+        apply={(r) => {
+          ctx.edit(setQuoted(ctx.text, at, r.text), "history.styledText");
+          requestAnimationFrame(() => {
+            ref.current?.focus();
+            ref.current?.setSelectionRange(r.selStart, r.selEnd);
+          });
+        }}
+      />
+    )}
+    {hasMarkup(value) && <StyledPreview display={value} />}
+    </div>
   );
 }
 
 /** A stage direction or flow line: a summary, or its text while editing (click to edit). */
-function RawLine({ at, ctx, icon, summary: sum }: { at: number; ctx: Ctx; icon: string; summary?: string | undefined }) {
+function RawLine({ at, ctx, icon, summary: sum, startEditing, onDone }: { at: number; ctx: Ctx; icon: string; summary?: string | undefined; startEditing?: boolean; onDone?: () => void }) {
   const source = lineBodyWithoutTag(ctx.text, at).replace(/:\s*$/, ":");
   const l = lineAt(ctx.text, at);
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditingState] = useState(startEditing === true);
+  const setEditing = (v: boolean) => {
+    setEditingState(v);
+    if (!v) onDone?.();
+  };
   const [draft, setDraft] = useState(source);
   useEffect(() => {
     if (pendingFocus && pendingFocus.raw && pendingFocus.at === l.start) {
@@ -604,7 +720,14 @@ function RawLine({ at, ctx, icon, summary: sum }: { at: number; ctx: Ctx; icon: 
 function OptionRow({ o, ctx, depth }: { o: MenuOption; ctx: Ctx; depth: number }) {
   const intl = useIntl();
   const preview = useStudio((st) => st.preview);
+  const variables = useStudio((st) => st.model?.check.manifest?.variables) ?? NO_VARIABLES;
+  const hasValues = Object.keys(variables).length > 0;
   const active = o.lineId !== null && preview.line === o.lineId;
+  const [editingCond, setEditingCond] = useState(false);
+  const condForm = useMemo(() => (o.cond ? conditionOf(o.cond) : null), [o.cond]);
+  // The condition exactly as written (so toggling "only once" never rewrites it).
+  const condText = o.cond ? (/"\s*if\s+(.*?)\s*:\s*$/.exec(lineBodyWithoutTag(ctx.text, o.span.start))?.[1] ?? null) : null;
+  const setHead = (once: boolean, cond: string | null) => ctx.edit(setOptionHead(ctx.text, o.span.start, once, cond), "history.editedChoice");
   return (
     <div className="sp-option">
       <div className={`sp-row option${active ? " waiting" : ""}`}>
@@ -617,17 +740,48 @@ function OptionRow({ o, ctx, depth }: { o: MenuOption; ctx: Ctx; depth: number }
         )}
         <span className="sp-option-mark">{o.once ? "◇" : "◆"}</span>
         <LineText at={o.span.start} ctx={ctx} speaker={null} />
-        {o.cond && (
+        {o.cond && condForm && (
+          <button className="sp-chip cond" title={intl.formatMessage({ id: "screenplay.condition" })} onClick={() => setEditingCond(!editingCond)}>
+            {intl.formatMessage({ id: "stage.cond.onlyIf" }, { cond: describeCondition(intl, condForm) })}
+          </button>
+        )}
+        {o.cond && !condForm && (
           <span className="sp-chip cond" title={intl.formatMessage({ id: "screenplay.condition" })}>
-            {lineBodyWithoutTag(ctx.text, o.span.start).replace(/^.*"\s*if\s+/, "if ").replace(/:\s*$/, "")}
+            {intl.formatMessage({ id: "stage.cond.code" }, { code: condText ?? "" })}
           </span>
         )}
         <span className="sp-tools">
+          <button className={o.once ? "small-button on" : "small-button"} aria-pressed={o.once} title={intl.formatMessage({ id: "stage.once.hint" })} onClick={() => setHead(!o.once, condText)}>
+            <FormattedMessage id="stage.once" />
+          </button>
+          {!o.cond && hasValues && (
+            <button className="small-button" onClick={() => {
+              const c = firstCondition(variables);
+              if (c) {
+                setHead(o.once, conditionSource(c));
+                setEditingCond(true);
+              }
+            }}>
+              <FormattedMessage id="stage.cond.add" />
+            </button>
+          )}
           <button className="icon-button" title={intl.formatMessage({ id: "screenplay.delete" })} aria-label={intl.formatMessage({ id: "screenplay.delete" })} onClick={() => ctx.edit(deleteLines(ctx.text, o.span.start, o.span.end), "history.deletedLine")}>
             <Icon name="trash" size={13} />
           </button>
         </span>
       </div>
+      {editingCond && condForm && (
+        <ConditionEditor
+          cond={condForm}
+          onChange={(c) => setHead(o.once, conditionSource(c))}
+          onScript={() => setEditingCond(false)}
+          onClose={() => setEditingCond(false)}
+          onRemove={() => {
+            setHead(o.once, null);
+            setEditingCond(false);
+          }}
+        />
+      )}
       <Body stmts={o.body} ctx={ctx} depth={depth} />
     </div>
   );
@@ -648,17 +802,74 @@ function AddBar({ ctx, after, sceneSpanEnd, indent }: { ctx: Ctx; after: Stmt | 
     ctx.edit(r.text, label);
     setStage(false);
   };
+  // A new stage direction opens as a form, never as text to type.
+  const addStage = (bodies: string[], label: string) => {
+    const r = insertAfter(useStudio.getState().files[ctx.file] ?? ctx.text, end, indent, bodies);
+    pendingFocus = { at: r.at, raw: false, form: true };
+    ctx.edit(r.text, label === "stage.add.onlyIf" ? "history.addedBranch" : "history.addedStage");
+    setStage(false);
+  };
   const firstAsset = (folder: string) => assets.find((a) => a.startsWith(`${folder}/`))?.slice(folder.length + 1).replace(/\.[^.]+$/, "");
   const scenes = model?.scenes.map((s) => s.id) ?? [];
-  const stageItems: [string, string][] = [
-    ["screenplay.add.bg", `bg ${firstAsset("bg") ?? "black"} with fade`],
-    ["screenplay.add.show", `show ${firstChar ?? "someone"} at center`],
-    ["screenplay.add.hide", `hide ${firstChar ?? "someone"}`],
-    ["screenplay.add.music", `music ${firstAsset("music") ?? "theme"}`],
-    ["screenplay.add.sfx", `sfx ${firstAsset("sfx") ?? "chime"}`],
-    ["screenplay.add.wait", "wait 500"],
-    ["screenplay.add.jump", `jump ${scenes[0] ?? "start"}`],
-    ["screenplay.add.end", "end"],
+  const chars = model ? [...model.check.characters.keys()] : [];
+  const variables = model?.check.manifest?.variables ?? {};
+  // A value to remember: the first one the project has, or a new yes/no one.
+  const firstValue = () => {
+    const name = Object.keys(variables).sort()[0];
+    if (name) {
+      const t = variables[name]!.type;
+      return `$ ${name} = ${t === "bool" ? "true" : t === "int" ? "1" : JSON.stringify(variables[name]!.enum?.[0] ?? "")}`;
+    }
+    const fresh = slug(intl.formatMessage({ id: "stage.defaultValueName" })) || "choice_made";
+    newVariable(fresh);
+    return `$ ${fresh} = true`;
+  };
+  const firstCond = () => {
+    const c = firstCondition(variables);
+    if (c) return conditionSource(c);
+    const fresh = slug(intl.formatMessage({ id: "stage.defaultValueName" })) || "choice_made";
+    newVariable(fresh);
+    return fresh;
+  };
+  const stageGroups: { group: string; items: [string, () => string[]][] }[] = [
+    {
+      group: "stage.group.scene",
+      items: [
+        ["screenplay.add.bg", () => [`bg ${firstAsset("bg") ?? "black"} with fade`]],
+        ["stage.add.cg", () => [`cg ${firstAsset("cg") ?? "picture"} with dissolve`]],
+        ["screenplay.add.show", () => [`show ${firstChar ?? "someone"} at center with dissolve`]],
+        ["screenplay.add.hide", () => [`hide ${firstChar ?? "someone"} with dissolve`]],
+        ["stage.add.move", () => [`move ${chars[0] ?? "someone"} at left`]],
+      ],
+    },
+    {
+      group: "stage.group.sound",
+      items: [
+        ["screenplay.add.music", () => [`music ${firstAsset("music") ?? "theme"} fade(1000)`]],
+        ["stage.add.ambient", () => [`ambient ${firstAsset("ambient") ?? "rain"} fade(1000)`]],
+        ["screenplay.add.sfx", () => [`sfx ${firstAsset("sfx") ?? "chime"}`]],
+        ["stage.add.stop", () => ["stop music fade(1000)"]],
+      ],
+    },
+    {
+      group: "stage.group.timing",
+      items: [
+        ["screenplay.add.wait", () => ["wait(500)"]],
+        ["stage.add.shake", () => ["shake"]],
+        ["stage.add.flash", () => ["flash"]],
+        ["stage.add.textbox", () => ["textbox nvl"]],
+      ],
+    },
+    {
+      group: "stage.group.story",
+      items: [
+        ["screenplay.add.jump", () => [`jump ${scenes[0] ?? "start"}`]],
+        ["stage.add.call", () => [`call ${scenes[0] ?? "start"}`]],
+        ["screenplay.add.end", () => ["end"]],
+        ["stage.add.remember", () => [firstValue()]],
+        ["stage.add.onlyIf", () => [`if ${firstCond()}:`, `    "…"`]],
+      ],
+    },
   ];
   return (
     <div className="sp-addbar">
@@ -688,12 +899,18 @@ function AddBar({ ctx, after, sceneSpanEnd, indent }: { ctx: Ctx; after: Stmt | 
           <FormattedMessage id="screenplay.add.stage" />
         </button>
         {stage && (
-          <div className="sp-attr-menu" onMouseLeave={() => setStage(false)}>
-            {stageItems.map(([label, body]) => (
-              <button key={label} className="sp-attr-option" onClick={() => add([body], true, "history.addedStage")}>
-                <FormattedMessage id={label} />
-                <code className="muted small">{body}</code>
-              </button>
+          <div className="sp-attr-menu stage-menu" onMouseLeave={() => setStage(false)}>
+            {stageGroups.map((g) => (
+              <div key={g.group} className="stage-menu-group">
+                <span className="muted small">
+                  <FormattedMessage id={g.group} />
+                </span>
+                {g.items.map(([label, body]) => (
+                  <button key={label} className="sp-attr-option" onClick={() => addStage(body(), label)}>
+                    <FormattedMessage id={label} />
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
         )}
@@ -701,6 +918,23 @@ function AddBar({ ctx, after, sceneSpanEnd, indent }: { ctx: Ctx; after: Stmt | 
       <span className="muted small grow right">{intl.formatMessage({ id: "screenplay.lines" }, { count: countLines(ctx.text) })}</span>
     </div>
   );
+}
+
+const NO_VARIABLES: Readonly<Record<string, { type: string; enum?: string[] }>> = {};
+
+/** Declares a yes/no value in himawari.json (when a form needs one and the project has none). */
+function newVariable(name: string) {
+  const s = useStudio.getState();
+  const text = s.files["himawari.json"];
+  if (!text) return;
+  try {
+    const m = JSON.parse(text) as { variables?: Record<string, unknown> };
+    if (m.variables?.[name]) return;
+    m.variables = { ...(m.variables ?? {}), [name]: { type: "bool", default: false, scope: "save" } };
+    s.edit("himawari.json", `${JSON.stringify(m, null, 2)}\n`, "you", { id: "history.addedVariable", values: { name } });
+  } catch {
+    /* himawari.json has errors: Problems shows them */
+  }
 }
 
 function countLines(text: string): number {

@@ -17,6 +17,14 @@ export interface Settings {
   recentProjects: string[];
   /** The coach mark on the first project ("Type a line. Watch it appear.") was dismissed. */
   coachDone: boolean;
+  /** The assistant panel is open (it starts closed: AI is present but quiet, FINALIZATION.md AI-1). */
+  assistantOpen: boolean;
+  /** The folder the last new project went into (the wizard starts there). */
+  lastProjectFolder: string;
+  /** For people who code (FINALIZATION.md C-7): open scripts in the Script view, and list project files (himawari.json, theme, extensions) in the Explorer. */
+  advanced: { scriptFirst: boolean; showProjectFiles: boolean };
+  /** Export's last choices (FINALIZATION.md OC-5): a zip, and one file instead of a folder (OC-6). */
+  exportAs: { zip: boolean; singleFile: boolean };
   /** AI assistant preferences (layer 3 of the agent instructions, §10.8). */
   ai: {
     model: string;
@@ -37,6 +45,12 @@ export interface AppInfo {
   templates: string[];
   /** Bundled projects available to open (the tutorial and samples). */
   bundled: BundledProject[];
+  /** Studio didn't close normally last time (a crash or power loss): the Welcome screen says what was kept (S-4). */
+  lastExitUnexpected: boolean;
+  /** The folder of Studio's standalone tools (hwc, himawari-mcp), when installed; null in a checkout. */
+  toolsDir: string | null;
+  /** Where new projects go unless the user picks another folder: Documents\\Himawari (FINALIZATION.md D-1). */
+  defaultProjectsDir: string;
 }
 
 /** A text file of the project, project-relative with forward slashes. */
@@ -45,12 +59,36 @@ export interface ProjectFile {
   text: string;
 }
 
+/** Image sizes by path under assets/: [width, height]. */
+export type ImageSizes = Record<string, [number, number]>;
+
 export interface ProjectSnapshot {
   root: string;
   /** himawari.json, script/**\/*.hws, characters/*.md, locales/*.json, extensions/*.schema.json, theme/theme.json, glossary.json, .himawari/notes.json, AGENTS.md. */
   files: ProjectFile[];
   /** Everything under assets/, relative to assets/. */
   assets: string[];
+  /** Background and CG sizes by asset path, for the image hints (FINALIZATION.md W-10). */
+  imageSizes: ImageSizes;
+  /** The project needs a newer Himawari than this Studio (its "engine" range), e.g. "^2.0.0" (FINALIZATION.md S-12). */
+  newerEngine?: string;
+}
+
+/** A save: written, or refused because the file changed outside Studio meanwhile (its text on disk). */
+export type WriteResult = { ok: true } | { ok: false; conflict: string };
+
+/** An earlier version of a file, from the local history (FINALIZATION.md S-2). */
+export interface FileVersion {
+  at: number;
+  reason: "edit" | "delete" | "outside";
+  size: number;
+}
+
+export interface RestorePointInfo {
+  id: string;
+  at: number;
+  label: string;
+  files: number;
 }
 
 export type BundledProject = "tutorial" | "sunflower-demo" | "festival-eve" | "layered";
@@ -87,7 +125,11 @@ export interface BuildReport {
   exe?: string;
   /** The zip, when one was asked for. */
   zip?: string;
+  /** The game is the exe alone (its data inside). */
+  singleFile?: boolean;
   files?: number;
+  /** Worth saying, didn't stop the export (an icon that couldn't be used). */
+  warnings?: string[];
 }
 
 /** Events from the docked runtime (spec/debug-protocol.md). */
@@ -221,6 +263,8 @@ export interface StudioApi {
     openExternal(url: string): Promise<void>;
     /** Shows a file or folder in Explorer. */
     reveal(path: string): Promise<void>;
+    /** Adds the tools folder to the user's PATH so `hwc` works in any terminal (asked for in Settings → Advanced). */
+    addToolsToPath(): Promise<boolean>;
   };
   settings: {
     get(): Promise<Settings>;
@@ -238,8 +282,17 @@ export interface StudioApi {
     /** A project bundled with Studio (the tutorial or a sample), copied to Documents\Himawari so the user owns it. */
     openBundled(name: BundledProject): Promise<ProjectSnapshot>;
     close(): Promise<void>;
-    /** Writes a text file (autosave). Returns the content hash on disk. */
-    write(file: string, text: string): Promise<void>;
+    /** Writes a text file (autosave). Refused (with the disk's text) when the file changed outside Studio meanwhile, unless `force`. */
+    write(file: string, text: string, force?: boolean): Promise<WriteResult>;
+    /** Earlier versions of a text file, newest first, and one of them. */
+    versions(file: string): Promise<FileVersion[]>;
+    version(file: string, at: number): Promise<string | null>;
+    /** Text files deleted from the project that the history can bring back. */
+    deletedFiles(): Promise<{ file: string; at: number }[]>;
+    /** Keeps every text file as a restore point before a wide change; the points, and one point's files. */
+    restorePoint(label: string): Promise<void>;
+    restorePoints(): Promise<RestorePointInfo[]>;
+    restorePointFiles(id: string): Promise<Record<string, string> | null>;
     remove(file: string): Promise<void>;
     rename(from: string, to: string): Promise<void>;
     writeAsset(file: string, bytes: Uint8Array): Promise<void>;
@@ -247,11 +300,15 @@ export interface StudioApi {
     /** Compiles to build/game.hwb (and reloads the preview). */
     build(): Promise<BuildReport>;
     /** Packages build/windows/<Game>/ (plan §14.4). */
-    exportGame(zip: boolean): Promise<BuildReport>;
+    exportGame(zip: boolean, singleFile: boolean): Promise<BuildReport>;
+    /** Starts the exported game (project-relative exe), as a player would. */
+    playExport(exe: string): Promise<void>;
     /** Plays every path headlessly (the coverage overlay on the story graph). */
     playtest(): Promise<PlaytestSummary>;
     /** Files changed outside the renderer: on disk (another program), or by an accepted AI proposal (`origin`). `assets` is null when unchanged. */
     onChanged(listener: (changes: FileChange[], assets: string[] | null, origin?: ChangeOrigin) => void): () => void;
+    /** Background and CG sizes, sent again whenever files under assets/ change. */
+    onImageSizes(listener: (sizes: ImageSizes) => void): () => void;
   };
   preview: {
     start(): Promise<void>;
@@ -291,6 +348,7 @@ export interface StudioApi {
 export const CHANNELS = {
   invoke: "himawari:invoke",
   projectChanged: "himawari:project-changed",
+  projectImageSizes: "himawari:project-image-sizes",
   previewEvent: "himawari:preview-event",
   proposalsChanged: "himawari:proposals-changed",
   assistantEvent: "himawari:assistant-event",

@@ -1,6 +1,6 @@
 # Himawari — Foundations Research
 
-> **Status:** v1.2 · 2026-10-17 (§4.4 and §15 updated with Phase 0 spike results; plan v0.5 is Windows-only, so Linux-specific findings, e.g. cross-compiling in §4.5, are kept for the future Linux work in plan §18.9 but are not on the v1 path)
+> **Status:** v1.3 · 2026-10-20 (§17 added: testing methods for finalization and the "any Windows PC" facts, see FINALIZATION.md). v1.2 · 2026-10-17 (§4.4 and §15 updated with Phase 0 spike results; plan v0.5 is Windows-only, so Linux-specific findings, e.g. cross-compiling in §4.5, are kept for the future Linux work in plan §18.9 but are not on the v1 path)
 > **Purpose:** Find proven, field-tested patterns before committing to designs, so the plan rests on evidence instead of guesses.
 > **Method:** Web research across official docs, specs, source repositories, and practitioner write-ups (October 2026). Each finding is rated:
 > - ✅ **Primary:** official docs, specs, or source code
@@ -438,6 +438,76 @@ Source: Anthropic's current Claude API reference material (official SDK docs bun
 - **Billing:** API keys are billed per token through the developer platform and are separate from consumer chat subscriptions. 💭 That's why plan §10.7 keeps Mode A (external Claude app via MCP) for subscription users.
 - ⚠️ The tool runner is beta, so re-verify the API surface when Phase 4 starts.
 
+## 17. Finalization: Testing a "Common Sense" Product (added 2026-10-20, for FINALIZATION.md)
+
+The question for finalization is different from the earlier ones. It isn't "which library?" but "how do we know the app behaves sensibly for real people, and never loses their work?" These are the methods with the best evidence, and what each one catches.
+
+### 17.1 Usability testing: small, repeated rounds ✅ / ◐
+- **Five users per round, several rounds.** Nielsen's model: each participant reveals about 31 % of the problems, so five find about 85 %. Rather than one 15-person study, run **three rounds of five** with fixes in between: each round checks the fixes and finds the deeper problems the first round hid. ✅ (NN/g)
+- **Distinct user groups need their own testers:** 3–4 per group with two groups. 💭 For Himawari that's English-speaking and Japanese-speaking writers, so a round is 3 + 3 rather than 5.
+- **Metrics need more people.** Quantitative benchmarks need about 20 users (NN/g). With 5–6 per round, the numbers are directional; the observed problems are what count.
+- **Task difficulty, per task: the Single Ease Question (SEQ).** One 7-point question after each task ("Overall, how easy or difficult was this task?"). Average across 400+ tasks: about 5.5, linked to about a 71 % completion rate. ◐ (MeasuringU)
+- **The whole product: the System Usability Scale (SUS).** Ten questions after the session. The average across about 500 studies is 68; **80.3 is the top 10 %**; under 51 is the bottom 15 %. A SUS score isn't a percentage. ◐ (MeasuringU and secondary summaries)
+- **Think-aloud:** participants say what they're thinking while working; the moderator doesn't help. 💭 Standard practice, not re-verified here.
+
+### 17.2 Expert reviews before users see it ◐
+- **Heuristic evaluation** against Nielsen's ten heuristics. The two that matter most for "common sense":
+  - **User control and freedom:** a clearly marked way out of any unwanted state, plus undo and redo.
+  - **Error prevention:** better than a good error message is a design where the problem can't happen; otherwise check and ask before an irreversible action. It separates **slips** (meant one thing, did another: a mis-click) from **mistakes** (a wrong mental model).
+- **Cognitive walkthrough** (Wharton, Rieman, Lewis, Polson, 1994): for each step of a task, ask whether a first-time user
+  1. knows what to do next,
+  2. sees the control for it,
+  3. understands that the control does what they want, and
+  4. gets feedback that it worked.
+
+  It predicts problems rather than observing them, so it comes before user tests, not instead of them.
+
+### 17.3 Never losing work ◐
+- **Atomic saves:** write a temporary file in the same folder, flush it, then rename it over the original. On Windows a plain rename isn't atomic (Go's `natefinch/atomic` uses `MoveFileEx`), and antivirus or sync tools briefly lock files, so writes should **retry on `EPERM`/`EBUSY`/`EACCES`** (as the `atomically` package does). Directory `fsync` fails on some Windows filesystems; treat it as best effort.
+- **Local history** (VS Code, since 1.66): a full copy of a file on each save, with saves within 10 seconds merged, up to 50 per file, kept outside the project; compare and restore from a timeline. ✅ 💭 Himawari's in-memory undo history disappears when Studio closes; a disk-backed history like this covers crashes and "I want yesterday's version".
+- **Cloud-synced folders:** Windows can move Documents into OneDrive (Known Folder Move), and its conflict copies keep both versions without choosing one. ◐ 💭 Himawari's default project folder is `Documents\Himawari`, so on many PCs projects live in OneDrive: test duplicate "conflict" files, files that are online-only, and short locks.
+- **Non-ASCII user names:** Electron apps and games have crashed or failed to find files when the Windows user name has CJK characters (Korean and Japanese reports; fixed upstream in some Electron versions, not in all apps). ◐ 💭 A Japanese user name is a must-test for a Japanese-first tool, in Studio, the CLI, and the runtime (which must use the wide-character Win32 APIs).
+- **Long paths:** `MAX_PATH` (260) limits are lifted only for apps that opt in through their manifest *and* a registry setting. ✅ (Microsoft) 💭 Deep route folders (`script/route_hana/ch10/…`) inside `C:\Users\<name>\OneDrive\Documents\Himawari\<project>\` can get close; test it.
+
+### 17.4 Clean-machine and release testing ✅ / ◐
+- **Windows Sandbox:** a throwaway, clean Windows from a `.wsb` file. Map the installer folder read-only, optionally turn networking off, and run it as the logon command. It's not a full VM: it has no snapshots and doesn't keep its state between runs. ✅ (Microsoft) 💭 This is the cheap first-run test: no developer tools, no runtime build, no network.
+- **Code signing and SmartScreen:** signing doesn't buy instant trust anymore. SmartScreen reputation is per file hash and builds up over downloads; EV certificates stopped bypassing it in 2024. Azure Artifact Signing (formerly Trusted Signing) had a CA rotation in spring 2026 that reset reputation, and its public-trust profile is limited to some countries (reported: USA, Canada, EU, UK). ◐ Plan for a "Windows protected your PC" warning on early releases, and explain it on the download page.
+- **Auto-update:** electron-updater's NSIS updater supports differential downloads and checks the update's code signature (`verifyUpdateCodeSignature`) before installing. ◐ (electron.build docs)
+
+### 17.5 Accessibility checks ✅ / ◐
+- **Automated:** `@axe-core/playwright` runs axe against a Playwright page; scans can target WCAG 2.2 AA (`wcag2a`, `wcag2aa`, `wcag22aa`). 💭 It should work on Studio's Electron window through Playwright's Electron support (the e2e suite already uses it); verify.
+- **Automated tools catch only part of it** (about a third of WCAG criteria are machine-checkable, per one source ◐). Keyboard-only use, focus order, and a screen reader (Narrator) need a person.
+
+### 17.6 What players expect from a VN ✅
+Ren'Py's defaults are the closest thing to a genre standard:
+- Skip passes **read text only** (`skip_unseen = False`), and stops at choices (`skip_after_choices = False`).
+- Auto-forward is off, and a click ends it.
+- Windowed, not fullscreen, by default; the window position is remembered.
+- Audio keeps playing when the window loses focus or is minimized.
+- All transitions shown.
+
+💭 Himawari's runtime already skips read text only, asks before quitting, and has Continue on the title screen. Finalization checks the rest against this list.
+
+### 17.7 "Any Windows PC" and "one file" ✅ / ◐
+- **The C runtime library:** builds that use the Universal CRT (UCRT, which MSYS2 UCRT64 targets) rely on `ucrtbase.dll`, part of Windows 10 and later. Windows 7 SP1, 8, and 8.1 need Microsoft's update KB2999226 to get it. ✅ (Microsoft) 💭 Himawari's static runtime has no other DLL dependencies, so on Windows 10 and 11 it truly needs nothing installed.
+- **Who's left on older Windows:** among Steam users (an opt-in survey of gamers, mid-2026), Windows 11 was about 70–71 % and Windows 10 about 23–24 %, of 94 % on Windows overall. ◐ 💭 Windows 7 and 8.1 are a fraction of a percent, unsupported by Microsoft, and not worth a second C runtime.
+- **Arm laptops:** Windows 11's x64 emulator (Prism) gained AVX/AVX2 in October 2025 (KB5066835) and runs most x64 games. It emulates 64-bit x86 only, which suits Himawari's x64-only build. ◐ (TechRadar, Microsoft blog coverage)
+- **One-file games:** Godot can embed its data pack in the Windows executable ("Embed PCK", up to about 3.9 GB in total). Editing the exe's resources afterwards (rcedit) and embedding conflict unless the order is right. ✅ (Godot docs) / ◐ (forums) 💭 For Himawari: patch the icon and version first, then append the pack, and keep the folder export as the default because patches add separate `patch*.hwp` files.
+- **Idle power:** 💭 a VN spends most of its time waiting for a click; redrawing at the display's refresh rate then wastes battery. Ren'Py has a `gl_powersave` preference, on by default (§17.6). Himawari should redraw only when something changes.
+
+### → Himawari decisions (FINALIZATION.md)
+- **Adopt** three rounds of 5–6 testers (English and Japanese groups), with think-aloud, SEQ per task, and SUS at the end. Targets: SEQ ≥ 5.5 on every core task, SUS ≥ 80, with 68 as the floor.
+- **Adopt** a heuristic evaluation and cognitive walkthroughs of the core tasks before round 1.
+- **Adopt** atomic writes with retries, a disk-backed local history, and Recycle Bin deletes in Studio.
+- **Adopt** a torture-test matrix: a Japanese user name, OneDrive's Documents, long paths, a read-only install folder, a full disk, a killed process mid-save, antivirus scanning, and two Studio windows.
+- **Adopt** Windows Sandbox clean-machine runs for the installer and for exported games.
+- **Adopt** axe-core in the Studio e2e suite, plus a manual keyboard and Narrator pass.
+- **Adapt** Ren'Py's player defaults as the checklist for the runtime.
+- **Avoid** promising "no SmartScreen warning": explain it instead.
+- **Adopt** "any Windows PC" = Windows 10 and 11, x64, with Arm laptops through emulation. **Avoid** Windows 7 and 8.1 (pending the owner's answer).
+- **Adapt** Godot's embedded pack as an optional single-file export: icon and version first, then the pack.
+- **Adopt** redraw-on-change in the runtime, for laptops.
+
 ---
 
 ## Sources
@@ -471,3 +541,11 @@ Source: Anthropic's current Claude API reference material (official SDK docs bun
 - [Tilengine license discussion](https://www.tilengine.org/forum/showthread.php?tid=244) · [GameDev.net engine license thread](https://comic.gamedev.net/forums/topic/700181-license-for-a-game-engine)
 - [Diátaxis at Canonical](https://ubuntu.com/blog/diataxis-a-new-foundation-for-canonical-documentation)
 - Localization formats: [ICU MessageFormat guide](https://simplelocalize.io/blog/posts/what-is-icu/) · [fluent-rs](https://docs.rs/crate/fluent/0.3.0)
+
+**Finalization (§17)**
+- Usability: [NN/g: Why you only need to test with 5 users](https://www.nngroup.com/articles/why-you-only-need-to-test-with-5-users/) · [MeasuringU: SUS](https://www.measuringu.com/sus/) · [MeasuringU: 10 things to know about the SEQ](https://measuringu.com/seq10/) · [Nielsen's heuristics (Decision Lab)](https://thedecisionlab.com/reference-guide/design/nielsens-heuristics) · [Cognitive walkthrough (Wikipedia)](https://en.wikipedia.org/wiki/Cognitive_walkthrough) · [A brief history of cognitive walkthroughs (Adobe)](https://xd.adobe.com/ideas/process/user-testing/cognitive-walkthrough-improve-ux)
+- Data safety: [write-file-atomic](https://openapps.pro/packages/write-file-atomic) · [atomically](https://openapps.pro/packages/atomically) · [natefinch/atomic (Go)](https://beta.pkg.go.dev/github.com/natefinch/atomic) · [VS Code 1.66: local history](https://code.visualstudio.com/updates/v1_66) · [Redirect known folders to OneDrive (Microsoft)](https://learn.microsoft.com/onedrive/redirect-known-folders) · [Maximum path length (Microsoft)](https://learn.microsoft.com/en-ie/Windows/Win32/fileio/maximum-file-path-limitation) · [CJK user name crash report (Electron app)](https://claudeissues.com/issue/41246-bug-claude-desktop-msix-recurring-native-crash-on-windows-with-cjk-username-v1-1)
+- Release: [Windows Sandbox configuration (Microsoft)](https://learn.microsoft.com/en-us/windows/security/application-security/application-isolation/windows-sandbox/windows-sandbox-configure-using-wsb-file) · [EV certificates no longer grant instant reputation (ToDesktop)](https://www.todesktop.com/blog/posts/windows-apps-psa-ev-certs-do-not-grant-immediate-reputation-anymore) · [Code signing from Japan in 2026](https://codenote.net/en/posts/windows-desktop-app-code-signing-distribution-japan-2026/) · [Artifact Signing Q&A (Microsoft)](https://learn.microsoft.com/en-us/answers/questions/5855805/artifact-signing-account-with-public-trust-certifi) · [electron-updater NsisUpdater](https://www.electron.build/docs/api/electron-updater.Class.NsisUpdater)
+- Accessibility: [Playwright accessibility testing](https://playwright.dev/docs/accessibility-testing)
+- Players: [Ren'Py preferences](https://www.renpy.org/doc/html/preferences.html)
+- Any PC: [KB2999226: Universal C Runtime update (Microsoft)](https://support.microsoft.com/kb/2999226) · [Steam survey: Windows 11 past 70 % (Windows Central)](https://www.windowscentral.com/gaming/pc-gaming/windows-11-new-milestone-steam-over-70-percent-share) · [Steam survey, August 2026](https://tech-insider.org/steam-hardware-survey-august-2026/) · [Prism improvements for games (TechRadar)](https://www.techradar.com/computing/windows/it-took-nearly-a-year-but-microsoft-has-finally-improved-windows-11-to-run-more-pc-games-on-arm-laptops) · [Godot: Exporting for Windows](https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_windows.html) · [Godot forum: PCK embedding and rcedit](https://godotforums.org/d/29929-pck-not-being-embedded-in-windows-export-although-the-option-is-checked)

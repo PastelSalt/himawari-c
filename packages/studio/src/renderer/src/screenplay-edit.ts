@@ -98,17 +98,37 @@ export function setSayHead(text: string, offset: number, speaker: string | null,
   return splice(text, l.start + l.indent.length, l.start + q.from, head);
 }
 
-/** Replaces a whole line's content (keeping its indentation and hidden line ID). */
+/** Where a line's trailing line ID or comment starts (with the spaces before it), or the end of the line. */
+function trailerStart(body: string): number {
+  const c = lex(body).tokens.find((t) => t.kind === "LineTag" || t.kind === "Comment");
+  if (!c) return body.length;
+  let s = c.start;
+  while (s > 0 && body[s - 1] === " ") s--;
+  return s;
+}
+
+/**
+ * Replaces a whole line's content, keeping its indentation, its hidden line ID, and any
+ * comment after it (a coder's `# note` survives every form edit).
+ */
 export function setLineBody(text: string, offset: number, body: string): string {
   const l = lineAt(text, offset);
-  const tag = /(\s*#line:[0-9a-hjkmnp-tv-z]{6}.*)$/.exec(l.body);
-  const keep = tag ? tag[1]! : "";
+  const keep = l.body.slice(trailerStart(l.body));
   return splice(text, l.start + l.indent.length, l.end, body.trim() + keep);
 }
 
-/** The editable part of a line: without indentation and without its line ID. */
+/** The editable part of a line: without indentation, its line ID, or a trailing comment. */
 export function lineBodyWithoutTag(text: string, offset: number): string {
-  return lineAt(text, offset).body.replace(/\s*#line:[0-9a-hjkmnp-tv-z]{6}.*$/, "");
+  const body = lineAt(text, offset).body;
+  return body.slice(0, trailerStart(body));
+}
+
+/** A menu option's header with "only once" and its condition set (the quoted text, ID, and comment stay). */
+export function setOptionHead(text: string, offset: number, once: boolean, cond: string | null): string {
+  const l = lineAt(text, offset);
+  const q = quotedOn(l.body);
+  if (!q) return text;
+  return setLineBody(text, offset, `${once ? "once " : ""}${l.body.slice(q.from, q.to)}${cond ? ` if ${cond}` : ""}:`);
 }
 
 /** Inserts lines after the statement ending at `end`, at `indent`. Returns the text and where the first new line starts. */

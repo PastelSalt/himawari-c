@@ -3,10 +3,13 @@
  * `hwc build --release`, §14.4): build/windows/<Game>/<Game>.exe (the
  * runtime), data.hwp (the bytecode and every asset, spec/pack.md), and
  * CREDITS.txt. Later releases can ship a patch pack with only what changed.
+ * A single-file export puts data.hwp inside the exe instead (spec/pack.md §7).
  * Shared by the `build` tool, hwc, and Studio's export.
  */
 import { readFileSync } from "node:fs";
 import { type PackFile, compile, diffForPatch, readPack, writeHwb, writePack } from "@himawari/core";
+import { brandExe } from "./brand.js";
+import { appendPackToExe, embeddedPack } from "./embed.js";
 import type { ProjectFs } from "./fs.js";
 import { check, describeDiagnostics, diagnosticsJson } from "./project.js";
 
@@ -17,6 +20,8 @@ export interface Compiled {
   title: string;
   /** himawari.json `id` (packs are tied to their game). */
   gameId: string;
+  /** himawari.json `version` (for the exe's file properties). */
+  version: string;
 }
 
 export function compileProject(fs: ProjectFs, options: { debug?: boolean } = {}): Compiled {
@@ -24,9 +29,16 @@ export function compileProject(fs: ProjectFs, options: { debug?: boolean } = {})
   const r = compile(c, { debug: options.debug ?? true });
   if (!r.module) {
     const ds = diagnosticsJson(c).filter((d) => d.severity === "error");
-    return { bytes: null, errors: ds.length ? describeDiagnostics(ds) : r.errors.map((e) => `${e.file}: ${e.message}`).join("\n"), title: "", gameId: "" };
+    return { bytes: null, errors: ds.length ? describeDiagnostics(ds) : r.errors.map((e) => `${e.file}: ${e.message}`).join("\n"), title: "", gameId: "", version: "" };
   }
-  return { bytes: writeHwb(r.module), errors: "", title: c.manifest?.name ?? "game", gameId: c.manifest?.id ?? "game" };
+  let version = "1.0.0";
+  try {
+    const v = (JSON.parse(fs.read("himawari.json")) as { version?: unknown }).version;
+    if (typeof v === "string") version = v;
+  } catch {
+    /* the checker already reported it */
+  }
+  return { bytes: writeHwb(r.module), errors: "", title: c.manifest?.name ?? "game", gameId: c.manifest?.id ?? "game", version };
 }
 
 /** A file name from the game's title: letters, digits, spaces, - and _ only. */
@@ -40,10 +52,12 @@ export interface Packaged {
   exe: string;
   /** Files in the folder. */
   files: number;
-  /** The pack written: data.hwp, or patch<N>.hwp for a patch; null when a patch found nothing changed. */
+  /** The pack written: data.hwp, the exe (single file), or patch<N>.hwp for a patch; null when a patch found nothing changed. */
   pack: string | null;
   /** Assets and bytecode in that pack (for a patch: changed and removed ones). */
   entries: number;
+  /** Things that didn't stop the export but are worth saying (an icon that couldn't be used). */
+  warnings: string[];
 }
 
 export interface PackageOptions {
@@ -51,6 +65,10 @@ export interface PackageOptions {
   patch?: boolean;
   /** Light obfuscation of the pack (not DRM). */
   obfuscate?: boolean;
+  /** The game's version for the exe's file properties (himawari.json `version`). */
+  version?: string;
+  /** One file: the pack goes inside the exe instead of data.hwp beside it (FINALIZATION.md OC-6). */
+  singleFile?: boolean;
 }
 
 /** Third-party notices shipped with every game (FreeType's license requires the credit). */
@@ -76,13 +94,20 @@ function packFiles(fs: ProjectFs, bytes: Uint8Array): PackFile[] {
 export function packageGame(fs: ProjectFs, bytes: Uint8Array, title: string, gameId: string, runtimeExe: string, options: PackageOptions = {}): Packaged {
   const name = safeName(title);
   const dir = `build/windows/${name}`;
+  const warnings: string[] = [];
   const files = packFiles(fs, bytes);
-  let pack: string | null = `${dir}/data.hwp`;
+  const exePath = `${dir}/${name}.exe`;
+  let pack: string | null = options.singleFile ? exePath : `${dir}/data.hwp`;
   let entries = files.length;
+  let packBytes: Uint8Array | null = null;
   if (options.patch) {
-    // The merged view of what players already have: data.hwp, then each patch by priority.
+    // The merged view of what players already have: data.hwp (or the pack inside a single-file exe), then each patch by priority.
     const shipped = fs.list(dir, (n) => /^(data|patch\d*)\.hwp$/i.test(n)).map((f) => readPack(new Uint8Array(fs.readBytes(f))));
-    if (!shipped.some((p) => p.priority === 0)) throw new Error(`${dir}/data.hwp isn't there yet: build a full release first, then patches`);
+    if (!shipped.some((p) => p.priority === 0) && fs.exists(exePath)) {
+      const inside = embeddedPack(new Uint8Array(fs.readBytes(exePath)));
+      if (inside) shipped.push(readPack(inside));
+    }
+    if (!shipped.some((p) => p.priority === 0)) throw new Error(`${dir} has no released game yet: build a full release first, then patches`);
     shipped.sort((a, b) => a.priority - b.priority);
     const view = new Map<string, { size: number; crc: number }>();
     for (const p of shipped) {
@@ -96,13 +121,28 @@ export function packageGame(fs: ProjectFs, bytes: Uint8Array, title: string, gam
     const priority = Math.max(...shipped.map((p) => p.priority)) + 1;
     pack = entries ? `${dir}/patch${priority}.hwp` : null;
     if (pack) fs.write(pack, writePack(changed, { gameId, priority, removed, obfuscate: options.obfuscate ?? false }));
+    // A patch leaves the exe as players have it.
+    fs.write(`${dir}/CREDITS.txt`, CREDITS);
+    return { dir, exe: exePath, files: fs.list(dir).length, pack, entries, warnings };
   } else {
-    // A full release: the runtime, one pack, the credits. Loose files from older exports and old patches go.
-    for (const old of fs.list(dir, (n) => n === "game.hwb" || /^patch\d*\.hwp$/i.test(n))) fs.remove(old);
+    // A full release: the runtime, one pack, the credits. Loose files from older exports and old patches go,
+    // and so does data.hwp for a single file (beside the exe, it would win over the pack inside).
+    for (const old of fs.list(dir, (n) => n === "game.hwb" || /^patch\d*\.hwp$/i.test(n) || (options.singleFile === true && n === "data.hwp"))) fs.remove(old);
     for (const old of fs.list(`${dir}/assets`)) fs.remove(old);
-    fs.write(pack, writePack(files, { gameId, obfuscate: options.obfuscate ?? false }));
+    packBytes = writePack(files, { gameId, obfuscate: options.obfuscate ?? false });
+    if (!options.singleFile) fs.write(pack!, packBytes);
   }
-  fs.write(`${dir}/${name}.exe`, readFileSync(runtimeExe));
+  // The exe carries the game's name, version, and icon (assets/icon.png) in its file properties.
+  const icon = fs.exists("assets/icon.png") ? new Uint8Array(fs.readBytes("assets/icon.png")) : undefined;
+  let exe: Uint8Array = new Uint8Array(readFileSync(runtimeExe));
+  try {
+    exe = brandExe(exe, { title, fileName: `${name}.exe`, version: options.version ?? "1.0.0", ...(icon ? { iconPng: icon } : {}) });
+  } catch (e) {
+    warnings.push(`The exe keeps Himawari's icon and details: ${(e as Error).message}.`);
+  }
+  // Branded first, then the pack appended: rewriting the exe's resources would drop what follows it.
+  if (options.singleFile && packBytes) exe = appendPackToExe(exe, packBytes);
+  fs.write(exePath, exe);
   fs.write(`${dir}/CREDITS.txt`, CREDITS);
-  return { dir, exe: `${dir}/${name}.exe`, files: fs.list(dir).length, pack, entries };
+  return { dir, exe: exePath, files: fs.list(dir).length, pack, entries, warnings };
 }

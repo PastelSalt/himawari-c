@@ -20,7 +20,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { studio } from "../api";
 import { LANGUAGE_NAMES } from "../i18n";
-import { useStudio } from "../store";
+import { selectAiAllowed, useStudio } from "../store";
 import { Icon } from "./Icon";
 import { Modal } from "./Modal";
 import { PAGE_SIZE, Pager, pathChoices } from "./Pager";
@@ -68,6 +68,12 @@ export function Localization({ initial }: { initial?: string | undefined }) {
   const [glossaryOpen, setGlossaryOpen] = useState(false);
   const [asking, setAsking] = useState(false);
   const run = useStudio((s) => s.translation);
+  // "Translate with AI" only when AI help is allowed here and set up (FINALIZATION.md T-5).
+  const aiAllowed = useStudio(selectAiAllowed);
+  const [hasKey, setHasKey] = useState(false);
+  useEffect(() => {
+    void studio.assistant.keyStatus().then((k) => setHasKey(k.hasKey));
+  }, []);
 
   const write = (table: L10nTable, label: string, values: Record<string, string> = {}) => {
     if (!file || !lang) return;
@@ -112,6 +118,24 @@ export function Localization({ initial }: { initial?: string | undefined }) {
     write(r.table, "history.importedTranslations", { count: String(r.updated) });
     setMessage(intl.formatMessage({ id: "l10n.imported" }, { updated: r.updated, refused: r.refused.length, unknown: r.unknown.length }));
     setProblems(Object.fromEntries(r.refused.map((x) => [x.id, x.problems])));
+  };
+
+  const [removing, setRemoving] = useState(false);
+  // Stop translating: the language leaves himawari.json and its table goes to the Recycle Bin, in one undo step (T-6).
+  const removeLanguage = (tag: string) => {
+    const text = files["himawari.json"];
+    if (!text) return;
+    try {
+      const m = JSON.parse(text) as { languages?: string[] };
+      m.languages = (m.languages ?? []).filter((l) => l !== tag);
+      const changes: { file: string; text: string | null }[] = [{ file: "himawari.json", text: `${JSON.stringify(m, null, 2)}\n` }];
+      if (files[`locales/${tag}.json`] !== undefined) changes.push({ file: `locales/${tag}.json`, text: null });
+      useStudio.getState().editMany(changes, "you", { id: "history.removedLanguage", values: { lang: tag } });
+      setRemoving(false);
+      setLang(m.languages.find((l) => l !== manifest?.sourceLanguage) ?? null);
+    } catch {
+      /* himawari.json has errors: Problems shows them */
+    }
   };
 
   const addLanguage = () => {
@@ -168,6 +192,22 @@ export function Localization({ initial }: { initial?: string | undefined }) {
               </option>
             ))}
           </select>
+        )}
+        {lang && (
+          <button className="small-button" onClick={() => setRemoving(true)}>
+            <FormattedMessage id="l10n.removeLanguage" values={{ language: LANGUAGE_NAMES[lang] ?? lang }} />
+          </button>
+        )}
+        {removing && lang && (
+          <span className="row small">
+            <FormattedMessage id="l10n.removeConfirm" values={{ language: LANGUAGE_NAMES[lang] ?? lang }} />
+            <button className="small-button" onClick={() => setRemoving(false)}>
+              <FormattedMessage id="common.cancel" />
+            </button>
+            <button className="small-button primary" onClick={() => removeLanguage(lang)}>
+              <FormattedMessage id="l10n.removeYes" />
+            </button>
+          </span>
         )}
         <form
           className="row"
@@ -240,10 +280,12 @@ export function Localization({ initial }: { initial?: string | undefined }) {
             <button onClick={() => setGlossaryOpen((o) => !o)} aria-expanded={glossaryOpen}>
               <FormattedMessage id="l10n.glossary" values={{ count: glossary.length }} />
             </button>
-            <button className="ai-button" disabled={untranslated.length === 0 || running} onClick={() => setAsking(true)}>
-              <Icon name="assistant" size={13} />
-              <FormattedMessage id="l10n.ai.button" values={{ count: untranslated.length }} />
-            </button>
+            {aiAllowed && hasKey && (
+              <button className="ai-button" disabled={untranslated.length === 0 || running} onClick={() => setAsking(true)}>
+                <Icon name="assistant" size={13} />
+                <FormattedMessage id="l10n.ai.button" values={{ count: untranslated.length }} />
+              </button>
+            )}
             <button onClick={() => exportAs("csv")}>
               <FormattedMessage id="l10n.exportCsv" />
             </button>

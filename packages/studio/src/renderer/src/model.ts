@@ -4,6 +4,7 @@
  * index of line IDs, so the preview's current line maps to a file position.
  */
 import { type Diagnostic, LineIndex, type ProjectCheck, type Stmt, checkProject } from "@himawari/core";
+import type { ImageSizes } from "../../shared/api.js";
 
 export interface LineLocation {
   file: string;
@@ -32,7 +33,7 @@ export const isCharacter = (f: string) => f.startsWith("characters/") && f.endsW
 export const isLocale = (f: string) => f.startsWith("locales/") && f.endsWith(".json");
 export const isExtension = (f: string) => f.startsWith("extensions/") && f.endsWith(".schema.json");
 
-export function buildModel(files: Record<string, string>, assets: string[]): ProjectModel {
+export function buildModel(files: Record<string, string>, assets: string[], sizes: ImageSizes = {}): ProjectModel {
   const pick = (test: (f: string) => boolean) =>
     Object.keys(files)
       .filter(test)
@@ -44,6 +45,7 @@ export function buildModel(files: Record<string, string>, assets: string[]): Pro
     characters: pick(isCharacter),
     scripts: pick(isScript),
     assets,
+    assetSizes: new Map(Object.entries(sizes).map(([a, [width, height]]) => [a, { width, height }])),
     locales: pick(isLocale),
     extensions: pick(isExtension),
     ...(files["theme/theme.json"] !== undefined ? { theme: { file: "theme/theme.json", text: files["theme/theme.json"] } } : {}),

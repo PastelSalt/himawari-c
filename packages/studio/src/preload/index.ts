@@ -18,7 +18,7 @@ function listen<A extends unknown[]>(channel: string) {
 }
 
 const api: StudioApi = {
-  app: { info: call("app.info"), openExternal: call("app.openExternal"), reveal: call("app.reveal") },
+  app: { info: call("app.info"), openExternal: call("app.openExternal"), reveal: call("app.reveal"), addToolsToPath: call("app.addToolsToPath") },
   settings: { get: call("settings.get"), set: call("settings.set") },
   dialog: { pickFolder: call("dialog.pickFolder"), pickFile: call("dialog.pickFile"), saveFile: call("dialog.saveFile") },
   project: {
@@ -27,14 +27,22 @@ const api: StudioApi = {
     openBundled: call("project.openBundled"),
     close: call("project.close"),
     write: call("project.write"),
+    versions: call("project.versions"),
+    version: call("project.version"),
+    deletedFiles: call("project.deletedFiles"),
+    restorePoint: call("project.restorePoint"),
+    restorePoints: call("project.restorePoints"),
+    restorePointFiles: call("project.restorePointFiles"),
     remove: call("project.remove"),
     rename: call("project.rename"),
     writeAsset: call("project.writeAsset"),
     readExternal: call("project.readExternal"),
     build: call("project.build"),
     exportGame: call("project.exportGame"),
+    playExport: call("project.playExport"),
     playtest: call("project.playtest"),
     onChanged: listen(CHANNELS.projectChanged),
+    onImageSizes: listen(CHANNELS.projectImageSizes),
   },
   preview: {
     start: call("preview.start"),

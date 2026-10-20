@@ -124,7 +124,7 @@ export const build = defineTool({
     const c = compileProject(ctx.fs, { debug: false });
     if (!c.bytes) throw new ToolError(`The project doesn't compile yet; fix these first:\n${c.errors}`);
     ctx.fs.write("build/game.hwb", c.bytes);
-    const p = packageGame(ctx.fs, c.bytes, c.title, c.gameId, exe);
+    const p = packageGame(ctx.fs, c.bytes, c.title, c.gameId, exe, { version: c.version });
     return { text: `Built ${p.exe} with ${p.pack} (${p.entries} files packed) in ${p.dir}.`, data: { dir: p.dir, exe: p.exe, files: p.files } };
   },
 });

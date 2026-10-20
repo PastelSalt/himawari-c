@@ -1,5 +1,7 @@
 # Using Claude with a Himawari project (Mode A)
 
+AI is **optional** in Himawari: every part of making a game works without it, and nothing AI-related runs unless you ask. This page is for when you want help from Claude.
+
 Himawari works with the AI app you already use: **Claude Code** or the **Claude desktop app** connect to your project through **himawari-mcp**, an MCP server that ships with Himawari. You use your own Claude plan; Himawari runs no servers and sends nothing anywhere. Studio also has a built-in assistant panel (Mode B) that uses your own Anthropic API key: Settings → Built-in assistant.
 
 ## What the AI can and can't do

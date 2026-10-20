@@ -849,6 +849,149 @@ Each run gets deterministic scores: the task itself, no errors afterwards, every
 
 **Checked:** `corepack pnpm check` (396 tests, 725 messages in both languages); the MCP server tests (prompts, the glossary resource, the MCP Apps views); the eval harness with the reference and do-nothing agents; screenshots of the glossary editor, the translate dialog, and the slash-command menu (with a throwaway home and a fake key; nothing was sent). Studio e2e 5/5. No runtime C code changed this session, so ctest and the golden images weren't rerun.
 
+## Session 18: 2026-10-20 · The finalization plan
+**You asked:** for a finalization plan, `FINALIZATION.md`, with "human-like common sense" in how the app behaves. The AI should be an assistant, not the center; translation should be optional; and the plan should list what you might have forgotten, after fresh research on how to test it.
+
+**Your answers:**
+- AI is **present but quiet**.
+- Projects are **one language by default**.
+- Finalization is **merged into the launch phase**.
+- All four kinds of common sense count: safety nets, writer-aware hints, smart defaults, and player-side polish.
+
+**What the plan contains** ([FINALIZATION.md](FINALIZATION.md)):
+- Eight finalization principles (F1–F8), such as "your work is never lost" and "ask only before what can't be undone".
+- The quiet-AI and optional-translation changes.
+- About 50 concrete items, each marked as working, partly there, or new.
+- A "you might have forgotten" list: privacy, Windows realities, updates, shipping, help, Studio's own accessibility, and project hygiene.
+- A test plan: expert review, three usability rounds, torture tests, clean machines, accessibility, players, and dogfooding.
+- The order of work, exit criteria, and seven questions for you.
+
+**Research** (RESEARCH §17, v1.3) covers:
+- Small repeated usability rounds (NN/g), SEQ and SUS benchmarks (MeasuringU).
+- Nielsen's heuristics and cognitive walkthroughs.
+- Atomic writes and local history.
+- Windows pitfalls: OneDrive, CJK user names, long paths.
+- Windows Sandbox, SmartScreen and signing in 2026, axe-core for accessibility, and Ren'Py's player defaults.
+
+**Found while checking the current state:**
+- The assistant panel opens by default.
+- Deletes in Studio are permanent.
+- There's no on-disk history, and nothing stops a second Studio window from opening the same project.
+- The per-project "AI off" switch promised in plan §10.9 was never built (FINALIZATION.md, question 1).
+- Already right: the game skips only read text, asks before quitting, has Continue, and hides the language menu in one-language games.
+
+**Then you added the core concept**, to be written into every related document:
+- Studio should be so easy that nobody needs to code; everything can be done in the UI. You'd noticed parts that still need code.
+- It must still serve people who code, at the same time.
+- Games are in C so they run on any PC.
+- Studio installs in one click with everything it needs, and a game runs by double-clicking its exe.
+
+It's now:
+- FINALIZATION.md v0.2: §1 (the concept, and two kinds of users on one project), §3 (no code needed, code welcome), §4 (any Windows PC), and §5 (one click).
+- Principles P13–P15 in the plan, plus its vision, budgets, export, and packaging sections.
+- The README's opening, CLAUDE.md's non-negotiables, and RESEARCH §17.7.
+
+**Where Studio still needs code** (checked in the source):
+- Stage directions, jumps, variable changes, and conditions show as rows, but editing them means typing script syntax.
+- Text styling (bold, color, furigana, pauses) is typed as markup.
+- Macros and extension calls are edited as text.
+- Project settings are raw `himawari.json`.
+
+**Already right for "any PC":** a static 2.6 MB exe with no DLLs, the UTF-8 code page, long paths, and per-monitor DPI in its manifest.
+
+**Not yet:**
+- The game redraws every frame while waiting for a click (battery).
+- The software-rendering fallback is untested.
+- The installer isn't one-click.
+- `hwc` and the MCP server need Node.
+
+Phase 8 is now about 16–17 weeks. Nothing in the code changed this session.
+
+**Your answers to FINALIZATION.md §13** (same day):
+- A per-project AI-off switch, with "present but quiet" as the default.
+- Sonnet 5.5 as the assistant's default model.
+- CC0 template content, but with Himawari credited.
+- Autosave on quit and at choices.
+- No Windows 7 or 8.1.
+- Folder export by default.
+- A one-click installer.
+
+**The credit:** you suggested asking before export, with the window title ("[title] created using Himawari Studio") as the default. The runtime is zlib-licensed, so credit can be a default but not a requirement. FINALIZATION.md OC-10 now has three choices, asked once per project. My suggestion was a small title-screen line as the default. **Your decision:** make it optional, so nobody is annoyed. The default shows nothing in the game; the title-screen line and the window title are opt-ins. You agreed with the rest and asked to start executing finalization.
+
+## Session 19: 2026-10-20 · Finalization, executed (stages A–D, F, and release tests)
+**You asked:** make crediting optional, use my suggestions for the open questions (testers, signing), install with the usual Windows setup wizard, and carry out the finalization. Two side sessions ran alongside: the runtime's part (`claude/adoring-euler-1f2243`) and the launch documents (`claude/zen-liskov-d64142`). Neither is merged yet.
+
+**Stage A, AI present but quiet, translation optional** (FINALIZATION.md §6, §7):
+- A per-project switch, `"aiHelp": false` in `himawari.json` (schema, Core's `aiHelpAllowed`). With it off, Studio hides the assistant and every AI button, and `himawari-mcp` refuses all tools with a plain message.
+- The assistant starts closed; the AI Proposals tab appears only once there's a proposal; Settings has one "AI help (optional)" section; Sonnet 5.5 is the default model.
+- New projects ask for one language. Localization appears with a second language; "Translate this game…" is in the Explorer and Settings; "Stop translating into X…" removes a language (the table goes to the Recycle Bin, with Undo).
+- The agent guide (1.3) asks AI helpers to use Studio's words with writers.
+
+**Stage B, never losing work** (§8.1):
+- Saves are atomic, and both reads and writes now retry while antivirus or OneDrive holds a file.
+- Local history on disk (outside the project): changes merged over 10 s, 50 versions per file, a Versions dialog per file, Deleted files, and restore points before big changes (three or more files at once, such as accepted proposals).
+- Deletes go to the Recycle Bin, with Undo instead of a confirmation.
+- A change made outside Studio is never overwritten: Studio asks which to keep.
+- One Studio per project; after a crash, the Welcome screen says so. OneDrive conflict copies are explained. Export refuses with under 200 MB free.
+
+**Stage C, no code needed** (§3):
+- Every stage direction opens as a form: backgrounds and CGs with thumbnails, characters with expressions and positions, sound with ▶, waits, textbox modes, jumps and visits, remembering values (new ones from the same form), and conditions built from dropdowns with and/or.
+- Options have "Only once" and "Only if…" toggles. Extension statements and macro calls get forms from their signatures.
+- A text toolbar: bold, italic, color, size, pauses, speed, shake, furigana, remembered values, with a styled preview.
+- Settings → This game edits the manifest (name, version, start scene, screen size, icon, credit, languages); project files stay hidden unless Settings → Advanced shows them.
+- The UI Designer edits the game UI's own words.
+
+**Stage D, any PC and the usual setup** (§4, §5):
+- `himawari-tools.exe`: a Node single executable with `hwc` and the MCP server inside Studio. No Node needed; Settings → Advanced can put `hwc` on PATH (only when you click).
+- Exported exes carry the game's icon, its version, and "Made with Himawari" in their file properties (`resedit`).
+- The first export asks once how to credit Himawari (default: credits only, D60); "Play it" runs the exported game.
+- The NSIS installer is the usual wizard (D61); the built Setup is 152 MB.
+- `scripts/release/clean-machine.mjs` prepares a Windows Sandbox test for you to run once Sandbox is enabled.
+
+**Stage F, common sense** (§8.2, §8.3):
+- Writer hints HW0350–HW0359, all suggestions and never errors:
+  - a one-option menu, or two options with the same text;
+  - a line pasted twice, doubled spaces, or an unclosed bracket;
+  - a silent character, or file names that differ only in case;
+  - a line too long for the textbox;
+  - a background far bigger than the game, or the wrong shape (new today: sizes come from file headers only).
+- "Don't point this out again" mutes a kind of hint per project.
+- New projects default to Documents\Himawari, and the wizard remembers the last folder.
+- Windows keys: Ctrl+S says it's saved automatically, Ctrl+Z undoes the last change, and F5 plays from the start. They're listed in Settings.
+- A "Story" button returns to the script from any tool (the UI Designer hides the Explorer). Problems say "start, line 5"; the code is in the tooltip.
+- Assets has "Gallery and music room": what will unlock, where it first appears, and a button to show that screen in the preview.
+
+**Release tests** (§11):
+- The e2e suite now has a **no-code test**: it adds a line, a choice, and all 17 kinds of stage direction from menus and forms (the Script view is never opened), then checks there are no errors and the game builds.
+- An **axe check**: no serious WCAG 2 A/AA problems on five main screens. It found low contrast on badges, so the light theme's muted, success, warning, and error colors are slightly darker.
+- **Torture tests** (`src/main/torture.test.ts`): a Japanese path, a 300-character path, the clock moved backwards, a file held by another program, and a save cut off half way.
+
+**Bugs the new tests found:**
+- Typing a line and then clicking "Choice" lost the choice: the text toolbar appeared and disappeared, moving the button between mouse-down and mouse-up. The toolbar now floats above the line.
+- A save failed outright while another program held the file, because Studio's read before saving (to spot outside changes) wasn't retried.
+
+**The runtime branch** (side session, committed on `claude/adoring-euler-1f2243`, not merged):
+- No redrawing while idle (CPU 89–96 % → 0–0.2 %); a software-renderer fallback.
+- Autosave on quit, at menus, and on going to the title; window place remembered; "Mute in the background".
+- A pack appended to the exe (single-file games, `appendPackToExe`); the title-screen and window-title credit.
+
+**Then, on your go-ahead, the merge:**
+- Both side branches are merged into main: `claude/adoring-euler-1f2243` (runtime) and `claude/zen-liskov-d64142` (launch documents). These are two merge commits; the session's own work is still uncommitted on top.
+- The only overlap was `spec/manifest.schema.json`, where the branch's copy was ours plus `credit`.
+- **Single-file export (OC-6)** now works end to end:
+  - `packageGame({ singleFile })` brands the exe first, then appends the pack (rewriting resources after would drop it).
+  - It removes a stale `data.hwp`, which would otherwise win over the pack inside.
+  - Patches diff against the pack inside the exe.
+  - In `hwc`: `build --release --single-file`. In Studio: Build → "Put the whole game in one file", remembered with the zip choice (OC-5).
+
+Verified on the merged tree:
+- `corepack pnpm check`: 485 tests, including a new packaging test that exports a single-file game, plays it, and patches it. 1 013 messages are in sync.
+- ctest (debug): 10 of 10.
+- Golden images: 22 of 22.
+- Studio's e2e: 7 of 7. The export test now also makes a single-file game.
+
+Not run: the ASan build. The installer wasn't re-packaged. Session 19's own changes are not committed.
+
 ---
 
 ## Decision Register
@@ -906,6 +1049,20 @@ Each run gets deterministic scores: the task itself, no errors afterwards, every
 | D49 | "Translate with AI" runs in Studio's main process with the assistant's key: Claude Haiku 5.5 by default (Sonnet 5.5 optional), structured outputs, about 40 lines per request, low effort, cached instructions; each batch is one undo step and lands as needs-review | session 17 | ✅ Active |
 | D50 | Recipes are defined once in `@himawari/tools` and served as both MCP prompts and the assistant's slash commands | session 17 | ✅ Active |
 | D51 | MCP Apps views (story graph, scene preview) are experimental and always advertised through `_meta.ui` (the SDK has no capability negotiation for them yet) | session 17 | ✅ Active |
+| D53 | AI is **present but quiet**: the assistant panel starts closed, AI controls are secondary, every AI feature has a human path, and AI never acts unless asked (FINALIZATION.md §2) | session 18 | ✅ Active |
+| D54 | Projects are **one language by default**; Localization and translation tools appear only once a second language is added (FINALIZATION.md §3) | session 18 | ✅ Active |
+| D55 | Finalization is merged into Phase 8, now "Finalization and open-source launch" (≈ 16–17 weeks with the core concept); its plan is FINALIZATION.md | session 18 | ✅ Active |
+| D56 | **No code needed, code welcome** (P13): every language feature gets a UI path (forms, pickers, plain-word conditions, text styling without markup), enforced by a no-code e2e test; text, `hwc`, git, and C extensions stay first-class on the same files | session 18 | ✅ Active |
+| D57 | **Runs on any Windows PC** (P14): Windows 10 and 11 x64 (Arm through emulation); integrated graphics, 4 GB RAM, software fallback; redraw only on change; Windows 7 and 8.1 not supported (pending your answer) | session 18 | ✅ Active |
+| D59 | FINALIZATION.md answers: a per-project AI-off switch ("present but quiet" stays the default); Sonnet 5.5 as the assistant's default model; CC0 template and example content; games autosave on quit and at choices; no Windows 7/8.1; folder export by default; a one-click installer | session 18 | ✅ Active |
+| D60 | Crediting Himawari is **optional** (the runtime stays zlib): asked once per project at the first export. The default shows nothing in the game; `CREDITS.txt` and the exe's properties carry it. Opt-ins: a small title-screen line, or the window title | session 18 | ✅ Active |
+| D61 | Studio installs with **the usual Windows setup wizard** (replacing "one click" in D58): per-user or all-users, a folder choice, and "Run Himawari Studio" at the end; everything inside, nothing else to install | session 19 | ✅ Active |
+| D62 | Writer hints (HW0350–HW0359) are suggestions only, worded like an editor's margin notes; a project mutes a kind with `"quietHints"`; errors and warnings can't be muted. Image hints read only file headers (more than 2× the game's size in either direction, or a shape more than 10 % off) | session 19 | ✅ Active |
+| D63 | `hwc` and `himawari-mcp` ship inside Studio as `himawari-tools.exe`, a Node single executable (Electron's run-as-Node fuse stays off). `hwc` goes on PATH only when you click it in Settings → Advanced | session 19 | ✅ Active |
+| D64 | Local history lives outside the project, in Studio's user data: edits merged over 10 s, 50 versions per file, restore points before changes to three or more files; deletes go to the Recycle Bin with Undo instead of a confirmation | session 19 | ✅ Active |
+| D65 | Studio's e2e suite gates releases on a no-code test (every kind of step from menus and forms) and on axe (no serious or critical WCAG 2 A/AA problems on the main screens) | session 19 | ✅ Active |
+| D66 | The gallery and music room follow the story (`cg` and `music` lines unlock them); Studio lists what will unlock instead of adding switches | session 19 | ✅ Active |
+| D58 | **One click** (P15): ~~a one-click per-user Studio installer~~ (the installer is D61) with everything inside (`hwc` and `himawari-mcp` run through Studio's executable, no Node); export is one button; an optional single-file game | session 18 | ✅ Active |
 | D52 | AI quality is measured by `packages/evals`: deterministic scores, JSON results by date, `TREND.md`; real runs are started by hand with a key (never by default in CI) | session 17 | ✅ Active |
 
 Also: **D13** (games export for Windows x64 only) stays active; its "internal Linux runtime" clause is superseded by D21.
@@ -917,14 +1074,21 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 17)
+## Next Steps (after session 19)
 
-1. **Review session 17 and decide on committing it.** Try it on Festival Eve or Sunflower Days: the Notes tab, the story graph's "Color by" and "Playtest every path", dragging between scenes, Localization's Glossary and "Translate with AI" (with your key: a few lines on Haiku cost well under a cent), and `/` in the assistant.
-2. **The first real eval runs:** `node packages/evals/dist/main.js run --model claude-haiku-5-5` (and Sonnet, Opus), then `trend --write`. Each run costs a few cents to a dollar. Expect to tune the tasks once real answers come in.
-3. Watch the first CI run of Phase 5: the golden suite and the budget step run on GPU-less runners for the first time; if the golden tolerance is too tight there, regenerate references from CI's artifacts or widen it per case.
-4. **The M2 hallway test** (plan §18): a non-programmer creates, writes, previews, localizes one scene, and exports, in English or Japanese, without docs, while an AI contributes through Mode A (a Claude app) and Mode B (the assistant, with your API key). Its findings decide the first Studio fixes. The Phase 6 hallway test (restyle a game in 15 minutes) can run in the same sitting.
-5. Phase 5 follow-ups: a real gamepad test; the ≈ 200 ms GPU renderer start for games with rule wipes; export icon and version patching (plan §14.4, `resedit`); async image decoding; human review of the Chinese and Japanese demo text and the runtime UI strings in Japanese.
-6. Human review of AI-written Japanese: `examples/tutorial`, `examples/festival-eve`, and Studio's own UI and diagnostic messages (`packages/studio/locales/ja.json`, now 720 messages, written by the AI).
-7. Phase 7 follow-ups: glossary matching for inflected forms; serving MCP Apps only to hosts that support them once the SDK says so; an eval task on a big generated project (scripts/stress); the assistant's agent loop in a utility process if long turns ever stutter the UI.
-8. Earlier follow-ups stand: a real PSD/ORA through the importer; the Screenplay block palette and multi-select; a pseudo-locale screenshot diff in CI; the MCP tasks extension; app icon and code signing before v1.0.
-9. **Phase 8: open-source launch** (docs site, signed installer, auto-update, governance), on your go-ahead.
+0. ~~Merge the side sessions' branches~~ ✅ merged in session 19, with single-file export in Studio and `hwc`.
+1. **Commit sessions 18–19** when you've looked them over: try the forms in the Screenplay, Settings → This game, the Versions dialog, and an export (folder and one file). Then re-package the installer (`corepack pnpm --filter @himawari/studio package`) and run ctest under ASan.
+2. **Run the clean-machine test** once Windows Sandbox is on (`node scripts/release/clean-machine.mjs`), and the manual torture tests: a full disk, and online-only OneDrive files.
+3. Finalization items still open (FINALIZATION.md):
+   - NC-9 "Save these steps as…" (macros from a selection).
+   - A volume slider (NC-3).
+   - "he/she/they by a choice" in the toolbar (NC-8).
+   - Per-row "Show as script" (C-3) and "Show line IDs" (C-7).
+   - W-12's mixed "..." and "…", and W-14's renamed-character offer.
+   - Ctrl+Y outside text boxes; D-3 (a game's first language follows Windows); asking about settings on uninstall (OC-9).
+   - A real app icon for Studio itself.
+4. **Usability rounds 1–3** (§11.2) with five or six writers each; the M2 and Phase 6 hallway tests can be round 1.
+5. The first real eval runs (`node packages/evals/dist/main.js run --model claude-haiku-5-5`, then Sonnet and Opus; a few cents to a dollar each), then `trend --write`.
+6. Human review of the Japanese UI (now 1 010 messages) and of AI-written Japanese in the examples.
+7. Before v1.0: code signing (Azure Artifact Signing or an OV certificate); betas ship unsigned with a SmartScreen explanation.
+8. Earlier follow-ups (session 18's list, items 3, 5, 7, 8) still stand.

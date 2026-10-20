@@ -60,7 +60,7 @@ export const TOOLS: readonly ToolDef[] = [
 
 export * from "./registry.js";
 export { ProjectFs, SandboxError } from "./fs.js";
-export { check, describeDiagnostics, diagnosticsJson, findScene, loadInput, revisionOf, type DiagnosticJson } from "./project.js";
+export { check, describeDiagnostics, diagnosticsJson, findScene, imageSizes, loadInput, revisionOf, type DiagnosticJson } from "./project.js";
 export { PROVENANCE_FILE, provenanceNow, readProvenance, stampAi, textHash, type ProvenanceFile } from "./provenance.js";
 export { findRuntime, runRuntime } from "./runtime.js";
 export { compileProject, packageGame, safeName } from "./package.js";

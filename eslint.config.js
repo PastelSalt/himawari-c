@@ -6,7 +6,7 @@ export const himawariPlugin = {
 };
 
 export default tseslint.config(
-  { ignores: ["**/dist/", "**/node_modules/", "runtime/", "**/out/", "**/release/", "**/build-resources/"] },
+  { ignores: ["**/dist/", "**/node_modules/", "runtime/", "**/out/", "**/release/", "**/build-resources/", ".claude/"] },
   ...tseslint.configs.recommended,
   {
     rules: {

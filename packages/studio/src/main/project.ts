@@ -7,9 +7,10 @@
 import { createHash } from "node:crypto";
 import { type FSWatcher, cpSync, existsSync, mkdirSync, watch } from "node:fs";
 import { basename, join, resolve } from "node:path";
-import { ProjectFs, compileProject, initProject, packageGame, safeName } from "@himawari/tools";
+import { LocalHistory } from "./local-history.js";
+import { ProjectFs, compileProject, imageSizes, initProject, packageGame, safeName } from "@himawari/tools";
 import { zipSync } from "fflate";
-import type { BuildReport, FileChange, NewProjectOptions, ProjectFile, ProjectSnapshot } from "../shared/api.js";
+import type { BuildReport, FileChange, ImageSizes, NewProjectOptions, ProjectFile, ProjectSnapshot } from "../shared/api.js";
 
 /** The text files Studio loads and edits. */
 export function isProjectText(file: string): boolean {
@@ -37,6 +38,16 @@ export interface ProjectEvents {
   built(report: BuildReport & { ms: number }): void;
 }
 
+export interface ProjectOptions {
+  /** Studio's data folder: earlier versions of files are kept there (FINALIZATION.md S-2). */
+  historyBase?: string;
+  /** Moves a file to the Recycle Bin (Electron's shell.trashItem); without it, deletes are permanent. */
+  trash?: (fullPath: string) => Promise<void>;
+}
+
+/** What a save did: written, or refused because the file changed outside Studio meanwhile (its text on disk). */
+export type WriteResult = { ok: true } | { ok: false; conflict: string };
+
 export class Project {
   readonly fs: ProjectFs;
   /** What Studio believes is on disk, by content hash (to tell our writes from outside changes). */
@@ -46,13 +57,16 @@ export class Project {
   private watchTimer: NodeJS.Timeout | null = null;
   private buildTimer: NodeJS.Timeout | null = null;
   private assetsCache: string[] = [];
+  readonly history: LocalHistory | null;
 
   constructor(
     root: string,
     private events: ProjectEvents,
+    private options: ProjectOptions = {},
   ) {
     this.fs = new ProjectFs(root);
     if (!this.fs.exists("himawari.json")) throw new Error("This folder has no himawari.json, so it isn't a Himawari project.");
+    this.history = options.historyBase ? new LocalHistory(options.historyBase, this.fs.root) : null;
   }
 
   get root(): string {
@@ -83,25 +97,60 @@ export class Project {
     for (const f of this.fs.list("extensions", (n) => n.endsWith(".schema.json"))) add(f);
     for (const f of ["theme/theme.json", "glossary.json", ".himawari/notes.json"]) if (this.fs.exists(f)) add(f);
     this.assetsCache = this.listAssets();
-    return { root: this.root, files, assets: this.assetsCache };
+    return { root: this.root, files, assets: this.assetsCache, imageSizes: this.imageSizes() };
+  }
+
+  /** Background and CG sizes (read once per file version; see imageSizes in @himawari/tools). */
+  imageSizes(): ImageSizes {
+    const out: ImageSizes = {};
+    for (const [a, s] of imageSizes(this.fs, this.assetsCache)) out[a] = [s.width, s.height];
+    return out;
   }
 
   private listAssets(): string[] {
     return this.fs.list("assets").map((f) => f.slice("assets/".length));
   }
 
-  /** Autosave. Paths are checked by the sandbox (inside the project) and by kind (text files only). */
-  write(file: string, text: string): void {
+    /**
+   * Autosave. Paths are checked by the sandbox (inside the project) and by kind (text files only).
+   * The text on disk before the change is kept in the local history. If the file changed outside
+   * Studio since Studio last saw it, nothing is written and the caller gets the disk's text to
+   * offer a choice (FINALIZATION.md S-6); `force` writes anyway (the user chose theirs).
+   */
+  write(file: string, text: string, force = false): WriteResult {
     if (!isWritableText(file)) throw new Error(`Studio doesn't write "${file}" as text.`);
+    if (this.fs.exists(file)) {
+      const old = this.fs.read(file);
+      const known = this.known.get(file);
+      const outside = known !== undefined && hash(old) !== known;
+      if (outside && !force && old !== text) return { ok: false, conflict: old };
+      if (old !== text) this.history?.save(file, old, outside ? "outside" : "edit");
+    }
     this.fs.write(file, text);
     this.known.set(file, hash(text));
     if (isProjectText(file)) this.scheduleBuild();
+    return { ok: true };
   }
 
-  remove(file: string): void {
+  /** Deletes a file: its text is kept in the local history, and the file goes to the Recycle Bin (S-3). */
+  async remove(file: string): Promise<void> {
     if (!isWritableText(file) && !file.startsWith("assets/")) throw new Error(`Studio doesn't delete "${file}".`);
-    this.fs.remove(file);
+    if (this.fs.exists(file) && isWritableText(file)) this.history?.save(file, this.fs.read(file), "delete");
+    let trashed = false;
+    if (this.options.trash && this.fs.exists(file)) {
+      try {
+        await this.options.trash(this.fs.path(file));
+        trashed = true;
+      } catch {
+        /* no Recycle Bin here (a network drive): the history still has the text */
+      }
+    }
+    if (!trashed) this.fs.remove(file);
     this.known.delete(file);
+    if (file.startsWith("assets/")) {
+      this.assetsCache = this.listAssets();
+      this.events.changed([], this.assetsCache);
+    }
     this.scheduleBuild();
   }
 
@@ -109,8 +158,17 @@ export class Project {
     if (!isWritableText(from) || !isWritableText(to)) throw new Error("Only scripts, characters, and locale files can be renamed here.");
     if (this.fs.exists(to)) throw new Error(`"${to}" already exists.`);
     const text = this.fs.read(from);
-    this.write(to, text);
-    this.remove(from);
+    this.write(to, text, true);
+    this.fs.remove(from);
+    this.known.delete(from);
+  }
+
+  /** Every text file as it is now, kept as a restore point before a wide change (S-8). */
+  restorePoint(label: string): string | null {
+    if (!this.history) return null;
+    const files: Record<string, string> = {};
+    for (const f of this.snapshot().files) files[f.file] = f.text;
+    return this.history.point(label, files);
   }
 
   writeAsset(file: string, bytes: Uint8Array): void {
@@ -145,17 +203,17 @@ export class Project {
   }
 
   /** build/windows/<Game>/, optionally zipped beside it (plan §14.4). */
-  exportGame(runtime: string, zip: boolean): BuildReport {
+  exportGame(runtime: string, zip: boolean, singleFile = false): BuildReport {
     const c = compileProject(this.fs, { debug: false });
     if (!c.bytes) return { ok: false, errors: c.errors };
-    const p = packageGame(this.fs, c.bytes, c.title, c.gameId, runtime);
-    if (!zip) return { ok: true, errors: "", dir: p.dir, exe: p.exe, files: p.files };
+    const p = packageGame(this.fs, c.bytes, c.title, c.gameId, runtime, { version: c.version, singleFile });
+    if (!zip) return { ok: true, errors: "", dir: p.dir, exe: p.exe, files: p.files, warnings: p.warnings, singleFile };
     const entries: Record<string, Uint8Array> = {};
     const name = safeName(c.title);
     for (const f of this.fs.list(p.dir)) entries[`${name}/${f.slice(p.dir.length + 1)}`] = this.fs.readBytes(f);
     const zipFile = `build/windows/${name}.zip`;
     this.fs.write(zipFile, zipSync(entries, { level: 6 }));
-    return { ok: true, errors: "", dir: p.dir, zip: zipFile, exe: p.exe, files: p.files };
+    return { ok: true, errors: "", dir: p.dir, zip: zipFile, exe: p.exe, files: p.files, warnings: p.warnings };
   }
 
   /** Watches for changes made outside Studio. */

@@ -149,6 +149,11 @@ export function Welcome() {
             {error}
           </p>
         )}
+        {info?.lastExitUnexpected && (
+          <p className="info-text" role="status">
+            <FormattedMessage id="safety.crashed" />
+          </p>
+        )}
         {info && !info.runtimeFound && (
           <p className="warning-text">
             <FormattedMessage id="welcome.noRuntime" />

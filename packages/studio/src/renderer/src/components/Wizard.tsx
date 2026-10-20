@@ -17,10 +17,11 @@ export function NewProjectWizard({ onClose, onCreated }: { onClose: () => void; 
   const ui = useStudio((s) => s.settings?.language ?? "en");
   const [step, setStep] = useState(1);
   const [name, setName] = useState("");
-  const [parent, setParent] = useState<string | null>(null);
+  // Where the last project went, or Documents\Himawari: never an empty folder choice (D-1).
+  const remembered = useStudio((s) => s.settings?.lastProjectFolder || s.info?.defaultProjectsDir || null);
+  const [parent, setParent] = useState<string | null>(remembered);
   const [template, setTemplate] = useState<string>("adv");
   const [source, setSource] = useState(ui === "ja" ? "ja" : "en");
-  const [targets, setTargets] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,7 +35,7 @@ export function NewProjectWizard({ onClose, onCreated }: { onClose: () => void; 
     setBusy(true);
     setError(null);
     try {
-      onCreated(await studio.project.create({ parent, name: name.trim(), template, sourceLanguage: source, targetLanguages: targets }));
+      onCreated(await studio.project.create({ parent, name: name.trim(), template, sourceLanguage: source, targetLanguages: [] }));
     } catch (e) {
       setError(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, "") : String(e));
       setBusy(false);
@@ -42,7 +43,6 @@ export function NewProjectWizard({ onClose, onCreated }: { onClose: () => void; 
   };
 
   const canNext = step === 1 ? name.trim().length > 0 && parent !== null : true;
-  const toggle = (l: string) => setTargets((t) => (t.includes(l) ? t.filter((x) => x !== l) : [...t, l]));
 
   return (
     <Modal title={<FormattedMessage id="welcome.newProject" />} onClose={onClose}>
@@ -114,24 +114,9 @@ export function NewProjectWizard({ onClose, onCreated }: { onClose: () => void; 
               ))}
             </select>
           </label>
-          <div className="field">
-            <span>
-              <FormattedMessage id="wizard.targetLanguages" />
-            </span>
-            <div className="checks">
-              {Object.entries(LANGUAGE_NAMES)
-                .filter(([tag]) => tag !== source)
-                .map(([tag, n]) => (
-                  <label key={tag} className="check">
-                    <input type="checkbox" checked={targets.includes(tag)} onChange={() => toggle(tag)} />
-                    {n}
-                  </label>
-                ))}
-            </div>
-            <span className="muted small">
-              <FormattedMessage id="wizard.languages.later" />
-            </span>
-          </div>
+          <p className="muted small">
+            <FormattedMessage id="wizard.languages.later" />
+          </p>
           <div className="field">
             <span>
               <FormattedMessage id="wizard.resolution" />

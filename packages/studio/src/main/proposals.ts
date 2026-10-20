@@ -70,9 +70,10 @@ export class Proposals {
         }
         writes.push({ file: c.file, text: merged });
       }
+      if (writes.length >= 3) project.restorePoint(`AI: ${p.proposal.rationale ?? p.proposal.tool}`);
       for (const c of writes) {
-        if (c.text === null) project.remove(c.file);
-        else project.write(c.file, c.text);
+        if (c.text === null) void project.remove(c.file);
+        else project.write(c.file, c.text, true);
       }
       this.onApplied(writes, p.proposal);
       p.settle({ status: "accepted" });

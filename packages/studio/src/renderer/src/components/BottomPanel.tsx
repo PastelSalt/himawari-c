@@ -1,9 +1,10 @@
 import { LineIndex, NOTES_FILE, type Note, noteAnchor, readNotes, stringifyNotes } from "@himawari/core";
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { FormattedMessage, FormattedTime, useIntl } from "react-intl";
 import { applyFix, useDiagnosticText } from "../diagnostics";
 import { type BottomTab, type HistoryEntry, useStudio } from "../store";
 import { Icon } from "./Icon";
+import { DeletedFilesDialog, RestorePointsDialog } from "./Safety";
 import { PAGE_SIZE, Pager } from "./Pager";
 import { Proposals } from "./Proposals";
 
@@ -19,7 +20,8 @@ export function BottomPanel({ height }: { height: number | undefined }) {
   const tabs: { id: BottomTab; label: React.ReactNode }[] = [
     { id: "problems", label: <FormattedMessage id="panel.problems" values={{ count }} /> },
     { id: "notes", label: <FormattedMessage id="panel.notes" values={{ count: openNotes }} /> },
-    { id: "proposals", label: <FormattedMessage id="panel.proposals" values={{ count: proposals }} /> },
+    // AI Proposals appear only once there is one (FINALIZATION.md AI-2).
+    ...(proposals > 0 || tab === "proposals" ? [{ id: "proposals" as const, label: <FormattedMessage id="panel.proposals" values={{ count: proposals }} /> }] : []),
     { id: "output", label: <FormattedMessage id="panel.output" /> },
     { id: "history", label: <FormattedMessage id="panel.history" /> },
   ];
@@ -43,6 +45,24 @@ export function BottomPanel({ height }: { height: number | undefined }) {
       )}
     </section>
   );
+}
+
+/** A script by its name ("start"), other files by their path: what the writer sees in the Explorer. */
+const plainName = (file: string) => file.replace(/^script\//, "").replace(/\.hws$/, "");
+
+/** "Don't point this out again": the hint's kind joins himawari.json "quietHints" (undo brings it back). */
+function muteHint(code: string) {
+  const s = useStudio.getState();
+  const text = s.files["himawari.json"];
+  if (!text) return;
+  try {
+    const m = JSON.parse(text) as { quietHints?: string[] };
+    m.quietHints = [...new Set([...(m.quietHints ?? []), code])].sort();
+    s.edit("himawari.json", `${JSON.stringify(m, null, 2)}\n`, "you", { id: "history.mutedHint", values: { code } });
+    s.notify({ id: "notice.mutedHint", values: { code } }, true);
+  } catch {
+    /* himawari.json has errors: they're listed above */
+  }
 }
 
 function Problems() {
@@ -76,25 +96,42 @@ function Problems() {
   return (
     <>
     <ul className="problem-list">
-      {rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(({ file, d }, i) => {
+      {rows.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE).map(({ file, d }, i, shown) => {
         const t = text(d);
+        // Hints come after real problems, under their own heading, and each kind can be muted (FINALIZATION.md §8.2).
+        const firstHint = d.severity === "info" && (i === 0 || shown[i - 1]!.d.severity !== "info");
+        const mutable = d.severity === "info" && /^HW03[45]\d$/.test(d.code);
         const source = files[file] ?? "";
         const pos = indexOf(file).at(d.span.start);
         const fix = d.fixes?.[0];
         return (
-          <li key={i} className={`problem ${d.severity}`}>
+          <Fragment key={i}>
+          {firstHint && (
+            <li className="problem-group muted small">
+              <FormattedMessage id="problems.suggestions" />
+            </li>
+          )}
+          <li className={`problem ${d.severity}`}>
             <button className="problem-main" onClick={() => useStudio.getState().revealAt(file, d.span.start)}>
               <Icon name={d.severity === "error" ? "error" : d.severity === "warning" ? "warning" : "info"} size={14} />
               <span className="problem-message">{t.message}</span>
               {t.help && <span className="muted">{t.help}</span>}
-              <span className="problem-where muted">{intl.formatMessage({ id: "problems.where" }, { file, line: pos.line, col: pos.col, code: d.code })}</span>
+              <span className="problem-where muted" title={intl.formatMessage({ id: "problems.whereCode" }, { file, line: pos.line, col: pos.col, code: d.code })}>
+                {intl.formatMessage({ id: "problems.where" }, { file: plainName(file), line: pos.line })}
+              </span>
             </button>
             {fix && (
               <button className="small-button" onClick={() => useStudio.getState().edit(file, applyFix(source, fix.edits), "fix", { id: "history.fixed", values: { code: d.code, file } })}>
                 <FormattedMessage id="diagnostic.applyFix" />
               </button>
             )}
+            {mutable && (
+              <button className="small-button" title={intl.formatMessage({ id: "problems.muteHint" })} onClick={() => muteHint(d.code)}>
+                <FormattedMessage id="problems.mute" />
+              </button>
+            )}
           </li>
+          </Fragment>
         );
       })}
     </ul>
@@ -196,11 +233,30 @@ function Output() {
 function History() {
   const history = useStudio((s) => s.history);
   const [failed, setFailed] = useState<number | null>(null);
+  const [dialog, setDialog] = useState<null | "deleted" | "points">(null);
+  const head = (
+    <div className="row small history-head">
+      <span className="muted grow">
+        <FormattedMessage id="safety.historyHint" />
+      </span>
+      <button className="small-button" onClick={() => setDialog("deleted")}>
+        <FormattedMessage id="safety.deletedButton" />
+      </button>
+      <button className="small-button" onClick={() => setDialog("points")}>
+        <FormattedMessage id="safety.pointsButton" />
+      </button>
+      {dialog === "deleted" && <DeletedFilesDialog onClose={() => setDialog(null)} />}
+      {dialog === "points" && <RestorePointsDialog onClose={() => setDialog(null)} />}
+    </div>
+  );
   if (history.length === 0) {
     return (
-      <p className="muted empty">
-        <FormattedMessage id="history.empty" />
-      </p>
+      <>
+        {head}
+        <p className="muted empty">
+          <FormattedMessage id="history.empty" />
+        </p>
+      </>
     );
   }
   const undo = (h: HistoryEntry) => {
@@ -208,6 +264,8 @@ function History() {
     setFailed(r.ok ? null : h.id);
   };
   return (
+    <>
+    {head}
     <ul className="history-list">
       {[...history].reverse().map((h) => (
         <li key={h.id} className={h.undone ? "history-row undone" : "history-row"}>
@@ -234,5 +292,6 @@ function History() {
         </li>
       ))}
     </ul>
+    </>
   );
 }

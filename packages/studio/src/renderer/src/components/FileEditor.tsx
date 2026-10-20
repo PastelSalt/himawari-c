@@ -2,14 +2,18 @@ import { RenameError, type RenameKind, planRename } from "@himawari/core";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { refAt } from "../editor/assist";
-import { useStudio } from "../store";
+import { selectAiAllowed, useStudio } from "../store";
 import { Icon } from "./Icon";
+import { VersionsDialog } from "./Safety";
 import { Modal } from "./Modal";
 import { Screenplay } from "./Screenplay";
 import { ScriptEditor, playFrom } from "./ScriptEditor";
 
 /** A file in the center pane: scripts get the Screenplay ↔ Script switch (P8); other files are text. */
 export function FileEditor({ file }: { file: string }) {
+  const intl = useIntl();
+  const [versions, setVersions] = useState(false);
+  const aiAllowed = useStudio(selectAiAllowed);
   const view = useStudio((s) => s.view);
   const settings = useStudio((s) => s.settings);
   const exists = useStudio((s) => s.files[file] !== undefined);
@@ -81,7 +85,12 @@ export function FileEditor({ file }: { file: string }) {
           </div>
         )}
         <div className="grow" />
-        {selection && selection.file === file && (
+        <button className="small-button" title={intl.formatMessage({ id: "safety.versionsButtonHint" })} onClick={() => setVersions(true)}>
+          <Icon name="history" size={12} />
+          <FormattedMessage id="safety.versionsButton" />
+        </button>
+        {versions && <VersionsDialog file={file} onClose={() => setVersions(false)} />}
+        {aiAllowed && selection && selection.file === file && (
           <button
             className="small-button"
             onClick={() => useStudio.setState((st) => ({ chat: { ...st.chat, selection, draft: st.chat.draft || "" } }))}

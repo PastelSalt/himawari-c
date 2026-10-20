@@ -111,3 +111,5 @@ export {
   stringifyGlossary,
   translationInstructions,
 } from "./l10n/glossary.js";
+export { aiHelpAllowed, setAiHelp } from "./project/ai-help.js";
+export { IMAGE_HEAD_BYTES, type ImageSize, imageSize } from "./project/image-size.js";

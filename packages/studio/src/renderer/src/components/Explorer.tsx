@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
 import { isExtension, isLocale, isScript } from "../model";
-import { useStudio } from "../store";
+import { selectAiAllowed, useStudio } from "../store";
 import { Icon } from "./Icon";
+import { OneDriveCopies } from "./Safety";
 
 const NAME = /^[a-z_][a-z0-9_]*$/;
 const localeFile = (lang: string) => `locales/${lang}.json`;
@@ -14,6 +15,9 @@ const BIG = 20;
 
 /** Scenes, characters, languages, and project files (plan §11.2). */
 export function Explorer() {
+  const showProjectFiles = useStudio((st) => st.settings?.advanced.showProjectFiles === true);
+  const aiAllowed = useStudio(selectAiAllowed);
+  const newerEngine = useStudio((st) => st.newerEngine);
   const intl = useIntl();
   const files = useStudio((s) => s.files);
   const model = useStudio((s) => s.model);
@@ -94,14 +98,21 @@ export function Explorer() {
     if (current === from) openFile(to);
   };
 
+  // Done at once, with Undo (F7): the file goes to the Recycle Bin and stays in the history.
   const remove = (file: string) => {
-    if (!window.confirm(intl.formatMessage({ id: "explorer.deleteConfirm" }, { file }))) return;
     useStudio.getState().edit(file, null, "you", { id: "history.deletedFile", values: { file } });
+    useStudio.getState().notify({ id: "notice.deleted", values: { file } }, true);
     if (current === file) useStudio.getState().open(null);
   };
 
   return (
     <div className="explorer">
+      <OneDriveCopies />
+      {newerEngine && (
+        <p className="warning-text small explorer-warning">
+          <FormattedMessage id="safety.newerEngine" values={{ engine: newerEngine }} />
+        </p>
+      )}
       <div className="explorer-project" title={root ?? ""}>
         {root?.split(/[\\/]/).pop()}
       </div>
@@ -204,7 +215,7 @@ export function Explorer() {
                               </span>
                             )}
                             <Icon name="file" size={14} />
-                            <span className="grow ellipsis">{nameOf(file)}</span>
+                            <span className="grow ellipsis">{nameOf(file).replace(/\.hws$/, "")}</span>
                             {big && !expanded && scenes.length > 0 && <span className="muted small">{scenes.length}</span>}
                             {errorsIn(file) > 0 && <span className="badge error">{errorsIn(file)}</span>}
                           </button>
@@ -286,6 +297,14 @@ export function Explorer() {
             {locales.includes(localeFile(l)) && <span className="muted small">{localeFile(l)}</span>}
           </button>
         ))}
+        {(model?.check.manifest?.languages.length ?? 0) < 2 && (
+          <button className="tree-row tree-label muted" onClick={() => useStudio.getState().open({ kind: "tool", tool: "localization" })}>
+            <Icon name="plus" size={13} />
+            <span>
+              <FormattedMessage id="explorer.translateGame" />
+            </span>
+          </button>
+        )}
       </div>
 
       <div className="explorer-section">
@@ -294,7 +313,13 @@ export function Explorer() {
             <FormattedMessage id="explorer.project" />
           </span>
         </div>
-        {["himawari.json", "AGENTS.md", "theme/theme.json", ...Object.keys(files).filter(isExtension).sort()]
+        <button className="tree-row tree-label" onClick={() => useStudio.getState().open({ kind: "tool", tool: "settings", arg: "project" })}>
+          <Icon name="settings" size={14} />
+          <span>
+            <FormattedMessage id="explorer.projectSettings" />
+          </span>
+        </button>
+        {(showProjectFiles ? ["himawari.json", "AGENTS.md", "theme/theme.json", ...Object.keys(files).filter(isExtension).sort()] : aiAllowed ? ["AGENTS.md"] : [])
           .filter((f) => files[f] !== undefined)
           .map((f) => (
             <button key={f} className={current === f ? "tree-row tree-label selected" : "tree-row tree-label"} onClick={() => openFile(f)}>

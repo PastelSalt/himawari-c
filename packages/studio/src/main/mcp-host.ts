@@ -13,6 +13,7 @@ import { SESSION_FILE } from "himawari-mcp/studio-link";
 import type { McpStatus, Settings } from "../shared/api.js";
 import type { Project } from "./project.js";
 import type { Proposals } from "./proposals.js";
+import { resources } from "./paths.js";
 
 /** How long a tool call waits for the user before answering "pending" (MCP clients time out eventually). */
 const DECISION_WAIT_MS = 90_000;
@@ -87,7 +88,10 @@ export class McpHost {
     await e?.close();
   }
 
+  /** How a Claude app starts himawari-mcp: Studio's standalone tools program when installed, else Node (a checkout). */
   private serverEntry() {
+    const tools = resources().tools;
+    if (tools) return { command: tools, args: ["mcp", "--project", this.root] };
     return { command: "node", args: [mcpScript(), "--project", this.root] };
   }
 

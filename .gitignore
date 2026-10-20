@@ -27,3 +27,5 @@ examples/*/build/
 
 # Golden images that didn't match (runtime --compare)
 tests/golden/*.actual.png
+packages/studio/build-resources-sea/
+scripts/release/out/

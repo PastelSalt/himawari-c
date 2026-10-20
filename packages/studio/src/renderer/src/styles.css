@@ -16,7 +16,7 @@
   --border: #e3dcd2;
   --border-strong: #d2c9bc;
   --text: #2e2a33;
-  --muted: #716a7a;
+  --muted: #675f70;
   --faint: #aaa3b3;
   --accent: #f5d57c;
   --accent-hover: #f1cb60;
@@ -25,13 +25,13 @@
   --accent-soft: #fdf3d4;
   --accent-line: #efd68e;
   --focus: #dcae3c;
-  --error: #b9414c;
+  --error: #a53a44;
   --error-soft: #fbe3e4;
-  --warning: #a95d1b;
+  --warning: #97521a;
   --warning-soft: #fcebdc;
   --info: #3a6fa8;
   --info-soft: #e2edf9;
-  --ok: #357f57;
+  --ok: #2c6e4c;
   --ok-soft: #dcf1e4;
   --ai: #7556b8;
   --ai-soft: #ece5fa;
@@ -2466,3 +2466,313 @@ details.asset-section > summary {
   flex: none;
   white-space: nowrap;
 }
+
+/* Forms for stage directions, flow, values, and conditions (FINALIZATION.md §3.1). */
+.stage-editor {
+  flex-basis: 100%;
+  margin: 4px 0 8px 52px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.stage-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+.stage-fields .field {
+  margin: 0;
+}
+.stage-thumb {
+  height: 40px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.stage-audio {
+  height: 30px;
+}
+.stage-seconds {
+  width: 72px;
+}
+.stage-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.stage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px 2px 4px;
+  border-radius: 999px;
+}
+.stage-chip.on {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
+.stage-cond {
+  gap: 6px;
+  align-items: center;
+}
+.stage-cond .field {
+  margin: 0;
+}
+.link-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  box-shadow: none;
+  color: var(--muted);
+  padding: 2px 4px;
+}
+.link-button:hover {
+  color: var(--text);
+  background: none;
+}
+.sp-chip.cond.words,
+button.sp-chip.cond {
+  font-family: inherit;
+}
+.sp-stage.static {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sp-stage.open {
+  border-color: var(--border);
+}
+.stage-menu {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.stage-menu-group {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 0;
+}
+.stage-menu-group > span {
+  padding: 4px 10px 2px;
+}
+.small-button.on {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
+
+/* The line editor's style toolbar and preview (FINALIZATION.md NC-8). */
+.sp-text-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+/* Floats above the line, so focusing a line never moves what's under the pointer. */
+.text-toolbar {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 4px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-sm);
+}
+.tt-button {
+  min-width: 28px;
+  padding: 1px 7px;
+  font-size: 12px;
+  border-radius: var(--radius-sm);
+}
+.tt-button.bold {
+  font-weight: 700;
+}
+.tt-button.italic {
+  font-style: italic;
+}
+.tt-button.color {
+  color: var(--ai);
+}
+.tt-panel {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding-left: 6px;
+}
+.tt-swatch {
+  width: 20px;
+  height: 20px;
+  min-width: 0;
+  padding: 0;
+  border-radius: 999px;
+}
+.text-preview {
+  font-size: 13px;
+  color: var(--muted);
+  padding: 0 8px;
+}
+.tp-var {
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--info-soft);
+  color: var(--info);
+}
+.tp-shake {
+  text-decoration: underline wavy;
+}
+.tp-slow {
+  letter-spacing: 0.08em;
+}
+.tp-pause {
+  opacity: 0.6;
+}
+.words-list {
+  max-height: 320px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-right: 4px;
+}
+.sp-text-wrap .sp-text {
+  flex: none;
+  width: 100%;
+}
+
+/* Never losing work (FINALIZATION.md §8.1). */
+.versions {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) 1fr;
+  gap: 12px;
+  max-height: 55vh;
+}
+.version-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.version {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  text-align: left;
+}
+.version.active {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
+.version-peek {
+  margin: 0;
+  padding: 10px;
+  overflow: auto;
+  border-radius: var(--radius);
+  background: var(--bg-2);
+  border: 1px solid var(--border);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+.conflict-sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  max-height: 45vh;
+}
+.conflict-sides > div {
+  min-width: 0;
+  overflow: auto;
+}
+.onedrive-banner,
+.explorer-warning {
+  margin: 6px 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius);
+  background: var(--warning-soft);
+}
+.history-head {
+  padding: 6px 12px;
+  gap: 8px;
+}
+.info-text {
+  color: var(--info);
+}
+.notice {
+  position: fixed;
+  left: 72px;
+  bottom: 36px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px 8px 14px;
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+}
+.credit-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0;
+}
+.credit-choice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+}
+.credit-choice > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.credit-choice.active {
+  background: var(--accent-soft);
+  border-color: var(--accent-line);
+}
+.game-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.problem-group {
+  padding: 8px 12px 2px;
+  list-style: none;
+}
+
+/* Assets: the gallery and music room (NC-14) */
+.extras .extras-group { margin-top: 8px; }
+.extras h3 { font-size: 13px; margin: 0; }
+.extras-list { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.extras-list .link-button { display: inline-flex; gap: 6px; align-items: baseline; }
+
+/* Settings: keyboard shortcuts (D-9) */
+.shortcuts { margin: 0; display: grid; gap: 4px; }
+.shortcuts dt { min-width: 120px; display: flex; gap: 4px; }
+.shortcuts dd { margin: 0; }
+.shortcuts kbd { font: inherit; font-size: 12px; padding: 1px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-3); }
+
+/* Build: a hint under a checkbox's label */
+.block { display: block; }

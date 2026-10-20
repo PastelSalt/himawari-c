@@ -6,6 +6,7 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
+import { aiHelpAllowed } from "@himawari/core";
 import { check, expandCommand, findScene } from "@himawari/tools";
 import { app, safeStorage } from "electron";
 import { readSpecDoc } from "himawari-mcp";
@@ -90,6 +91,7 @@ export class AssistantHost {
     if (!r || typeof r.text !== "string" || !r.text.trim()) throw new Error("Type a message first.");
     const project = this.project();
     if (!project) throw new Error("No project is open.");
+    if (!aiHelpAllowed(project.fs.exists("himawari.json") ? project.fs.read("himawari.json") : null)) throw new Error("AI help is turned off for this project.");
     if (this.abort) throw new Error("The assistant is still answering.");
     const client = this.apiClient();
     const settings = this.settings();

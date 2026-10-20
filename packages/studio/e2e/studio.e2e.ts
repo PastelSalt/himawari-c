@@ -5,11 +5,14 @@
  *  - Play-as-you-write: an edit shows up in the running game in under 1 s (P1).
  *  - Export a Windows game.
  *  - The UI Designer: a preset, then dragging the title buttons.
+ *  - No code needed: every kind of step from menus and forms (FINALIZATION.md §3).
+ *  - Accessibility: axe finds no serious problems on the main screens.
  *  - The UI switches to Japanese.
  * Needs `electron-vite build` and runtime/build/win64-release (or -debug).
  * Run: corepack pnpm --filter @himawari/studio e2e
  */
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -87,10 +90,19 @@ describe("Himawari Studio", () => {
   test("exports a Windows game folder", async () => {
     await page.getByRole("button", { name: "Build and export" }).click();
     await page.getByRole("button", { name: "Export the game" }).click();
+    // The first export asks, once, how to credit Himawari; the default is credits only (D60).
+    await page.getByRole("button", { name: "Export", exact: true }).click();
     await page.getByText(/^Done:/).waitFor({ timeout: 60000 });
+    expect(JSON.parse((await state()).files["himawari.json"] ?? "{}")).toMatchObject({ credit: "none" });
     const dir = join(projects, "Hallway Test", "build", "windows", "Hallway Test");
     expect(readdirSync(dir)).toEqual(expect.arrayContaining(["Hallway Test.exe", "data.hwp", "CREDITS.txt"]));
-  }, 90000);
+    // One file (OC-6): the data goes inside the exe; no second credit question.
+    await page.getByRole("checkbox", { name: /Put the whole game in one file/ }).check();
+    await page.getByRole("button", { name: "Export the game" }).click();
+    await page.getByText(/That one file is the whole game/).waitFor({ timeout: 60000 });
+    expect(readdirSync(dir).sort()).toEqual(["CREDITS.txt", "Hallway Test.exe"]);
+    await page.getByRole("checkbox", { name: /Put the whole game in one file/ }).uncheck();
+  }, 120000);
 
   test("the UI Designer restyles the game (plan §11.6): a preset, then a drag", async () => {
     await page.getByRole("button", { name: "UI Designer", exact: true }).click();
@@ -111,6 +123,64 @@ describe("Himawari Studio", () => {
     expect(theme.layout?.title_menu?.x).toBeLessThan(45);
     expect(s.preview.built?.ok).toBe(true);
   }, 30000);
+
+  test("no code needed: every kind of step added from menus and forms checks clean and plays (FINALIZATION.md §3)", async () => {
+    // The Screenplay only: the Script view is never opened, and nothing is typed except the story's own words.
+    await page.getByRole("button", { name: "Story", exact: true }).click();
+    await page.locator(".explorer").getByText("start", { exact: true }).first().click();
+    await page.locator(".sp-scene").first().waitFor();
+    const addBar = () => page.locator(".sp-addbar").last();
+    const closeForm = async () => {
+      await page.waitForTimeout(150);
+      const done = page.getByRole("button", { name: "Done", exact: true });
+      if ((await done.count()) > 0) await done.first().click();
+    };
+
+    await addBar().getByRole("button", { name: "Line", exact: true }).click();
+    await page.keyboard.insertText("Written without any code.");
+    await addBar().getByRole("button", { name: "Choice", exact: true }).click();
+    const steps = [
+      "Background", "Show a picture (CG)", "Show a character", "Move a character", "Hide a character",
+      "Music", "Background sound", "Sound effect", "Stop music or sound",
+      "Pause", "Shake the screen", "Flash the screen", "Text box style or page",
+      "Remember something", "Only if… (a branch)", "Visit a scene and come back", "Go to scene",
+    ];
+    for (const step of steps) {
+      await addBar().getByRole("button", { name: "Stage direction" }).click();
+      await page.getByRole("button", { name: step, exact: true }).click();
+      await closeForm();
+    }
+
+    const s = await waitFor((x) => (x.files["script/start.hws"] ?? "").includes("jump "), 10000);
+    const script = s.files["script/start.hws"] ?? "";
+    expect(script).toContain("Written without any code.");
+    for (const word of ["menu:", "bg ", "cg ", "show ", "move ", "hide ", "music ", "ambient ", "sfx ", "stop ", "wait(", "shake", "flash", "textbox ", "$ ", "if ", "call ", "jump "]) {
+      expect(script, word).toContain(word);
+    }
+    // No errors (warnings about steps after "The end" are fine), and the game still builds and plays.
+    const errors = await page.evaluate(() => (globalThis as unknown as { __studio: { getState(): { model: { errors: number } | null } } }).__studio.getState().model?.errors);
+    expect(errors).toBe(0);
+    const built = await waitFor((x) => x.preview.built !== null && (x.files["script/start.hws"] ?? "") === script, 10000);
+    expect(built.preview.built?.ok).toBe(true);
+  }, 90000);
+
+  test("accessibility: no serious axe problems on the main screens (FINALIZATION.md §11.5)", async () => {
+    // Evaluated through the debugger protocol, so Studio's content security policy doesn't block it.
+    await page.evaluate(readFileSync(createRequire(import.meta.url).resolve("axe-core/axe.min.js"), "utf8"));
+    const problems: string[] = [];
+    for (const screen of ["Screenplay", "Assets", "Characters", "Build and export", "Settings"]) {
+      if (screen !== "Screenplay") await page.getByRole("button", { name: screen, exact: true }).click();
+      await page.waitForTimeout(300);
+      const found = await page.evaluate(async () => {
+        type Result = { violations: { id: string; impact: string | null; help: string; nodes: { target: string[] }[] }[] };
+        const g = globalThis as unknown as { axe: { run(ctx: unknown, o: object): Promise<Result> }; document: unknown };
+        const r = await g.axe.run(g.document, { runOnly: { type: "tag", values: ["wcag2a", "wcag2aa"] } });
+        return r.violations.filter((v) => v.impact === "serious" || v.impact === "critical").map((v) => `${v.id} (${v.nodes.length}): ${v.help} — ${v.nodes[0]?.target.join(" ")}`);
+      });
+      problems.push(...found.map((f) => `${screen}: ${f}`));
+    }
+    expect(problems).toEqual([]);
+  }, 60000);
 
   test("the UI switches to Japanese", async () => {
     await page.getByRole("button", { name: "Settings", exact: true }).click();

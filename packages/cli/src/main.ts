@@ -44,11 +44,12 @@ Commands:
                          Write locales/ja.csv (or .xlf) for translators
   l10n import <file> --lang ja [--ai]
                          Bring translations back (placeholders are checked)
-  build [--release [--patch]]
+  build [--release [--patch] [--single-file]]
                          Compile the project to build/game.hwb
                          (--release: without debug info, and package a playable
                          build/windows/<Game>/ folder: the runtime and data.hwp;
-                         --patch: only patch<N>.hwp with what changed since then)
+                         --patch: only patch<N>.hwp with what changed since then;
+                         --single-file: the data inside the exe, one file to send)
   run [--warp scene|file:line|#lineid] [--lang xx]
                          Play the project in the runtime (dev mode: F3, F5)
   playtest [--choices "0 1"] [--seed N] [--lang xx] [--out report.json]
@@ -236,7 +237,7 @@ function build(args: readonly string[]): number {
     `✓ ${display(out)}: ${bytes.length} bytes, ${m.scenes.length} scene(s), ${m.lines.length} line(s)${release ? "" : ", with debug info"}`,
   );
   if (release) {
-    const packaged = packageRelease(root, args.includes("--patch"));
+    const packaged = packageRelease(root, args.includes("--patch"), args.includes("--single-file"));
     if (packaged) console.log(packaged);
   }
   return 0;

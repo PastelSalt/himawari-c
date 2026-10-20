@@ -1,4 +1,4 @@
-# Your story starts here. Change any line and play it right away.
+# Your story starts here. Change any line and it plays right away.
 # Missing art never blocks you: Himawari shows a labeled placeholder instead.
 
 scene start:
@@ -9,10 +9,10 @@ scene start:
     menu "What would you like to do?":
         "Tell me how this works.":
             $ talked_about_engine = true
-            aoi "Scenes live in script/, characters in characters/, and pictures and sounds in assets/."
-            aoi "Each line of dialogue is one line in the script, like this one."
+            aoi "Click any line to change it. The game updates as you type."
+            aoi "The buttons under each scene add lines, choices, pictures, and music."
         "Let's just start.":
-            aoi "Great! Open script/start.hws and write your first line."
+            aoi "Great! Click this line and write your own."
     if talked_about_engine:
         aoi "Have fun, and come back if you get stuck!"
     else:

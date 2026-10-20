@@ -15,7 +15,11 @@ function defaults(): Settings {
     appearance: "light",
     recentProjects: [],
     coachDone: false,
-    ai: { model: "claude-opus-5-5", replyLanguage: "", autoAccept: {}, effort: "high" },
+    assistantOpen: false,
+    lastProjectFolder: "",
+    advanced: { scriptFirst: false, showProjectFiles: false },
+    exportAs: { zip: false, singleFile: false },
+    ai: { model: "claude-sonnet-5-5", replyLanguage: "", autoAccept: {}, effort: "high" },
   };
 }
 
@@ -35,6 +39,16 @@ function sanitize(raw: unknown): Settings {
     appearance: APPEARANCES.includes(r["appearance"] as Appearance) ? (r["appearance"] as Appearance) : d.appearance,
     recentProjects: Array.isArray(r["recentProjects"]) ? r["recentProjects"].filter((p): p is string => typeof p === "string").slice(0, 10) : [],
     coachDone: r["coachDone"] === true,
+    assistantOpen: r["assistantOpen"] === true,
+    lastProjectFolder: typeof r["lastProjectFolder"] === "string" ? r["lastProjectFolder"] : "",
+    exportAs: {
+      zip: (r["exportAs"] as Record<string, unknown> | undefined)?.["zip"] === true,
+      singleFile: (r["exportAs"] as Record<string, unknown> | undefined)?.["singleFile"] === true,
+    },
+    advanced: {
+      scriptFirst: (r["advanced"] as Record<string, unknown> | undefined)?.["scriptFirst"] === true,
+      showProjectFiles: (r["advanced"] as Record<string, unknown> | undefined)?.["showProjectFiles"] === true,
+    },
     ai: {
       model: typeof ai["model"] === "string" && ai["model"] ? ai["model"] : d.ai.model,
       replyLanguage: typeof ai["replyLanguage"] === "string" ? ai["replyLanguage"] : "",

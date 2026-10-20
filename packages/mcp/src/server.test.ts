@@ -185,6 +185,20 @@ describe("himawari-mcp", () => {
     expect(JSON.parse((g.contents[0] as { text: string }).text)).toEqual({ terms: [] });
   });
 
+  test("a project with AI help turned off refuses every tool, and works again when it's back on", async () => {
+    const file = join(dir, "himawari.json");
+    const original = readFileSync(file, "utf8");
+    writeFileSync(file, JSON.stringify({ ...(JSON.parse(original) as object), aiHelp: false }));
+    try {
+      const r = await call("project_info");
+      expect(r.isError).toBe(true);
+      expect(JSON.stringify(r.content)).toContain("turned off for this project");
+    } finally {
+      writeFileSync(file, original);
+    }
+    expect((await call("project_info")).isError).toBeFalsy();
+  });
+
   test("MCP Apps (experimental): the graph and preview tools point at self-contained views", async () => {
     const { tools } = await client.listTools();
     const meta = (name: string) => (tools.find((t) => t.name === name)?._meta as { ui?: { resourceUri?: string } } | undefined)?.ui?.resourceUri;

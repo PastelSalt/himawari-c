@@ -1,6 +1,7 @@
 /** Small line icons (24×24, stroke = currentColor). Decorative: buttons carry their own labels. */
 const PATHS: Record<string, string> = {
   plus: "M12 5v14M5 12h14",
+  code: "M8 7l-5 5 5 5M16 7l5 5-5 5",
   folder: "M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z",
   book: "M4 5a2 2 0 0 1 2-2h13v16H6a2 2 0 0 0-2 2zM4 21V5M8 7h7",
   globe: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18",

@@ -24,6 +24,9 @@ extraResources:
     to: spec
   - from: build-resources/mcp
     to: mcp
+  # hwc and himawari-mcp as one standalone program: nothing else to install (FINALIZATION.md OC-3).
+  - from: build-resources/tools
+    to: tools
 win:
   target:
     - target: nsis
@@ -32,11 +35,17 @@ win:
       arch: [x64]
   # Code signing is planned before the public v1.0 (plan §14.5).
   signAndEditExecutable: false
+# The usual Windows setup (FINALIZATION.md OC-1, D61): "for me only" (no admin) or "for everyone",
+# a folder choice, Start menu and desktop shortcuts, and "Run Himawari Studio" at the end.
+# Uninstalling never touches projects; Studio's settings and history stay unless removed by hand.
 nsis:
   oneClick: false
   perMachine: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
+  createStartMenuShortcut: true
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
   artifactName: Himawari-Studio-Setup-${version}.${ext}
 portable:
   artifactName: Himawari-Studio-${version}-portable.${ext}

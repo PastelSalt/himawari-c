@@ -96,6 +96,8 @@ export function Assets() {
         </section>
       )}
 
+      <Extras />
+
       {FOLDERS.map((f) => {
         const files = byFolder(f);
         if (files.length === 0) return null;
@@ -134,6 +136,79 @@ export function Assets() {
       {making && <PlaceholderMaker initial={making} onClose={() => setMaking(null)} />}
       {adding && <AddAsset onClose={() => setAdding(false)} />}
     </div>
+  );
+}
+
+/**
+ * The gallery and music room (FINALIZATION.md NC-14): nothing to set up. Every
+ * picture a `cg` line shows joins the gallery, every song a `music` line plays
+ * joins the music room, and players unlock each by reaching it. This lists what
+ * will be there and where each first appears, and shows the screen in the preview.
+ */
+function Extras() {
+  const model = useStudio((s) => s.model);
+  const ready = useStudio((s) => s.preview.ready);
+  const lists = useMemo(() => {
+    const first = { cg: new Map<string, { file: string; start: number }>(), music: new Map<string, { file: string; start: number }>() };
+    for (const [file, r] of model?.check.parsed ?? []) {
+      for (const ref of r.refs) {
+        if (ref.kind !== "asset" || (ref.channel !== "cg" && ref.channel !== "music")) continue;
+        const seen = first[ref.channel];
+        if (!seen.has(ref.name)) seen.set(ref.name, { file, start: ref.span.start });
+      }
+    }
+    const sceneAt = (file: string, at: number) =>
+      (model?.scenes ?? []).filter((s) => s.file === file && s.start <= at).reduce<string | null>((best, s) => s.id, null);
+    const rows = (m: Map<string, { file: string; start: number }>) =>
+      [...m].map(([name, w]) => ({ name, ...w, scene: sceneAt(w.file, w.start) })).sort((a, b) => a.name.localeCompare(b.name));
+    return { cg: rows(first.cg), music: rows(first.music) };
+  }, [model]);
+  const show = (name: "gallery" | "music") => void studio.preview.command({ cmd: "screen", name });
+  const total = lists.cg.length + lists.music.length;
+  return (
+    <details className="asset-section extras">
+      <summary>
+        <FormattedMessage id="extras.title" />
+        <span className="muted small">{` · ${total}`}</span>
+      </summary>
+      <p className="muted small">
+        <FormattedMessage id="extras.hint" />
+      </p>
+      {total === 0 && (
+        <p className="muted small">
+          <FormattedMessage id="extras.none" />
+        </p>
+      )}
+      {(["cg", "music"] as const).map((kind) =>
+        lists[kind].length === 0 ? null : (
+          <div key={kind} className="extras-group">
+            <div className="row">
+              <h3 className="grow">
+                <FormattedMessage id={kind === "cg" ? "extras.gallery" : "extras.music"} values={{ count: lists[kind].length }} />
+              </h3>
+              <button className="small-button" disabled={!ready} onClick={() => show(kind === "cg" ? "gallery" : "music")}>
+                <Icon name="play" size={12} />
+                <FormattedMessage id="extras.preview" />
+              </button>
+            </div>
+            <ul className="extras-list">
+              {lists[kind].map((r) => (
+                <li key={r.name}>
+                  <button className="link-button" onClick={() => useStudio.getState().revealAt(r.file, r.start)}>
+                    <span>{r.name}</span>
+                    {r.scene && (
+                      <span className="muted small">
+                        <FormattedMessage id="extras.firstAt" values={{ scene: r.scene }} />
+                      </span>
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ),
+      )}
+    </details>
   );
 }
 

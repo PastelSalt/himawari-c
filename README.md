@@ -1,6 +1,13 @@
 # Himawari 🌻
 
-An open-source, AI-assisted **visual novel engine** for developers. Write in plain text, play instantly, ship a small native Windows game.
+An open-source **visual novel engine** that's easy enough for anyone, open enough for coders, and light enough for any PC.
+
+- **No code needed, code welcome.** Himawari Studio is meant to let you make a whole visual novel without writing code: lines, choices, characters, backgrounds, music, branching, and the look of your menus. Everything can be done with pickers and forms. People who code get the same project as plain text, with a command-line tool, git, and C extensions, and both ways can be mixed.
+- **Runs on any Windows PC.** Games are tiny native programs written in C. They start with a double-click on any Windows 10 or 11 PC, old laptops included, with nothing to install.
+- **Easy to set up.** Studio installs with a normal Windows setup and brings everything it needs; exporting a game is one button.
+- **AI is an optional assistant**, never required. It never makes images, audio, or video.
+
+Some of this is still being finished: the finalization plan, [FINALIZATION.md](FINALIZATION.md), lists what's done and what isn't.
 
 > **Status: Phases 0–6 built.** The script language, compiler, and validator (`hwc`), the C runtime (`himawari.exe`, about 2.6 MB, feature-complete: menus, saves, config, accessibility, gamepad, gallery, music room, novel mode, themes, asset packs), the AI tools (`himawari-mcp`), and **Himawari Studio** (the editor, with the game playing beside it as you write) work. Studio's **UI Designer** restyles a game's menus and textbox by hand (move, resize, recolor, presets, a color wheel), and Studio itself comes in light (the default), dark, or Windows's own theme. The hallway tests with non-programmers (Phases 4 and 6) are still to do. See [DETAILED_PLAN.md](DETAILED_PLAN.md) for the full plan and [LOG.md](LOG.md) for progress.
 >

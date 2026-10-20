@@ -2,12 +2,15 @@
 import { createHash } from "node:crypto";
 import {
   type Diagnostic,
+  IMAGE_HEAD_BYTES,
+  type ImageSize,
   LineIndex,
   type ProjectCheck,
   type ProjectInput,
   type Scene,
   type SourceFile,
   checkProject,
+  imageSize,
   lex,
 } from "@himawari/core";
 import type { ProjectFs } from "./fs.js";
@@ -20,16 +23,46 @@ export function revisionOf(text: string): string {
 export function loadInput(fs: ProjectFs): ProjectInput {
   if (!fs.exists("himawari.json")) throw new Error("this folder has no himawari.json (is it a Himawari project?)");
   const read = (file: string): SourceFile => ({ file, text: fs.read(file) });
+  const assets = fs.list("assets").map((f) => f.slice("assets/".length));
   return {
     manifest: read("himawari.json"),
     characters: fs.list("characters", (n) => n.endsWith(".md")).map(read),
     scripts: fs.list("script", (n) => n.endsWith(".hws")).map(read),
-    assets: fs.list("assets").map((f) => f.slice("assets/".length)),
+    assets,
+    assetSizes: imageSizes(fs, assets),
     locales: fs.list("locales", (n) => n.endsWith(".json")).map(read),
     extensions: fs.list("extensions", (n) => n.endsWith(".schema.json")).map(read),
     ...(fs.exists("theme/theme.json") ? { theme: read("theme/theme.json") } : {}),
     ...(fs.exists("glossary.json") ? { glossary: read("glossary.json") } : {}),
   };
+}
+
+/** Image sizes already read, by full path, while the file's size and time are the same. */
+const sizeCache = new Map<string, { stamp: string; size: ImageSize | null }>();
+
+/**
+ * The size of each background and CG (assets/bg, assets/cg), for the "too big" and
+ * "wrong shape" hints (FINALIZATION.md W-10). Reads only each file's head, once.
+ */
+export function imageSizes(fs: ProjectFs, assets: readonly string[]): Map<string, ImageSize> {
+  const out = new Map<string, ImageSize>();
+  for (const a of assets) {
+    if (!/^(bg|cg)\/.+\.(png|jpe?g|webp)$/i.test(a)) continue;
+    const rel = `assets/${a}`;
+    try {
+      const key = fs.path(rel);
+      const stamp = fs.stamp(rel);
+      let hit = sizeCache.get(key);
+      if (hit?.stamp !== stamp) {
+        hit = { stamp, size: imageSize(fs.readHead(rel, IMAGE_HEAD_BYTES)) };
+        sizeCache.set(key, hit);
+      }
+      if (hit.size) out.set(a, hit.size);
+    } catch {
+      /* vanished or locked: no hint for it this time */
+    }
+  }
+  return out;
 }
 
 /** File changes: new text, or null to delete the file. */

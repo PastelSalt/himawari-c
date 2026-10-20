@@ -137,16 +137,18 @@ export function report(root: string, args: readonly string[]): number {
 /**
  * After `hwc build --release`: build/windows/<Game>/ with the runtime and data.hwp, when the
  * runtime can be found. With --patch: patch<N>.hwp with only what changed since the shipped packs.
+ * With --single-file: the pack goes inside the exe (spec/pack.md §7).
  */
-export function packageRelease(root: string, patch: boolean): string {
+export function packageRelease(root: string, patch: boolean, singleFile = false): string {
   const fs = new ProjectFs(root);
   const exe = findRuntime();
   if (!exe) return "note: himawari.exe wasn't found, so only build/game.hwb was written (set HIMAWARI_RUNTIME to package a playable folder)";
   const c = compileProject(fs, { debug: false });
   if (!c.bytes) return "";
   try {
-    const p = packageGame(fs, c.bytes, c.title, c.gameId, exe, { patch });
-    if (patch) return p.pack ? `✓ ${p.pack}: a patch with ${p.entries} changed or removed file(s); ship it beside data.hwp` : "✓ nothing changed since the shipped packs; no patch written";
+    const p = packageGame(fs, c.bytes, c.title, c.gameId, exe, { patch, singleFile, version: c.version });
+    if (patch) return p.pack ? `✓ ${p.pack}: a patch with ${p.entries} changed or removed file(s); ship it beside the game's exe` : "✓ nothing changed since the shipped packs; no patch written";
+    if (singleFile) return `✓ ${p.exe}: the whole game in one file (${p.entries} files packed inside)`;
     return `✓ ${p.exe}: a playable folder in ${p.dir} (${p.pack}, ${p.entries} files packed)`;
   } catch (e) {
     throw new CommandError((e as Error).message);
@@ -166,10 +168,11 @@ function mcpMain(): string | null {
  */
 export function aiSetup(root: string, args: readonly string[]): number {
   if (args[0] !== "setup") throw new CommandError("usage: hwc ai setup [--write]");
-  const main = mcpMain();
-  if (!main) throw new CommandError("himawari-mcp isn't built next to hwc (run corepack pnpm build in the Himawari checkout)");
-  const node = process.execPath;
-  const server = { command: node, args: [main, "--project", root] };
+  // Installed with Studio: hwc and himawari-mcp are one standalone program (no Node needed, FINALIZATION.md OC-3).
+  const tools = process.env["HIMAWARI_TOOLS_EXE"];
+  const main = tools ? null : mcpMain();
+  if (!tools && !main) throw new CommandError("himawari-mcp isn't built next to hwc (run corepack pnpm build in the Himawari checkout)");
+  const server = tools ? { command: tools, args: ["mcp", "--project", root] } : { command: process.execPath, args: [main!, "--project", root] };
   const name = "himawari";
   const mcpJson = `${JSON.stringify({ mcpServers: { [name]: server } }, null, 2)}\n`;
   const fs = new ProjectFs(root);
@@ -184,7 +187,7 @@ export function aiSetup(root: string, args: readonly string[]): number {
       "Connect an AI app to this project (Mode A, your own Claude plan):",
       "",
       "Claude Code (in a terminal, from this folder):",
-      `  claude mcp add ${name} -- ${[node, main, "--project", root].map(quote).join(" ")}`,
+      `  claude mcp add ${name} -- ${[server.command, ...server.args].map(quote).join(" ")}`,
       `  or: hwc ai setup --write   (creates .mcp.json${fs.exists(".mcp.json") ? ", already present" : ""})`,
       "",
       "Claude desktop app: Settings > Developer > Edit Config, and add this inside \"mcpServers\" in claude_desktop_config.json, then restart the app:",

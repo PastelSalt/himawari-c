@@ -4,9 +4,9 @@
  * gives new script lines their hidden line IDs, re-checks the project with
  * Core, and records the change in the unified history (P9).
  */
-import { addLineIds, applyTranslations, collectLines, parseTable, stringifyTable, syncTable } from "@himawari/core";
+import { addLineIds, aiHelpAllowed, applyTranslations, collectLines, parseTable, stringifyTable, syncTable } from "@himawari/core";
 import { create } from "zustand";
-import type { AppInfo, AssistantEvent, AssistantUsage, FileChange, PreviewEvent, ProjectSnapshot, Proposal, Settings, TranslateEvent } from "../../shared/api";
+import type { AppInfo, AssistantEvent, AssistantUsage, FileChange, ImageSizes, PreviewEvent, ProjectSnapshot, Proposal, Settings, TranslateEvent } from "../../shared/api";
 import { studio } from "./api";
 import { type ProjectModel, buildModel, isScript } from "./model";
 import { applyPatch } from "../../shared/patch";
@@ -80,6 +80,9 @@ export interface TranslationRun {
   error: string | null;
 }
 
+/** False when the open project turned AI help off (himawari.json "aiHelp": false). */
+export const selectAiAllowed = (s: { files: Record<string, string> }) => aiHelpAllowed(s.files["himawari.json"]);
+
 const NO_USAGE: AssistantUsage = { inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheWriteTokens: 0, cost: 0 };
 
 export interface OutputLine {
@@ -112,6 +115,18 @@ interface State {
   searchOpen: boolean;
   chat: ChatState;
   translation: TranslationRun | null;
+  /** A save refused because the file changed outside Studio: the writer's text and the disk's. */
+  conflict: { file: string; mine: string; theirs: string } | null;
+  /** Keep the writer's version (write it over the disk's) or the disk's (take it into Studio). */
+  resolveConflict(keep: "mine" | "theirs"): void;
+  /** A short notice with Undo, after an action that's done at once instead of asked about (F7). */
+  notice: { label: HistoryEntry["label"]; undo: number | null; seq: number } | null;
+  /** Shows a notice; `undoLast` offers Undo for the change just made. */
+  notify(label: HistoryEntry["label"], undoLast?: boolean): void;
+  /** The open project needs a newer Himawari ("^2.0.0"): saving here may lose what this Studio doesn't know (S-12). */
+  newerEngine: string | null;
+  /** Background and CG sizes, for the image hints (W-10). */
+  imageSizes: ImageSizes;
   /** The Script view's selection, for "ask about selection". */
   selection: { file: string; text: string } | null;
 
@@ -172,8 +187,8 @@ export const useStudio = create<State>((set, get) => {
     if (modelTimer) clearTimeout(modelTimer);
     modelTimer = setTimeout(() => {
       modelTimer = null;
-      const { files, assets, root } = get();
-      if (root) set({ model: buildModel(files, assets) });
+      const { files, assets, imageSizes, root } = get();
+      if (root) set({ model: buildModel(files, assets, imageSizes) });
     }, delay);
   };
 
@@ -195,9 +210,24 @@ export const useStudio = create<State>((set, get) => {
             recompute(0);
           }
         }
-        studio.project.write(file, text).catch((e: unknown) => get().log("output.saveFailed", { file, reason: String(e) }, "error"));
+        const mine = text;
+        studio.project
+          .write(file, mine)
+          .then((r) => {
+            // The file changed outside Studio meanwhile: nothing was written; the writer chooses (FINALIZATION.md S-6).
+            if (!r.ok) set({ conflict: { file, mine, theirs: r.conflict } });
+          })
+          .catch((e: unknown) => get().log("output.saveFailed", { file, reason: friendlyError(e) }, "error"));
       }, 250),
     );
+  };
+
+  /** "ENOSPC: no space left on device" → words (S-10). */
+  const friendlyError = (e: unknown) => {
+    const m = String(e);
+    if (/ENOSPC/.test(m)) return "the drive is full";
+    if (/EPERM|EACCES|EROFS/.test(m)) return "the file is read-only or locked by another program";
+    return m.replace(/^Error invoking remote method '[^']+': (Error: )?/, "");
   };
 
   const record = (source: Source, label: HistoryEntry["label"], changes: HistoryEntry["changes"], typing = false) => {
@@ -233,13 +263,40 @@ export const useStudio = create<State>((set, get) => {
     searchOpen: false,
     chat: { items: [], running: null, last: null, session: NO_USAGE, draft: "", selection: null },
     translation: null,
+    conflict: null,
+    newerEngine: null,
+    imageSizes: {},
+    notice: null,
+
+    notify(label, undoLast = false) {
+      const last = get().history[get().history.length - 1];
+      set({ notice: { label, undo: undoLast && last ? last.id : null, seq: Date.now() } });
+    },
+
+    resolveConflict(keep) {
+      const c = get().conflict;
+      if (!c) return;
+      set({ conflict: null });
+      if (keep === "mine") {
+        const now = get().files[c.file] ?? c.mine;
+        void studio.project.write(c.file, now, true);
+      } else {
+        get().edit(c.file, c.theirs, "outside", { id: "history.outside", values: { files: c.file } });
+        void studio.project.write(c.file, c.theirs, true);
+      }
+    },
     selection: null,
 
     async init() {
       const [info, settings] = await Promise.all([studio.app.info(), studio.settings.get()]);
-      set({ info, settings });
+      set({ info, settings, view: settings.advanced.scriptFirst ? "script" : "screenplay" });
       // Development builds expose the store to end-to-end tests.
       if (info.dev) (window as unknown as { __studio: typeof useStudio }).__studio = useStudio;
+      studio.project.onImageSizes((imageSizes) => {
+        if (!get().root) return;
+        set({ imageSizes });
+        recompute();
+      });
       studio.project.onChanged((changes, assets, origin) => {
         if (!get().root) return;
         const files = { ...get().files };
@@ -395,6 +452,9 @@ export const useStudio = create<State>((set, get) => {
         proposals: [],
         output: [],
         preview: initialPreview,
+        newerEngine: s.newerEngine ?? null,
+        imageSizes: s.imageSizes,
+        conflict: null,
       });
       void studio.proposals.list().then((proposals) => set({ proposals }));
       void studio.preview.start();
@@ -407,6 +467,7 @@ export const useStudio = create<State>((set, get) => {
         root: null,
         files: {},
         assets: [],
+        imageSizes: {},
         model: null,
         center: null,
         history: [],
@@ -432,6 +493,8 @@ export const useStudio = create<State>((set, get) => {
 
     editMany(changes, source, label) {
       if (changes.length === 0) return;
+      // A wide change (a rename across files, an import): keep a restore point first (S-8).
+      if (changes.length >= 3) void studio.project.restorePoint(JSON.stringify(label));
       const files = { ...get().files };
       const recorded = changes.map((c) => ({ file: c.file, before: files[c.file] ?? null, after: c.text }));
       for (const c of changes) {

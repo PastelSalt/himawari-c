@@ -3,13 +3,15 @@ import { FormattedMessage, useIntl } from "react-intl";
 import type { AssistantKeyStatus, McpStatus, UiLanguage } from "../../../shared/api";
 import { studio } from "../api";
 import { LANGUAGE_NAMES } from "../i18n";
-import { useStudio } from "../store";
+import { setAiHelp } from "@himawari/core";
+import { CREDITS, type Credit, GameIcon, creditOf, setCredit } from "./Credit";
+import { selectAiAllowed, useStudio } from "../store";
 import { ThemeSelect } from "./Welcome";
 
 /** Models for the built-in assistant (plan §10.9). */
 export const MODELS = [
-  { id: "claude-opus-5-5", label: "settings.model.opus" },
   { id: "claude-sonnet-5-5", label: "settings.model.sonnet" },
+  { id: "claude-opus-5-5", label: "settings.model.opus" },
   { id: "claude-haiku-5-5", label: "settings.model.haiku" },
 ] as const;
 
@@ -31,6 +33,17 @@ export function SettingsPage() {
   }, []);
   const set = (patch: Parameters<ReturnType<typeof useStudio.getState>["setSettings"]>[0]) => void useStudio.getState().setSettings(patch);
   const languages: UiLanguage[] = info?.dev ? ["en", "ja", "en-XA"] : ["en", "ja"];
+  const aiAllowed = useStudio(selectAiAllowed);
+  const manifest = useStudio((s) => s.files["himawari.json"]);
+  const [hwcOnPath, setHwcOnPath] = useState(false);
+  const setProjectAi = (allowed: boolean) => {
+    if (manifest === undefined) return;
+    try {
+      useStudio.getState().edit("himawari.json", setAiHelp(manifest, allowed), "you", { id: allowed ? "history.aiHelpOn" : "history.aiHelpOff" });
+    } catch {
+      /* himawari.json has errors: Problems shows them */
+    }
+  };
 
   return (
     <div className="tool-page settings">
@@ -69,10 +82,52 @@ export function SettingsPage() {
         )}
       </section>
 
+      {manifest !== undefined && <ProjectSettings />}
+
+      <Shortcuts />
+
       <section className="card">
         <h3>
-          <FormattedMessage id="settings.connectClaude" />
+          <FormattedMessage id="settings.advanced" />
         </h3>
+        <label className="check">
+          <input type="checkbox" checked={settings.advanced.scriptFirst} onChange={(e) => set({ advanced: { ...settings.advanced, scriptFirst: e.target.checked } })} />
+          <FormattedMessage id="settings.scriptFirst" />
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={settings.advanced.showProjectFiles} onChange={(e) => set({ advanced: { ...settings.advanced, showProjectFiles: e.target.checked } })} />
+          <FormattedMessage id="settings.showProjectFiles" />
+        </label>
+        {info?.toolsDir && (
+          <div className="row wrap">
+            <button className="small-button" onClick={() => void studio.app.addToolsToPath().then(setHwcOnPath)}>
+              <FormattedMessage id="settings.hwcPath" />
+            </button>
+            <span className="muted small">
+              <FormattedMessage id={hwcOnPath ? "settings.hwcPathDone" : "settings.hwcPathHint"} />
+            </span>
+          </div>
+        )}
+      </section>
+
+      <section className="card">
+        <h3>
+          <FormattedMessage id="settings.aiHelp" />
+        </h3>
+        <p className="muted small">
+          <FormattedMessage id="settings.aiHelpAbout" />
+        </p>
+        {manifest !== undefined && (
+          <label className="check">
+            <input type="checkbox" checked={aiAllowed} onChange={(e) => setProjectAi(e.target.checked)} />
+            <FormattedMessage id="settings.aiHelpProject" />
+          </label>
+        )}
+        {aiAllowed && (
+          <>
+        <h4>
+          <FormattedMessage id="settings.connectClaude" />
+        </h4>
         <p className="muted small">
           <FormattedMessage id="settings.connectClaudeHint" />
         </p>
@@ -121,12 +176,9 @@ export function SettingsPage() {
             <FormattedMessage id="settings.openProjectFirst" />
           </p>
         )}
-      </section>
-
-      <section className="card">
-        <h3>
+        <h4>
           <FormattedMessage id="settings.assistant" />
-        </h3>
+        </h4>
         <p className="muted small">
           <FormattedMessage id="settings.keyBilling" />
         </p>
@@ -219,7 +271,172 @@ export function SettingsPage() {
             ))}
           </div>
         </div>
+          </>
+        )}
       </section>
     </div>
+  );
+}
+
+const RESOLUTIONS: [number, number][] = [
+  [1920, 1080],
+  [1280, 720],
+  [2560, 1440],
+  [3840, 2160],
+];
+
+/** The game's own settings (FINALIZATION.md NC-11), so nobody has to open himawari.json. */
+/** The keyboard shortcuts (FINALIZATION.md D-9). */
+const SHORTCUTS: [keys: string, id: string][] = [
+  ["F5", "shortcuts.play"],
+  ["Ctrl+S", "shortcuts.save"],
+  ["Ctrl+Z", "shortcuts.undo"],
+  ["Ctrl+P", "shortcuts.search"],
+  ["Shift Shift", "shortcuts.searchShift"],
+  ["Esc", "shortcuts.close"],
+];
+
+function Shortcuts() {
+  return (
+    <section className="card">
+      <h3>
+        <FormattedMessage id="shortcuts.title" />
+      </h3>
+      <dl className="shortcuts">
+        {SHORTCUTS.map(([keys, id]) => (
+          <div key={id} className="row">
+            <dt>
+              {keys.split(" ").map((k, i) => (
+                <kbd key={i}>{k}</kbd>
+              ))}
+            </dt>
+            <dd className="muted">
+              <FormattedMessage id={id} />
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  );
+}
+
+function ProjectSettings() {
+  const intl = useIntl();
+  const text = useStudio((s) => s.files["himawari.json"]);
+  const model = useStudio((s) => s.model);
+  const scenes = model?.scenes.map((s) => s.id) ?? [];
+  let m: Record<string, unknown> | null = null;
+  try {
+    m = text ? (JSON.parse(text) as Record<string, unknown>) : null;
+  } catch {
+    m = null;
+  }
+  if (!m) {
+    return (
+      <section className="card">
+        <h3>
+          <FormattedMessage id="settings.project" />
+        </h3>
+        <p className="warning-text small">
+          <FormattedMessage id="settings.projectBroken" />
+        </p>
+      </section>
+    );
+  }
+  const manifest = m;
+  const patch = (fields: Record<string, unknown>, label: string) => {
+    const next = { ...manifest, ...fields };
+    useStudio.getState().edit("himawari.json", `${JSON.stringify(next, null, 2)}\n`, "you", { id: label });
+  };
+  const res = Array.isArray(manifest["resolution"]) ? (manifest["resolution"] as number[]) : [1920, 1080];
+  const resKey = `${res[0]}x${res[1]}`;
+  const languages = Array.isArray(manifest["languages"]) ? (manifest["languages"] as string[]) : [];
+  return (
+    <section className="card" id="project-settings">
+      <h3>
+        <FormattedMessage id="settings.project" />
+      </h3>
+      <div className="grid-2">
+        <label className="field">
+          <span>
+            <FormattedMessage id="settings.projectName" />
+          </span>
+          <input defaultValue={String(manifest["name"] ?? "")} key={String(manifest["name"] ?? "")} onBlur={(e) => e.target.value.trim() && e.target.value !== manifest["name"] && patch({ name: e.target.value.trim() }, "history.projectRenamed")} />
+        </label>
+        <label className="field">
+          <span>
+            <FormattedMessage id="settings.projectVersion" />
+          </span>
+          <input
+            defaultValue={String(manifest["version"] ?? "0.1.0")}
+            key={String(manifest["version"] ?? "")}
+            onBlur={(e) => /^\d+\.\d+\.\d+$/.test(e.target.value.trim()) && e.target.value.trim() !== manifest["version"] && patch({ version: e.target.value.trim() }, "history.projectVersion")}
+          />
+        </label>
+        <label className="field">
+          <span>
+            <FormattedMessage id="settings.projectStart" />
+          </span>
+          <select value={String(manifest["entry"] ?? "")} onChange={(e) => patch({ entry: e.target.value }, "history.projectStart")}>
+            {!scenes.includes(String(manifest["entry"])) && <option value={String(manifest["entry"] ?? "")}>{String(manifest["entry"] ?? "")}</option>}
+            {scenes.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field">
+          <span>
+            <FormattedMessage id="settings.projectResolution" />
+          </span>
+          <select
+            value={resKey}
+            onChange={(e) => {
+              const [w, h] = e.target.value.split("x").map(Number);
+              patch({ resolution: [w, h] }, "history.projectResolution");
+            }}
+          >
+            {!RESOLUTIONS.some(([w, h]) => `${w}x${h}` === resKey) && <option value={resKey}>{`${res[0]} × ${res[1]}`}</option>}
+            {RESOLUTIONS.map(([w, h]) => (
+              <option key={`${w}x${h}`} value={`${w}x${h}`}>
+                {intl.formatMessage({ id: "settings.resolutionOption" }, { w, h })}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="grid-2">
+        <GameIcon />
+        <label className="field">
+          <span>
+            <FormattedMessage id="credit.label" />
+          </span>
+          <select value={creditOf(text) ?? "none"} onChange={(e) => setCredit(e.target.value as Credit)}>
+            {CREDITS.map((c) => (
+              <option key={c} value={c}>
+                {intl.formatMessage({ id: `credit.${c}` })}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="field">
+        <span>
+          <FormattedMessage id="settings.projectLanguages" />
+        </span>
+        <div className="row wrap">
+          {languages.map((l) => (
+            <span key={l} className="badge">
+              {LANGUAGE_NAMES[l] ?? l}
+              {l === manifest["sourceLanguage"] ? ` · ${intl.formatMessage({ id: "explorer.source" })}` : ""}
+            </span>
+          ))}
+          <button className="small-button" onClick={() => useStudio.getState().open({ kind: "tool", tool: "localization" })}>
+            <FormattedMessage id={languages.length > 1 ? "settings.manageLanguages" : "explorer.translateGame"} />
+          </button>
+        </div>
+      </div>
+    </section>
   );
 }

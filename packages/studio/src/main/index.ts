@@ -5,9 +5,11 @@
  * from a custom app:// protocol (not file://), every IPC call checked for its
  * sender and arguments. Fuses are set at packaging (electron-builder.yml).
  */
-import { existsSync } from "node:fs";
+import { existsSync, mkdirSync, rmSync, statfsSync, writeFileSync as writeFileSyncNow } from "node:fs";
 import { readFile, stat, writeFile } from "node:fs/promises";
-import { extname, join, normalize, sep } from "node:path";
+import { execFile, spawn } from "node:child_process";
+import { dirname, extname, join, normalize, sep } from "node:path";
+import { CORE_VERSION } from "@himawari/core";
 import { TOOLS } from "@himawari/tools";
 import { BrowserWindow, Menu, app, dialog, ipcMain, nativeTheme, protocol, session, shell } from "electron";
 import { type BundledProject, CHANNELS, type MethodName, type PreviewEvent, type ProjectSnapshot, type Settings } from "../shared/api.js";
@@ -102,17 +104,36 @@ function send(channel: string, ...args: unknown[]): void {
 
 const emitPreview = (event: PreviewEvent) => send(CHANNELS.previewEvent, event);
 
+/** The engine versions this Studio understands (bytecode 1.1). A project asking for more was made by a newer Himawari. */
+const ENGINE: readonly [number, number] = [1, 1];
+
+function newerEngine(manifestText: string): string | undefined {
+  try {
+    const engine = (JSON.parse(manifestText) as { engine?: unknown }).engine;
+    if (typeof engine !== "string") return undefined;
+    const m = /(\d+)\.(\d+)/.exec(engine);
+    if (!m) return undefined;
+    const [major, minor] = [Number(m[1]), Number(m[2])];
+    return major > ENGINE[0] || (major === ENGINE[0] && minor > ENGINE[1]) ? engine : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function openProject(root: string): Promise<ProjectSnapshot> {
   await closeProject();
   const p = new Project(root, {
-    changed: (changes, assets) => send(CHANNELS.projectChanged, changes, assets),
+    changed: (changes, assets) => {
+      send(CHANNELS.projectChanged, changes, assets);
+      if (assets && project) send(CHANNELS.projectImageSizes, project.imageSizes());
+    },
     built: (report) => {
       emitPreview({ ev: "built", ok: report.ok, errors: report.errors, ms: report.ms });
       if (!report.ok || !project) return;
       if (preview?.running) preview.send({ cmd: "reload" });
       else preview?.start(project.root, previewOptions());
     },
-  });
+  }, { historyBase: app.getPath("userData"), trash: (full) => shell.trashItem(full) });
   project = p;
   previewLang = p.sourceLanguage();
   const snapshot = p.snapshot();
@@ -120,7 +141,8 @@ async function openProject(root: string): Promise<ProjectSnapshot> {
   addRecent(p.root);
   await mcp.start(p.root);
   win?.setTitle(`${snapshot.root.split(/[\\/]/).pop() ?? ""} · Himawari Studio`);
-  return snapshot;
+  const newer = newerEngine(p.fs.read("himawari.json"));
+  return newer ? { ...snapshot, newerEngine: newer } : snapshot;
 }
 
 async function closeProject(): Promise<void> {
@@ -156,7 +178,19 @@ const handlers: Record<MethodName, (...args: unknown[]) => unknown> = {
     runtimeFound: resources().runtime !== null,
     templates: ["adv", "blank"],
     bundled: (Object.entries(resources().projects) as [BundledProject, string][]).filter(([, dir]) => existsSync(join(dir, "himawari.json"))).map(([n]) => n),
+    lastExitUnexpected,
+    defaultProjectsDir: join(documentsDir(), "Himawari"),
+    toolsDir: resources().tools ? dirname(resources().tools!) : null,
   }),
+  // The user asked for `hwc` in terminals: the tools folder joins their own PATH (added, never replacing anything).
+  "app.addToolsToPath": async () => {
+    const tools = resources().tools;
+    if (!tools) return false;
+    const dir = dirname(tools).replaceAll("'", "''");
+    const script = `$d='${dir}'; $p=[Environment]::GetEnvironmentVariable('Path','User'); if (-not (($p -split ';') -contains $d)) { $n = if ($p) { "$p;$d" } else { $d }; [Environment]::SetEnvironmentVariable('Path', $n, 'User') }`;
+    await new Promise<void>((ok, fail) => execFile("powershell.exe", ["-NoProfile", "-NonInteractive", "-Command", script], (e) => (e ? fail(e) : ok())));
+    return true;
+  },
   "app.openExternal": async (url) => {
     const u = new URL(str(url, "url"));
     if (u.protocol !== "https:") throw new Error("Only https links open in the browser.");
@@ -206,7 +240,9 @@ const handlers: Record<MethodName, (...args: unknown[]) => unknown> = {
   "project.create": async (options) => {
     const o = options as Parameters<typeof createProject>[0];
     if (!o || typeof o.parent !== "string" || typeof o.name !== "string" || !Array.isArray(o.targetLanguages)) throw new Error("bad options");
+    mkdirSync(o.parent, { recursive: true });
     const root = createProject(o, resources().templates);
+    setSettings({ lastProjectFolder: o.parent });
     return openProject(root);
   },
   "project.open": (root) => openProject(str(root, "root")),
@@ -218,7 +254,19 @@ const handlers: Record<MethodName, (...args: unknown[]) => unknown> = {
     return openProject(copyBundled(projects[n], documentsDir(), folder));
   },
   "project.close": () => closeProject(),
-  "project.write": (file, text) => needProject().write(str(file, "file"), str(text, "text")),
+  "project.write": (file, text, force) => needProject().write(str(file, "file"), str(text, "text"), force === true),
+  "project.versions": (file) => needProject().history?.list(str(file, "file")) ?? [],
+  "project.version": (file, at) => {
+    if (typeof at !== "number") throw new Error("at must be a number");
+    return needProject().history?.read(str(file, "file"), at) ?? null;
+  },
+  "project.deletedFiles": () => {
+    const p = needProject();
+    return p.history?.deleted((f) => p.fs.exists(f)) ?? [];
+  },
+  "project.restorePoint": (label) => void needProject().restorePoint(str(label, "label")),
+  "project.restorePoints": () => needProject().history?.points() ?? [],
+  "project.restorePointFiles": (id) => needProject().history?.readPoint(str(id, "id")) ?? null,
   "project.remove": (file) => needProject().remove(str(file, "file")),
   "project.rename": (from, to) => needProject().rename(str(from, "from"), str(to, "to")),
   "project.writeAsset": (file, bytes) => {
@@ -258,10 +306,24 @@ const handlers: Record<MethodName, (...args: unknown[]) => unknown> = {
       ms: performance.now() - t0,
     };
   },
-  "project.exportGame": (zip) => {
+  "project.playExport": (exe) => {
+    const p = needProject();
+    const rel = str(exe, "exe");
+    if (!rel.startsWith("build/windows/") || !rel.endsWith(".exe")) throw new Error("Only an exported game can be played from here.");
+    const full = p.fs.path(rel);
+    spawn(full, [], { cwd: dirname(full), detached: true, stdio: "ignore" }).unref();
+  },
+  "project.exportGame": (zip, singleFile) => {
     const runtime = resources().runtime;
     if (!runtime) throw new Error("The Himawari runtime isn't installed with this Studio.");
-    return needProject().exportGame(runtime, zip === true);
+    // Low disk space: say so before writing a game folder (S-10).
+    try {
+      const fs = statfsSync(needProject().root);
+      if (fs.bavail * fs.bsize < 200 * 1024 * 1024) throw new Error("There's less than 200 MB free on this drive. Free some space, then export again.");
+    } catch (e) {
+      if (e instanceof Error && e.message.startsWith("There's less")) throw e;
+    }
+    return needProject().exportGame(runtime, zip === true, singleFile === true);
   },
   "preview.start": () => {
     // (Re)start: a successful build starts the preview (see `built` in openProject).
@@ -369,7 +431,26 @@ function createWindow(): void {
   else void win.loadURL(`${APP_ORIGIN}/index.html`);
 }
 
+// One Studio at a time: a second start brings the open window forward instead of opening the same project twice (S-5).
+if (!app.requestSingleInstanceLock()) app.quit();
+app.on("second-instance", () => {
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.focus();
+});
+
+// Crash recovery (S-4): a marker while Studio runs; if it's still there at the next start, the last exit wasn't normal.
+const runningMarker = () => join(app.getPath("userData"), "running.json");
+let lastExitUnexpected = false;
+app.on("will-quit", () => rmSync(runningMarker(), { force: true }));
+
 app.whenReady().then(() => {
+  lastExitUnexpected = existsSync(runningMarker());
+  try {
+    writeFileSyncNow(runningMarker(), JSON.stringify({ pid: process.pid, version: CORE_VERSION }));
+  } catch {
+    /* a read-only profile: crash notes are skipped */
+  }
   Menu.setApplicationMenu(null);
   const renderer = rendererDir();
   protocol.handle("app", (req) => serveFrom(renderer, new URL(req.url).pathname, { "content-security-policy": CSP }));

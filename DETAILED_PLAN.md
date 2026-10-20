@@ -1,7 +1,7 @@
 # Himawari — Detailed Project Plan
 
-> **Status:** Draft **v0.6** · 2026-10-18 · Nothing here is final. **Phases 0–3 and 5 done; Phases 4 (Studio) and 6 (UI Designer) built**, their hallway tests pending (§18); RFCs 0001–0010 accepted. Next: the hallway tests, then Phase 7.
-> **Companion files:** [RESEARCH.md](RESEARCH.md) (evidence) · [LOG.md](LOG.md) (decision history and next steps) · [CLAUDE.md](CLAUDE.md) (context for AI coding sessions)
+> **Status:** Draft **v0.7** · 2026-10-20 · Nothing here is final. **Phases 0–3 and 5 done; Phases 4 (Studio), 6 (UI Designer), and 7 (AI depth) built**, their hallway tests pending (§18); RFCs 0001–0011 accepted. Next: Phase 8, finalization ([FINALIZATION.md](FINALIZATION.md)) and launch.
+> **Companion files:** [FINALIZATION.md](FINALIZATION.md) (the finalization plan and the core concept) · [RESEARCH.md](RESEARCH.md) (evidence) · [LOG.md](LOG.md) (decision history and next steps) · [CLAUDE.md](CLAUDE.md) (context for AI coding sessions)
 > Decisions marked 🔬 cite RESEARCH.md by section number (e.g. 🔬§3 = RESEARCH.md §3).
 
 ---
@@ -23,12 +23,26 @@ The design rules, unchanged from v0.1:
 1. **The runtime never parses source text.** `.hws` source compiles to validated `.hwb` bytecode plus a `.hwp` asset pack.
 2. **Build headless first:** Contract → Compiler → Runtime → MCP → Studio. An AI-to-`.exe` vertical slice works by about week 14.
 3. **Ease of use is a top-level requirement** (§2). Writing and playing happen in the same window, every error comes with a suggested fix, missing art never blocks writing, and nothing advanced shows up until you need it.
+   **The core concept** (2026-10-20, [FINALIZATION.md](FINALIZATION.md) §1): *easy enough for anyone, open enough for coders, light enough for any PC*.
+   - **No code needed, code welcome:** everything can be done in Studio's UI, while people who code use text, git, `hwc`, and C extensions on the same project.
+   - **Any Windows PC:** games are tiny native programs that start with a double-click on any Windows 10 or 11 PC, weak laptops included, with nothing to install.
+   - **One click:** Studio installs in one click with everything inside, and export is one button.
 4. **AI is a development assistant only** (§1.5). It reads, writes, validates, refactors, playtests, and translates *project text and scripts*. Himawari has **no image, audio, voice, video, or other media generation** of any kind.
-5. **Two ways to work with AI, both first-class** (§10.7): chat in your own Claude app (via MCP) and watch Studio update live, or use Studio's **built-in assistant panel** with your own API key. Both use the same tools and the same Himawari agent instructions.
+5. **AI is optional, and two ways to use it are both first-class** (§10.7). Since v0.7 it's present but quiet: the assistant starts closed, and every task works without it. The two ways: chat in your own Claude app (via MCP) and watch Studio update live, or use Studio's **built-in assistant panel** with your own API key. Both use the same tools and the same Himawari agent instructions.
 
 ---
 
 ## 0.1 What Changed
+
+### v0.6 → v0.7 (finalization, your decisions of 2026-10-20)
+
+| Area | v0.6 | v0.7 | Why |
+|---|---|---|---|
+| Core concept | Ease of use (P1–P12) | Plus **no code needed, code welcome** (P13), **any Windows PC** (P14), and **one click** (P15) | Your concept: anyone can make a VN in the UI alone, coders aren't held back, and games run anywhere |
+| AI | Two first-class modes | Still both, but **present but quiet**: the assistant starts closed, AI controls are secondary | AI is an assistant, not the center |
+| Translation | Asked for in the New Project wizard | **One language by default**; translation tools appear with a second language | Most first games are one language |
+| Phase 8 | Open-source launch (3 weeks) | **Finalization and open-source launch** (≈ 16–17 weeks), planned in [FINALIZATION.md](FINALIZATION.md) | Common sense, no-code completeness, any-PC and one-click checks, and real usability rounds before v1.0 |
+| Supported Windows | Windows x64 | **Windows 10 and 11** x64, Arm through emulation; 7 and 8.1 not supported (pending your answer) | UCRT is built into 10 and later; the old systems are unsupported (RESEARCH §17.7) |
 
 ### v0.4 → v0.5 (Phase 0 on Windows, your decisions)
 
@@ -115,7 +129,7 @@ The design rules, unchanged from v0.1:
 ## 1. Vision, Users, Non-Goals
 
 ### 1.1 Vision
-A VN engine (Windows games, authored on Windows) where **a first-time writer can play their first scene within 5 minutes**, a professional team can ship a multi-language commercial title, and an AI collaborator can contribute through a precise, validated API. All of them work on the same plain-text, git-friendly project. The shipped game is a single small native executable plus a data pack.
+A VN engine (Windows games, authored on Windows) that is **so easy nobody needs to code**, yet **fully open to those who do**. Every feature can be used from Studio's UI, and the same project is plain text for people who prefer code. **A first-time writer can play their first scene within 5 minutes**, a professional team can ship a multi-language commercial title, and an AI collaborator can contribute through a precise, validated API. All of them work on the same plain-text, git-friendly project. The shipped game is a single small native executable plus a data pack (optionally one file). It starts with a double-click on any Windows 10 or 11 PC, including weak laptops, with nothing to install, because the runtime is optimized C with no dependencies.
 
 ### 1.2 Who it's for
 
@@ -126,6 +140,8 @@ A VN engine (Windows games, authored on Windows) where **a first-time writer can
 | **Developer / integrator** | Custom UI themes, extension statements, CI builds, version control | Script view, `hwc` CLI, extension API |
 | **Translator** | Spreadsheet or CAT-tool workflow, context for each line | CSV/XLIFF export, Studio localization table |
 | **AI agent** | Typed tools, validation feedback, playtests, character context | himawari-mcp |
+
+Writers and developers often share one project. Neither should get in the other's way: the UI never rewrites what was typed, and coding tools never appear for those who don't use them (FINALIZATION.md §1.1).
 
 ### 1.3 Positioning 🔬§1
 
@@ -185,6 +201,9 @@ These are **acceptance criteria**, not aspirations. Every feature is reviewed ag
 | P10 | **Defaults that ship** | The default UI theme is accessible, polished, and localized. A new project can be exported as a real game without touching settings. | — |
 | P11 | **Find anything** | Double-Shift fuzzy search across scenes, lines, characters, assets, and commands. | Naninovel, JetBrains |
 | P12 | **The AI explains itself** | Every AI proposal carries a one-line rationale, a diff, and validation results. Accept or reject per change. | — |
+| P13 | **No code needed, code welcome** (2026-10-20) | Every language feature has a UI: pickers, forms, toggles, and plain-word conditions. Nobody has to type script syntax, JSON, or commands. Text, git, `hwc`, and C extensions stay first-class, and both ways edit the same files losslessly. Proven by the no-code test (FINALIZATION.md §11.3). | — |
+| P14 | **Runs on any Windows PC** (2026-10-20) | Games run on Windows 10 and 11 (x64, and Arm through emulation), on integrated graphics with 4 GB RAM, and without a GPU driver (software fallback). No installs, no admin, no internet. They stop redrawing when idle. | — |
+| P15 | **One click** (2026-10-20) | Studio installs with the usual Windows setup and everything inside (no Node, Python, Git, or compilers). One button exports, and one double-click plays. | — |
 
 ### 2.1 First-run flow (Studio)
 ```
@@ -578,6 +597,9 @@ Reveal her transfer plans before ch4_rooftop.
 | Frame-loop allocations | Zero |
 | `.hwb` load (1 MB) | ≤ 5 ms |
 | External DLLs on Windows | None |
+| Supported Windows (2026-10-20) | Windows 10 and 11, x64; Arm through Windows 11's x64 emulation (FINALIZATION.md §4) |
+| Hardware floor | Integrated graphics, 4 GB RAM, a hard disk, 1366×768; software rendering when no GPU driver |
+| CPU while waiting for a click | Near zero: redraw only when something changes (battery) |
 
 ### 8.2 Dependencies (pinned by tag + SHA-256, built from source with CMake, linked statically; RFC 0001)
 | Need | Library | License | Notes |
@@ -1054,9 +1076,12 @@ build/windows/SunflowerDays/
 ```
 - **Export needs no compiler.** Studio ships the prebuilt Windows runtime, so export is: compile `.hwb` → pack `.hwp` → copy the runtime `.exe` → patch its icon and version resource → write licenses. 🔬§12
 - The `.exe` resource patching is done in TypeScript (a pure-JS PE resource editor such as `resedit`, to be verified in Phase 4), so exports are reproducible.
+- **Optional single-file export** (FINALIZATION.md OC-6): the pack appended to the patched exe, as Godot's "Embed PCK" does. The folder stays the default, since patches add separate `patch*.hwp` files.
+- **The game is one double-click:** no installer, no admin rights, no internet. It runs from any folder, including read-only ones, USB sticks, and paths with Japanese characters.
 
 ### 14.5 Studio packaging
 - `electron-builder`: NSIS installer and portable build for Windows, built on the Windows runner.
+- **The usual Windows setup wizard** (FINALIZATION.md OC-1, D61): for me only (no admin) or everyone, a folder choice, and "Run Himawari Studio" at the end. Everything is inside: the runtime, templates, examples, fonts, `himawari-mcp`, and `hwc`, which run through Studio's own executable, so no Node install.
 - Auto-update channel.
 - **Code signing** planned before the public v1.0.
 
@@ -1262,13 +1287,23 @@ Estimates assume **one developer full-time**. Each phase has exit criteria. ⏱ 
 - AI eval suite trending.
 - ✅ **Built** (2026-10-19, LOG session 17, rfcs/0011): review notes (`.himawari/notes.json`, three new tools, Studio's Notes panel); continuity checks HW0340–HW0342; route balance in `analyze` and on the graph; the graph's playtest coverage overlay, drag-to-link, and New scene; the glossary (`glossary.json`, HW0407) and "Translate with AI" (Claude Haiku 5.5 by default); eight recipes as MCP prompts and assistant slash commands; experimental MCP Apps views; `packages/evals` with a trend report. Open: the first real eval runs need an API key.
 
-### Phase 8: Open-source launch (⏱ 3)
+### Phase 8: Finalization and open-source launch (⏱ ≈ 16–17, was 3)
+- **The core concept first** (FINALIZATION.md §1, §3–§5):
+  - No-code completeness: forms for every statement, conditions in plain words, text styling and furigana without markup, project settings in the UI.
+  - Code welcome: "Show as script", `hwc` without Node.
+  - Any Windows PC: the device lab, software fallback, idle power.
+  - One click: the installer, single-file export.
+- **Finalization first** ([FINALIZATION.md](FINALIZATION.md), 2026-10-20):
+  - AI present but quiet: the assistant starts closed, and every AI feature has a human path.
+  - Translation optional: projects are one language until you add another.
+  - "Human-like common sense": safety nets so work is never lost, writer-aware hints, smart defaults, and player-side polish.
+  - Three usability rounds with English and Japanese writers (SEQ ≥ 5.5 per task, SUS ≥ 80), torture tests for data safety, clean-machine and accessibility checks (RESEARCH §17).
 - Docs site (Diátaxis, tutorials in EN + JA) on GitHub Pages, the tutorial project, a video walkthrough.
 - Signed Studio installer for Windows, auto-update, itch.io `butler` export (`hwc report ai-content` for store disclosure is already built, Phase 3).
 - Governance and contribution docs, RFC repo, security policy, license audit.
 - 🎯 **M3: public v1.0.**
 
-**Total ≈ 37 weeks to v1.0** (v0.2 was 32: the built-in assistant and Studio UI localization add 2 weeks to Phase 4, and AI depth and polish shrinks by 1; v0.6 adds the 4-week UI Designer as Phase 6, and AI depth and the launch become Phases 7 and 8). An AI-to-game slice still works at ≈ week 14.
+**Total ≈ 51 weeks to v1.0** (v0.7: Phase 8 grows from 3 to about 16–17 weeks with finalization; before that, ≈ 37) (v0.2 was 32: the built-in assistant and Studio UI localization add 2 weeks to Phase 4, and AI depth and polish shrinks by 1; v0.6 adds the 4-week UI Designer as Phase 6, and AI depth and the launch become Phases 7 and 8). An AI-to-game slice still works at ≈ week 14.
 
 ### 18.9 After v1
 - **Linux (future improvement, v0.5):** Studio on Linux, a Linux runtime build for its live preview and headless playtests, Linux CI (sanitizers, fuzzing), and possibly a tested Proton path for Steam Deck. The portable `core/` and `text/` code and the SDL layer keep this a small change. Phase 0 already proved most of the pieces on Windows.

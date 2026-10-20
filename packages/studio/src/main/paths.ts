@@ -10,11 +10,13 @@ function repoRoot(): string {
 }
 
 /** Bundled resources (electron-builder `extraResources`), or the checkout in development. */
-export function resources(): { templates: string; spec: string; projects: Record<BundledProject, string>; runtime: string | null } {
+export function resources(): { templates: string; spec: string; projects: Record<BundledProject, string>; runtime: string | null; tools: string | null } {
   if (app.isPackaged) {
     const r = process.resourcesPath;
     const exe = join(r, "runtime", "himawari.exe");
-    return { templates: join(r, "templates"), spec: join(r, "spec"), projects: bundled(join(r, "examples")), runtime: existsSync(exe) ? exe : null };
+    // hwc and himawari-mcp as one standalone program (FINALIZATION.md OC-3): no Node needed.
+    const tools = join(r, "tools", "himawari-tools.exe");
+    return { templates: join(r, "templates"), spec: join(r, "spec"), projects: bundled(join(r, "examples")), runtime: existsSync(exe) ? exe : null, tools: existsSync(tools) ? tools : null };
   }
   const root = repoRoot();
   const env = process.env["HIMAWARI_RUNTIME"];
@@ -23,7 +25,7 @@ export function resources(): { templates: string; spec: string; projects: Record
     const exe = join(root, "runtime", "build", preset, "himawari.exe");
     if (!runtime && existsSync(exe)) runtime = exe;
   }
-  return { templates: join(root, "templates"), spec: join(root, "spec"), projects: bundled(join(root, "examples")), runtime };
+  return { templates: join(root, "templates"), spec: join(root, "spec"), projects: bundled(join(root, "examples")), runtime, tools: null };
 }
 
 function bundled(examples: string): Record<BundledProject, string> {

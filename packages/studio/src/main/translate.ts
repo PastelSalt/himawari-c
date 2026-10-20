@@ -4,7 +4,7 @@
  * renderer applies each batch to its own copy of the table (one undo step per
  * batch), so a cancelled run keeps what it already has.
  */
-import { GLOSSARY_FILE, type LineToTranslate, readGlossary, translationInstructions } from "@himawari/core";
+import { GLOSSARY_FILE, type LineToTranslate, aiHelpAllowed, readGlossary, translationInstructions } from "@himawari/core";
 import { check, stampAi } from "@himawari/tools";
 import type { TranslateEstimate, TranslateEvent, TranslateRequest } from "../shared/api.js";
 import type { AssistantHost } from "./assistant.js";
@@ -34,6 +34,7 @@ export class TranslateHost {
     const r = raw as TranslateRequest;
     const p = this.project();
     if (!p) throw new Error("No project is open.");
+    if (!aiHelpAllowed(p.fs.exists("himawari.json") ? p.fs.read("himawari.json") : null)) throw new Error("AI help is turned off for this project.");
     if (!r || typeof r.lang !== "string" || !Array.isArray(r.lines)) throw new Error("Nothing to translate.");
     const model = (TRANSLATION_MODELS as readonly string[]).includes(r.model) ? r.model : TRANSLATION_MODELS[0];
     const lines = r.lines

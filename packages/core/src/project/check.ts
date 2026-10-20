@@ -4,6 +4,8 @@
  * all get identical results.
  */
 import { checkSpeakers, checkVariableUse } from "./continuity.js";
+import { caseClashes, checkSilentCharacters, checkWriting, imageHint, quietHints, textboxFit } from "./hints.js";
+import type { ImageSize } from "./image-size.js";
 import { pushAll } from "../arrays.js";
 import { type AstResult, type Expr, type MenuOption, type Ref, type Stmt, endsFlow, parseAst } from "../syntax/ast.js";
 import { type Diagnostic, type DiagnosticCode, type Span, diagnostic } from "../syntax/diagnostics.js";
@@ -32,6 +34,8 @@ export interface ProjectInput {
   scripts: SourceFile[];
   /** Files under assets/, relative to it (e.g. bg/classroom_day.png). Omit to skip asset checks. */
   assets?: readonly string[];
+  /** Image sizes by asset path (as in `assets`), where known: for the "too big" and "wrong shape" hints. */
+  assetSizes?: ReadonlyMap<string, ImageSize>;
   /** locales/<lang>.json string tables. */
   locales?: SourceFile[];
   /** extensions/<name>.schema.json: extension statement signatures (rfcs/0007). */
@@ -184,7 +188,11 @@ export function checkProject(input: ProjectInput): ProjectCheck {
     });
   }
 
-  const ctx: Ctx = { manifest, characters, scenes, calls, assets: input.assets };
+  const ctx: Ctx = { manifest, characters, scenes, calls, assets: input.assets, assetSizes: input.assetSizes, imagesHinted: new Set() };
+  // Writer-aware hints (FINALIZATION.md §8.2): how much fits in the textbox, roughly.
+  const sizeEntry = theme?.get("text.size");
+  const fit = manifest ? textboxFit(manifest.resolution, typeof sizeEntry?.value === "number" ? sizeEntry.value : 36) : null;
+  const speakers = new Set<string>();
   for (const s of input.scripts) {
     const r = parsed.get(s.file) as AstResult;
     const out = report(s.file, s.text).diagnostics;
@@ -195,6 +203,15 @@ export function checkProject(input: ProjectInput): ProjectCheck {
     pushAll(out, fromMacros.map((d) => ({ ...d, fixes: [], note: d.note ? `${d.note} (from a macro)` : "from a macro" })));
     checkTypesAndFlow({ ...r, ast: expansion.asts.get(s.file) ?? r.ast }, s.text, ctx, out);
     checkSpeakers(expansion.asts.get(s.file) ?? r.ast, characters, out);
+    checkWriting(r.ast, fit, out);
+    for (const ref of r.refs) if (ref.kind === "speaker") speakers.add(ref.name);
+  }
+  if (input.scripts.length > 0) {
+    checkSilentCharacters(characters, speakers, (file) => report(file, input.characters?.find((c) => c.file === file)?.text ?? "").diagnostics);
+  }
+  if (input.manifest) {
+    const paths = [...input.scripts.map((s) => s.file), ...(input.characters ?? []).map((c) => c.file), ...(input.assets ?? []).map((a) => `assets/${a}`)];
+    for (const [a, b] of caseClashes(paths)) report(input.manifest.file, input.manifest.text).diagnostics.push(diagnostic("HW0356", { start: 0, end: 0 }, { a, b }));
   }
   // Variables set but never read, or used in conditions but never set (continuity).
   if (manifest && input.manifest) {
@@ -234,7 +251,12 @@ export function checkProject(input: ProjectInput): ProjectCheck {
     }
   }
 
-  for (const r of reports.values()) r.diagnostics.sort((a, b) => a.span.start - b.span.start);
+  // Hints the project muted ("quietHints" in himawari.json) are left out; real problems never are.
+  const quiet = quietHints(input.manifest?.text);
+  for (const r of reports.values()) {
+    if (quiet.size > 0) r.diagnostics = r.diagnostics.filter((d) => d.severity !== "info" || !quiet.has(d.code));
+    r.diagnostics.sort((a, b) => a.span.start - b.span.start);
+  }
   return { files: [...reports.values()], manifest, characters, parsed, locales, expanded: expansion.asts, macros, extensions: extensions, theme };
 }
 
@@ -312,6 +334,9 @@ interface Ctx {
   /** Every scene that is the target of a `call` anywhere in the project. */
   calls: Set<string>;
   assets: readonly string[] | undefined;
+  assetSizes: ReadonlyMap<string, ImageSize> | undefined;
+  /** Images already given a size hint (once per image, at its first use). */
+  imagesHinted: Set<string>;
 }
 
 function withSuggestion(name: string, candidates: Iterable<string>, span?: Span): Pick<Diagnostic, "help" | "fixes"> {
@@ -372,7 +397,16 @@ function checkRefs(refs: readonly Ref[], ctx: Ctx, out: Diagnostic[]): void {
         const folder = ASSET_FOLDERS[ref.channel ?? ""];
         if (!folder) break;
         const prefix = `${folder}/${ref.name}.`;
-        if (ctx.assets.some((a) => a.startsWith(prefix))) break;
+        const found = ctx.assets.find((a) => a.startsWith(prefix));
+        if (found) {
+          const size = (ref.channel === "bg" || ref.channel === "cg") && !ctx.imagesHinted.has(found) ? ctx.assetSizes?.get(found) : undefined;
+          const hint = size && imageHint(`assets/${found}`, size, ctx.manifest?.resolution ?? [1920, 1080]);
+          if (hint) {
+            ctx.imagesHinted.add(found);
+            push(hint.code, ref, hint.params, { help: hint.help });
+          }
+          break;
+        }
         const names = ctx.assets.filter((a) => a.startsWith(`${folder}/`)).map((a) => a.slice(folder.length + 1).replace(/\.[^.]+$/, ""));
         push("HW0213", ref, { channel: ref.channel === "rule" ? "rule mask" : (ref.channel ?? ""), name: ref.name, folder }, withSuggestion(ref.name, names, ref.span));
         break;

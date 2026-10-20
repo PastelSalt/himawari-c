@@ -7,7 +7,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { CORE_VERSION, graphToMermaid, storyGraph } from "@himawari/core";
+import { CORE_VERSION, aiHelpAllowed, graphToMermaid, storyGraph } from "@himawari/core";
 import { ProjectFs, RECIPES, SandboxError, TOOLS, type ToolContext, ToolError, check, findScene, isConfirm } from "@himawari/tools";
 import { McpServer, ResourceTemplate, acceptedContent, inputRequired } from "@modelcontextprotocol/server";
 import { z } from "zod";
@@ -71,6 +71,10 @@ export function createServer(options: ServerOptions): McpServer {
         ...(meta ? { _meta: meta } : {}),
       },
       async (args: Record<string, unknown>, ctx) => {
+        // The project's own switch (himawari.json "aiHelp": false): AI help is off for everyone on it.
+        if (!aiHelpAllowed(fs.exists("himawari.json") ? fs.read("himawari.json") : null)) {
+          return { content: [{ type: "text" as const, text: "AI help is turned off for this project (\"aiHelp\": false in himawari.json). Ask the project's owner before using AI tools on it." }], isError: true };
+        }
         if (def.kind === "write" && options.forwardWrite && args["dry_run"] !== true) {
           const forwarded = await options.forwardWrite(def.name, args);
           if (forwarded) return forwarded as never;

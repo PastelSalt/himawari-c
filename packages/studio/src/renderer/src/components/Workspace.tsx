@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { FormattedMessage, useIntl } from "react-intl";
-import { type Tool, useStudio } from "../store";
+import { studio } from "../api";
+import { isScript } from "../model";
+import { type Tool, selectAiAllowed, useStudio } from "../store";
 import { Assets } from "./Assets";
 import { Designer } from "./Designer";
 import { Assistant } from "./Assistant";
@@ -13,6 +15,7 @@ import { Icon } from "./Icon";
 import { Localization } from "./Localization";
 import { PreviewPane } from "./PreviewPane";
 import { Search } from "./Search";
+import { ConflictDialog } from "./Safety";
 import { SettingsPage } from "./Settings";
 import { StoryGraph } from "./StoryGraph";
 import { Variables } from "./Variables";
@@ -79,9 +82,13 @@ export function Workspace() {
   const [rightW, setRightW] = useSize("right", 560);
   const [bottomH, setBottomH] = useSize("bottom", 200);
   const [assistantH, setAssistantH] = useSize("assistant", 320);
-  const [assistantOpen, setAssistantOpen] = useState(true);
+  const aiAllowed = useStudio(selectAiAllowed);
+  const assistantOpen = useStudio((s) => s.settings?.assistantOpen === true) && aiAllowed;
+  const setAssistantOpen = (open: boolean) => void useStudio.getState().setSettings({ assistantOpen: open });
+  // Translation appears once the game has a second language (FINALIZATION.md T-2).
+  const translating = useStudio((s) => (s.model?.check.manifest?.languages.length ?? 0) > 1);
 
-  // Double-Shift opens search (P11); Ctrl+P too.
+  // Double-Shift opens search (P11); Ctrl+P too. The usual Windows keys (FINALIZATION.md D-9; listed in Settings).
   useEffect(() => {
     let lastShift = 0;
     const onKey = (e: KeyboardEvent) => {
@@ -98,6 +105,25 @@ export function Workspace() {
         e.preventDefault();
         useStudio.getState().setSearch(true);
       }
+      const s = useStudio.getState();
+      // Ctrl+S: there's nothing to save by hand, so say so instead of doing nothing.
+      if (e.ctrlKey && !e.shiftKey && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        s.notify({ id: "notice.savedAutomatically" });
+      }
+      // F5: play the game from the start in the preview.
+      if (e.key === "F5" && !e.ctrlKey) {
+        e.preventDefault();
+        if (s.preview.ready) void studio.preview.command({ cmd: "restart" });
+      }
+      // Ctrl+Z outside a text box: undo the last change (text boxes keep their own undo).
+      if (e.ctrlKey && !e.shiftKey && (e.key === "z" || e.key === "Z") && !inTextBox(e.target)) {
+        const last = [...s.history].reverse().find((h) => !h.undone);
+        if (last) {
+          e.preventDefault();
+          s.undoEntry(last.id);
+        }
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -105,12 +131,23 @@ export function Workspace() {
 
   const open = (tool: Tool) => useStudio.getState().open({ kind: "tool", tool });
   const active = center?.kind === "tool" ? center.tool : null;
+  // "Story" goes back to the script last open (or the first one) from any tool, the UI Designer included.
+  const lastFile = useRef<string | null>(null);
+  if (center?.kind === "file") lastFile.current = center.file;
+  const openStory = () => {
+    const s = useStudio.getState();
+    const file = lastFile.current && s.files[lastFile.current] !== undefined ? lastFile.current : Object.keys(s.files).filter(isScript).sort()[0];
+    if (file) s.open({ kind: "file", file });
+  };
 
   return (
     <div className="workspace">
       <div className="ws-main">
         <nav className="activity-bar" aria-label={intl.formatMessage({ id: "workspace.tools" })}>
-          {TOOLS.map((t) => (
+          <button className={center?.kind === "file" ? "activity active" : "activity"} title={intl.formatMessage({ id: "tool.story" })} aria-label={intl.formatMessage({ id: "tool.story" })} onClick={openStory}>
+            <Icon name="scene" size={20} />
+          </button>
+          {TOOLS.filter((t) => t.tool !== "localization" || translating || active === "localization").map((t) => (
             <button key={t.tool} className={active === t.tool ? "activity active" : "activity"} title={intl.formatMessage({ id: t.label })} aria-label={intl.formatMessage({ id: t.label })} onClick={() => open(t.tool)}>
               <Icon name={t.icon} size={20} />
             </button>
@@ -119,9 +156,11 @@ export function Workspace() {
           <button className="activity" title={intl.formatMessage({ id: "search.open" })} aria-label={intl.formatMessage({ id: "search.open" })} onClick={() => useStudio.getState().setSearch(true)}>
             <Icon name="search" size={20} />
           </button>
-          <button className={assistantOpen ? "activity active" : "activity"} title={intl.formatMessage({ id: "tool.assistant" })} aria-label={intl.formatMessage({ id: "tool.assistant" })} onClick={() => setAssistantOpen(!assistantOpen)}>
-            <Icon name="assistant" size={20} />
-          </button>
+          {aiAllowed && (
+            <button className={assistantOpen ? "activity active" : "activity"} title={intl.formatMessage({ id: "tool.assistant" })} aria-label={intl.formatMessage({ id: "tool.assistant" })} onClick={() => setAssistantOpen(!assistantOpen)}>
+              <Icon name="assistant" size={20} />
+            </button>
+          )}
           <button className={active === "settings" ? "activity active" : "activity"} title={intl.formatMessage({ id: "tool.settings" })} aria-label={intl.formatMessage({ id: "tool.settings" })} onClick={() => open("settings")}>
             <Icon name="settings" size={20} />
           </button>
@@ -170,6 +209,8 @@ export function Workspace() {
       </div>
       <StatusBar />
       {searchOpen && <Search onClose={() => useStudio.getState().setSearch(false)} />}
+      <ConflictDialog />
+      <Notice />
     </div>
   );
 }
@@ -209,4 +250,48 @@ function StatusBar() {
       </button>
     </footer>
   );
+}
+
+/** The undo notice (bottom left): disappears after a few seconds. */
+function Notice() {
+  const notice = useStudio((s) => s.notice);
+  useEffect(() => {
+    if (!notice) return;
+    const t = setTimeout(() => {
+      if (useStudio.getState().notice?.seq === notice.seq) useStudio.setState({ notice: null });
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [notice]);
+  if (!notice) return null;
+  return (
+    <div className="notice" role="status">
+      <span>
+        <FormattedMessage id={notice.label.id} values={notice.label.values ?? {}} />
+      </span>
+      {notice.undo !== null && (
+        <button
+          className="small-button"
+          onClick={() => {
+            useStudio.getState().undoEntry(notice.undo!);
+            useStudio.setState({ notice: null });
+          }}
+        >
+          <FormattedMessage id="history.undo" />
+        </button>
+      )}
+      <button className="icon-button" aria-label={useIntlLabel()} onClick={() => useStudio.setState({ notice: null })}>
+        <Icon name="close" size={11} />
+      </button>
+    </div>
+  );
+}
+
+function useIntlLabel() {
+  return useIntl().formatMessage({ id: "common.close" });
+}
+
+/** Typing somewhere that has its own undo: a field, a text area, or the script editor. */
+function inTextBox(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.closest(".cm-editor") !== null;
 }
