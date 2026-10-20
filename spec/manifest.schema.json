@@ -27,6 +27,16 @@
       "type": "string",
       "minLength": 1
     },
+    "quietHints": {
+      "description": "Suggestion codes (info diagnostics, e.g. \"HW0352\") this project doesn't want to see. Errors and warnings are never muted. FINALIZATION.md §8.2.",
+      "type": "array",
+      "items": { "type": "string", "pattern": "^HW\\d{4}$" },
+      "uniqueItems": true
+    },
+    "aiHelp": {
+      "description": "false turns AI help off for this project: Studio hides the assistant and AI buttons, and himawari-mcp refuses its tools. Default true (AI is still optional and quiet). FINALIZATION.md, D59.",
+      "type": "boolean"
+    },
     "resolution": {
       "description": "Virtual canvas size in pixels. Templates use 16:9 (D16).",
       "type": "array",
