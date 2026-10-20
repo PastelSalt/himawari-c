@@ -134,6 +134,35 @@ int main(void)
         free(b);
     }
 
+    /* Single-file games (spec/pack.md §7): a fake PE32+ exe, the pack, the trailer; then signed (a certificate table after it). */
+    {
+        size_t exe_size = 1024, total = exe_size + size + HW_PACK_TRAILER;
+        uint8_t *f = calloc(total + 64, 1);
+        f[0] = 'M', f[1] = 'Z', f[0x3C] = 0x80;
+        memcpy(f + 0x80, "PE\0\0", 4);
+        f[0x80 + 24] = 0x0b, f[0x80 + 25] = 0x02; /* PE32+ */
+        f[0x80 + 24 + 108] = 16;                  /* NumberOfRvaAndSizes */
+        memcpy(f + exe_size, bytes, size);
+        uint8_t *t = f + exe_size + size;
+        for (int k = 0; k < 8; k++) t[k] = (uint8_t)((uint64_t)exe_size >> (8 * k)), t[8 + k] = (uint8_t)((uint64_t)size >> (8 * k));
+        memcpy(t + 16, "HWPEXE\x01\x00", 8);
+        uint64_t at = 0, len = 0;
+        uint64_t end = hw_pack_trailer_end(f, 4096 < total ? 4096 : total, total);
+        CHECK(end == total && hw_pack_trailer_parse(t, end, &at, &len) && at == exe_size && len == size);
+        CHECK(open_pack(&base, f + at, (size_t)len, err, sizeof err));
+        hw_pack_free(&base);
+        CHECK(!hw_pack_trailer_parse(t, end - 1, &at, &len)); /* the pack must end right at the trailer */
+        f[0x80 + 24 + 112 + 32] = (uint8_t)total, f[0x80 + 24 + 112 + 33] = (uint8_t)(total >> 8);
+        f[0x80 + 24 + 112 + 34] = (uint8_t)(total >> 16), f[0x80 + 24 + 112 + 36] = 64;
+        end = hw_pack_trailer_end(f, 4096, total + 64);
+        CHECK(end == total && hw_pack_trailer_parse(t, end, &at, &len) && at == exe_size);
+        t[16] = 'X';
+        CHECK(!hw_pack_trailer_parse(t, total, &at, &len));
+        uint8_t junk[64] = { 0 };
+        CHECK(hw_pack_trailer_end(junk, sizeof junk, 5000) == 5000); /* not a PE file */
+        free(f);
+    }
+
     free(bytes);
     free(patch);
     free(hwb);

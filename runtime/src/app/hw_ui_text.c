@@ -1,5 +1,6 @@
 #include "hw_ui_text.h"
 
+#include <stdbool.h>
 #include <string.h>
 
 static const char *const KEYS[UI_COUNT] = {
@@ -60,6 +61,12 @@ static const char *const KEYS[UI_COUNT] = {
     [UI_ACTION_HIDE] = "action_hide",
     [UI_ACTION_QUICK_SAVE] = "action_quick_save",
     [UI_ACTION_QUICK_LOAD] = "action_quick_load",
+    [UI_AUTO_SLOT] = "auto_slot",
+    [UI_OVERWRITE] = "overwrite",
+    [UI_LAST_SAVED_NOW] = "last_saved_now",
+    [UI_LAST_SAVED_MINUTES] = "last_saved_minutes",
+    [UI_LAST_SAVED_HOURS] = "last_saved_hours",
+    [UI_MUTE_BACKGROUND] = "mute_background",
 };
 
 static const char *const EN[UI_COUNT] = {
@@ -144,6 +151,12 @@ static const char *const EN[UI_COUNT] = {
     [UI_ACTION_HIDE] = "Hide the textbox",
     [UI_ACTION_QUICK_SAVE] = "Quick save",
     [UI_ACTION_QUICK_LOAD] = "Quick load",
+    [UI_AUTO_SLOT] = "Auto",
+    [UI_OVERWRITE] = "Overwrite this save?",
+    [UI_LAST_SAVED_NOW] = "Last saved just now.",
+    [UI_LAST_SAVED_MINUTES] = "Last saved %d min ago.",
+    [UI_LAST_SAVED_HOURS] = "Last saved %d h ago.",
+    [UI_MUTE_BACKGROUND] = "Mute in the background",
 };
 
 static const char *const JA[UI_COUNT] = {
@@ -228,12 +241,117 @@ static const char *const JA[UI_COUNT] = {
     [UI_ACTION_HIDE] = "テキストボックスを隠す",
     [UI_ACTION_QUICK_SAVE] = "クイックセーブ",
     [UI_ACTION_QUICK_LOAD] = "クイックロード",
+    [UI_AUTO_SLOT] = "オート",
+    [UI_OVERWRITE] = "このセーブに上書きしますか？",
+    [UI_LAST_SAVED_NOW] = "最後のセーブ：たった今",
+    [UI_LAST_SAVED_MINUTES] = "最後のセーブ：%d分前",
+    [UI_LAST_SAVED_HOURS] = "最後のセーブ：%d時間前",
+    [UI_MUTE_BACKGROUND] = "非アクティブ時に消音",
 };
+
+/* Simplified Chinese (zh-Hans): the default theme ships it too (P10). */
+static const char *const ZH[UI_COUNT] = {
+    [UI_START] = "开始游戏",
+    [UI_LOAD] = "读取",
+    [UI_SAVE] = "保存",
+    [UI_LANGUAGE] = "语言",
+    [UI_QUIT] = "退出",
+    [UI_RESUME] = "返回游戏",
+    [UI_BACK] = "返回",
+    [UI_TITLE] = "返回标题",
+    [UI_HISTORY] = "历史记录",
+    [UI_AUTO] = "自动",
+    [UI_SKIP] = "快进",
+    [UI_MENU] = "菜单",
+    [UI_ROLLBACK] = "回退",
+    [UI_TEXT_SPEED] = "文字速度",
+    [UI_EMPTY_SLOT] = "空",
+    [UI_SLOT] = "存档 %d",
+    [UI_QUICK_SLOT] = "快速存档",
+    [UI_SAVED] = "已保存。",
+    [UI_LOADED] = "已读取。",
+    [UI_LOAD_REMAPPED] = "这个存档是用旧版本的剧情保存的。将从同一句台词继续。",
+    [UI_LOAD_FALLBACK] = "存档所在的台词已经更改，故事将从稍早的地方继续。",
+    [UI_LOAD_FAILED] = "无法读取这个存档：%s",
+    [UI_NO_QUICK_SAVE] = "还没有快速存档。",
+    [UI_THE_END] = "完",
+    [UI_ERROR_TITLE] = "因为出错，故事停止了",
+    [UI_ERROR_RELEASE] = "故事的这一部分出了问题。你在最后一次存档之前的进度是安全的。",
+    [UI_CLICK_TO_CONTINUE] = "点击返回标题画面",
+    [UI_CONFIRM_QUIT] = "要退出游戏吗？",
+    [UI_YES] = "是",
+    [UI_NO] = "否",
+    [UI_HISTORY_EMPTY] = "还没有任何台词。",
+    [UI_RELOADED] = "已重新载入故事。",
+    [UI_RELOAD_FAILED] = "重新载入失败：%s",
+    [UI_CONFIG] = "设置",
+    [UI_EXTRAS] = "特典",
+    [UI_GALLERY] = "画廊",
+    [UI_MUSIC_ROOM] = "音乐室",
+    [UI_LOCKED] = "尚未解锁",
+    [UI_AUTO_SPEED] = "自动速度",
+    [UI_TEXT_SIZE] = "文字大小",
+    [UI_LINE_SPACING] = "行距",
+    [UI_FONT] = "字体",
+    [UI_FONT_DEFAULT] = "游戏默认",
+    [UI_FONT_READABLE] = "易读",
+    [UI_TEXTBOX_OPACITY] = "文本框不透明度",
+    [UI_HIGH_CONTRAST] = "高对比度",
+    [UI_REDUCE_MOTION] = "减少晃动和闪烁",
+    [UI_SKIP_UNREAD] = "快进未读文字",
+    [UI_FULLSCREEN] = "全屏",
+    [UI_VOLUME_MUSIC] = "音乐音量",
+    [UI_VOLUME_AMBIENT] = "环境音音量",
+    [UI_VOLUME_SFX] = "音效音量",
+    [UI_VOLUME_VOICE] = "语音音量",
+    [UI_CONTROLS] = "操作设置",
+    [UI_KEYBOARD] = "键盘",
+    [UI_GAMEPAD] = "手柄",
+    [UI_PRESS_KEY] = "请按一个键或手柄按钮（Esc 取消）",
+    [UI_RESET_CONTROLS] = "恢复默认操作",
+    [UI_ACCESSIBILITY] = "无障碍",
+    [UI_A11Y_PROMPT] = "开始之前",
+    [UI_A11Y_PROMPT_BODY] = "把游戏调整得适合你。之后随时可以在“设置”里更改。",
+    [UI_CONTINUE] = "继续",
+    [UI_ON] = "开",
+    [UI_OFF] = "关",
+    [UI_DEFAULT] = "默认",
+    [UI_REPLAY_VOICE] = "播放语音",
+    [UI_NOW_PLAYING] = "正在播放",
+    [UI_STOP] = "停止",
+    [UI_ACTION_ADVANCE] = "下一句 / 确定",
+    [UI_ACTION_BACK] = "菜单 / 返回",
+    [UI_ACTION_UP] = "上",
+    [UI_ACTION_DOWN] = "下",
+    [UI_ACTION_LEFT] = "左",
+    [UI_ACTION_RIGHT] = "右",
+    [UI_ACTION_ROLLBACK] = "回退",
+    [UI_ACTION_SKIP] = "快进",
+    [UI_ACTION_AUTO] = "自动",
+    [UI_ACTION_HISTORY] = "历史记录",
+    [UI_ACTION_HIDE] = "隐藏文本框",
+    [UI_ACTION_QUICK_SAVE] = "快速保存",
+    [UI_ACTION_QUICK_LOAD] = "快速读取",
+    [UI_AUTO_SLOT] = "自动存档",
+    [UI_OVERWRITE] = "要覆盖这个存档吗？",
+    [UI_LAST_SAVED_NOW] = "上次保存：刚刚",
+    [UI_LAST_SAVED_MINUTES] = "上次保存：%d分钟前",
+    [UI_LAST_SAVED_HOURS] = "上次保存：%d小时前",
+    [UI_MUTE_BACKGROUND] = "后台时静音",
+};
+
+
+/* zh, zh-Hans, zh-CN, zh-SG; not Traditional Chinese (zh-Hant, zh-TW, zh-HK, zh-MO), which falls back to English. */
+static bool simplified_chinese(const char *tag)
+{
+    if (strncmp(tag, "zh", 2) != 0 || (tag[2] != 0 && tag[2] != '-')) return false;
+    return !strstr(tag, "Hant") && !strstr(tag, "TW") && !strstr(tag, "HK") && !strstr(tag, "MO");
+}
 
 const char *hw_ui(const char *language, hw_ui_string id)
 {
     if (id < 0 || id >= UI_COUNT) return "";
-    const char *s = language && strcmp(language, "ja") == 0 ? JA[id] : EN[id];
+    const char *s = !language ? EN[id] : strcmp(language, "ja") == 0 ? JA[id] : simplified_chinese(language) ? ZH[id] : EN[id];
     return s ? s : EN[id];
 }
 

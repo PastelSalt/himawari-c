@@ -89,3 +89,37 @@ describe.skipIf(!runtime)("golden images (theme presets)", () => {
     }, 120000);
   }
 });
+
+/* Finalization (FINALIZATION.md): software rendering (RA-3), the autosave (P-2), and the title-screen credit (OC-10). */
+describe.skipIf(!runtime)("golden images (finalization)", () => {
+  const dirs: string[] = [];
+  afterAll(() => dirs.forEach((d) => rmSync(d, { recursive: true, force: true })));
+  const temp = () => {
+    const d = mkdtempSync(join(tmpdir(), "hw-golden-"));
+    dirs.push(d);
+    return d;
+  };
+
+  test("SDL's software renderer draws the same frame (no graphics driver needed)", () => {
+    run(DEMO, "en-hana-happy-software", ["--warp", "#07cgn7", "--renderer", "software"]); // its own image: edges filter a little differently
+  }, 60000);
+
+  test("the autosave at a menu loads back to that menu", () => {
+    const save = join(temp(), "auto.hwsav");
+    run(DEMO, "en-menu", ["--warp", "#7qff7k", "--autosave-to", save]);
+    expect(existsSync(save)).toBe(true);
+    run(DEMO, "en-menu", ["--load", save]);
+  }, 60000);
+
+  test("credit: title draws a small line on the title screen", () => {
+    const dir = temp();
+    cpSync(DEMO, dir, { recursive: true, filter: (s) => !s.endsWith("build") && !s.includes("\build\\") });
+    const manifest = JSON.parse(readFileSync(join(dir, "himawari.json"), "utf8")) as Record<string, unknown>;
+    writeFileSync(join(dir, "himawari.json"), JSON.stringify({ ...manifest, credit: "title" }));
+    const fs = new ProjectFs(dir);
+    const c = compileProject(fs);
+    expect(c.errors).toBe("");
+    fs.write("build/game.hwb", c.bytes as Uint8Array);
+    run(dir, "en-title-credit", []);
+  }, 60000);
+});

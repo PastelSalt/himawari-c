@@ -24,6 +24,7 @@ bool hw_persist_open(hw_persist *p, const char *game_id)
 void hw_persist_slot_path(const hw_persist *p, int slot, char *out, size_t cap)
 {
     if (slot == HW_SLOT_QUICK) snprintf(out, cap, "%squick.hwsav", p->dir);
+    else if (slot == HW_SLOT_AUTO) snprintf(out, cap, "%sauto.hwsav", p->dir);
     else snprintf(out, cap, "%sslot%d.hwsav", p->dir, slot);
 }
 
@@ -109,7 +110,9 @@ bool hw_unlock(hw_unlocks *u, bool music, uint32_t asset)
 
 /* ---- global.dat: "HWGL", version, payload size, crc, payload (u32 words, padded strings) ----
  * version 1: language, cps, volume × 4, fullscreen, globals, read lines
- * version 2 adds: auto_speed, text_size, line_spacing, font, textbox_opacity, flags, bindings, unlocked CGs, heard music */
+ * version 2 adds: auto_speed, text_size, line_spacing, font, textbox_opacity, flags, bindings, unlocked CGs, heard music,
+ * then optionally (readers before them ignore what follows the music): window x, y, w, h, flags2 (1 maximized, 2 mute in
+ * the background) */
 
 #define GLOBAL_VERSION 2
 
@@ -208,13 +211,14 @@ void hw_global_load(const hw_persist *p, const hw_module *m, hw_vm *vm, uint8_t 
         int32_t value = 0;
         bool ok = true;
         if (type == HW_VAR_STR) {
-            uint32_t sidx = hw_module_find_string(m, rstr(&r));
+            const char *str = rstr(&r);
+            uint32_t sidx = m ? hw_module_find_string(m, str) : HW_NONE;
             ok = sidx != HW_NONE;
             value = (int32_t)sidx;
         } else {
             value = (int32_t)r32(&r);
         }
-        uint32_t v = hw_module_find_var(m, name);
+        uint32_t v = m ? hw_module_find_var(m, name) : HW_NONE;
         if (ok && v != HW_NONE && m->vars[v].scope == HW_SCOPE_GLOBAL && m->vars[v].type == type) {
             vm->vars[v] = type == HW_VAR_BOOL ? value != 0 : value;
         }
@@ -222,7 +226,7 @@ void hw_global_load(const hw_persist *p, const hw_module *m, hw_vm *vm, uint8_t 
     uint32_t seen = r32(&r);
     for (uint32_t i = 0; i < seen && !r.bad; i++) {
         uint32_t id = r32(&r);
-        for (uint32_t l = 0; l < m->line_count; l++) {
+        for (uint32_t l = 0; m && read_lines && l < m->line_count; l++) {
             if (m->lines[l].line_id == id) {
                 read_lines[l] = 1;
                 break;
@@ -253,9 +257,22 @@ void hw_global_load(const hw_persist *p, const hw_module *m, hw_vm *vm, uint8_t 
         for (int list = 0; list < 2 && !r.bad; list++) {
             uint32_t n = r32(&r);
             for (uint32_t i = 0; i < n && !r.bad; i++) {
-                uint32_t asset = hw_module_find_string(m, rstr(&r));
+                const char *str = rstr(&r);
+                uint32_t asset = m ? hw_module_find_string(m, str) : HW_NONE;
                 if (asset != HW_NONE && u) hw_unlock(u, list == 1, asset);
             }
+        }
+        if (!r.bad && r.n - r.pos >= 20) {
+            loaded.win_x = (int32_t)r32(&r);
+            loaded.win_y = (int32_t)r32(&r);
+            int32_t w = (int32_t)r32(&r), h = (int32_t)r32(&r);
+            uint32_t flags2 = r32(&r);
+            if (w >= 160 && h >= 90 && w <= 32768 && h <= 32768) {
+                loaded.win_w = w;
+                loaded.win_h = h;
+            }
+            loaded.win_maximized = (flags2 & 1u) != 0;
+            loaded.mute_background = (flags2 & 2u) != 0;
         }
     }
     if (!r.bad) *s = loaded;
@@ -311,6 +328,11 @@ bool hw_global_save(const hw_persist *p, const hw_module *m, const hw_vm *vm, co
             if (flags[i]) wstr(&b, hw_str(m, names[i]));
         }
     }
+    w32(&b, (uint32_t)s->win_x);
+    w32(&b, (uint32_t)s->win_y);
+    w32(&b, (uint32_t)s->win_w);
+    w32(&b, (uint32_t)s->win_h);
+    w32(&b, (s->win_maximized ? 1u : 0u) | (s->mute_background ? 2u : 0u));
 
     hw_buf out = { 0 };
     hw_buf_put(&out, "HWGL", 4);

@@ -11,7 +11,7 @@ import type { Diagnostic } from "../syntax/diagnostics.js";
 import { LineIndex } from "../syntax/position.js";
 import { type TextPart, parseText } from "../syntax/text.js";
 import {
-  Channel, type DebugEntry, type ExtensionEntry, HWB_MAJOR, type HwbModule, LINE_CALL, LINE_ONCE, LINE_OPTION, LINE_PROMPT, type LocaleEntry, NONE, OPS_1_1,
+  CREDIT_MODES, Channel, type DebugEntry, type ExtensionEntry, HWB_MAJOR, type HwbModule, LINE_CALL, LINE_ONCE, LINE_OPTION, LINE_PROMPT, type LocaleEntry, NONE, OPS_1_1,
   Op, type OpName, POSITION_SCALE, SPRITE_ALWAYS, SPRITE_BLINK, SPRITE_LIPFLAP, SPRITE_MULTIPLE, type SpriteEntry, TEXTBOX_MODES, TextOp, type ThemeEntry,
   XPARAM_TYPES, XTNS_BLOCKING,
 } from "./format.js";
@@ -121,6 +121,7 @@ class Compiler {
         const [x, y] = manifest.positions[name] as [number, number];
         return { name: this.str(name), x: Math.round(x * POSITION_SCALE), y: Math.round(y * POSITION_SCALE) };
       }),
+      ...(manifest.credit && manifest.credit !== "none" ? { credit: CREDIT_MODES.indexOf(manifest.credit) } : {}),
     };
 
     // Every extension statement the project declares, in name order (XTNS).

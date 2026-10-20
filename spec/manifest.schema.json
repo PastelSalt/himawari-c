@@ -68,6 +68,11 @@
       "propertyNames": { "$ref": "#/$defs/identifier" },
       "additionalProperties": { "$ref": "#/$defs/variable" }
     },
+    "credit": {
+      "description": "How the game credits Himawari in play (optional; CREDITS.txt and the exe's properties always do): \"none\" (default), \"title\" (a small \"Made with Himawari\" line on the title screen, placed by the theme's layout.credit), or \"window\" (\"<Game> (made with Himawari)\" as the window title).",
+      "enum": ["none", "title", "window"],
+      "default": "none"
+    },
     "fonts": {
       "description": "Font fallback chains per role, with optional per-language overrides (plan §7).",
       "type": "object",

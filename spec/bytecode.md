@@ -59,8 +59,11 @@ All counts and fields are u32 unless noted.
 title: str, id: str, width, height, source_language: str
 language_count, languages[language_count]: str     every language the game offers; the first is the source language
 position_count, positions[position_count] = { name: str, x: i32, y: i32 }
+[credit]                                             optional (2026-10-20): how the game credits Himawari
 ```
 `width`/`height` are the virtual canvas (`resolution`), 1–16384. Positions (`at left`) are in 1/10000 of the canvas: `x` is the sprite anchor's horizontal position, `y` its vertical position (10000 = bottom edge). Sorted by name.
+
+`credit` (`himawari.json` `"credit"`, FINALIZATION.md OC-10): 0 none, 1 a small "Made with Himawari" line on the title screen (placed by the theme's `layout.credit`), 2 the window title "<title> (made with Himawari)". Writers emit it only when it isn't 0, so games without a credit are byte-identical to before. Readers treat a missing word, or a value they don't know, as 0, and ignore any words after it. Because 1.0 and 1.1 readers already ignore trailing `META` words, this optional field doesn't raise the header's minor version: an older player plays the game and just doesn't show the credit.
 
 ### 2.1 `STRS`: string pool
 ```

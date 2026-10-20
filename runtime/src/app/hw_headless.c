@@ -12,9 +12,10 @@
 
 uint8_t *hw_read_file(const char *path, size_t *size)
 {
-    /* A pack: the game's bytecode is its game.hwb entry, with patches applied (spec/pack.md). */
+    /* A pack (or a player exe with one inside): the game's bytecode is its game.hwb entry, with patches applied (spec/pack.md). */
     size_t n = strlen(path);
-    if (n > 4 && SDL_strcasecmp(path + n - 4, ".hwp") == 0) {
+    bool exe = n > 4 && SDL_strcasecmp(path + n - 4, ".exe") == 0;
+    if (exe || (n > 4 && SDL_strcasecmp(path + n - 4, ".hwp") == 0)) {
         char dir[1100], err[200];
         snprintf(dir, sizeof dir, "%s", path);
         char *slash = strrchr(dir, '/'), *bslash = strrchr(dir, '\\');
@@ -23,7 +24,8 @@ uint8_t *hw_read_file(const char *path, size_t *size)
         else dir[0] = 0;
         hw_vfs *v = hw_vfs_create();
         uint8_t *bytes = NULL;
-        if (v && hw_vfs_mount_packs(v, dir[0] ? dir : ".", err, sizeof err)) bytes = hw_vfs_load(v, "game.hwb", size);
+        bool mounted = v && (exe ? hw_vfs_mount_embedded(v, path, dir[0] ? dir : ".", err, sizeof err) : hw_vfs_mount_packs(v, dir[0] ? dir : ".", err, sizeof err));
+        if (mounted) bytes = hw_vfs_load(v, "game.hwb", size);
         else SDL_SetError("%s", v ? err : "out of memory");
         hw_vfs_destroy(v);
         return bytes;

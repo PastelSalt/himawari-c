@@ -10,6 +10,7 @@
 
 typedef struct mount {
     char path[1024];
+    uint64_t base; /* where the pack starts in its file: 0, or its offset inside the player exe (single-file games) */
     hw_pack pack;
 } mount;
 
@@ -36,25 +37,26 @@ void hw_vfs_set_root(hw_vfs *v, const char *root)
     snprintf(v->root, sizeof v->root, "%s%s", root, n == 0 || root[n - 1] == '/' || root[n - 1] == '\\' ? "" : "/");
 }
 
-/* Reads a pack's header and table of contents. */
-static bool open_pack(mount *mt, const char *path, char *err, size_t cap)
+/* Reads a pack's header and table of contents: the whole file, or `pack_size` bytes from `base` (0 = to the end). */
+static bool open_pack(mount *mt, const char *path, uint64_t base, uint64_t pack_size, char *err, size_t cap)
 {
     snprintf(mt->path, sizeof mt->path, "%s", path);
+    mt->base = base;
     SDL_IOStream *io = SDL_IOFromFile(path, "rb");
     if (!io) {
         snprintf(err, cap, "can't open %s: %s", path, SDL_GetError());
         return false;
     }
     bool ok = false;
-    Sint64 size = SDL_GetIOSize(io);
+    Sint64 size = pack_size ? (Sint64)pack_size : SDL_GetIOSize(io);
     uint8_t head[HW_PACK_HEADER];
     hw_pack_header h;
-    if (size < 0 || SDL_ReadIO(io, head, sizeof head) != sizeof head) {
+    if (size < 0 || SDL_SeekIO(io, (Sint64)base, SDL_IO_SEEK_SET) < 0 || SDL_ReadIO(io, head, sizeof head) != sizeof head) {
         snprintf(err, cap, "%s is too short to be a pack", path);
     } else if (hw_pack_header_parse(&h, head, sizeof head, (uint64_t)size, err, cap)) {
         size_t toc_size = (size_t)((uint64_t)size - h.toc_offset);
         uint8_t *toc = SDL_malloc(toc_size ? toc_size : 1);
-        if (toc && SDL_SeekIO(io, h.toc_offset, SDL_IO_SEEK_SET) >= 0 && SDL_ReadIO(io, toc, toc_size) == toc_size) {
+        if (toc && SDL_SeekIO(io, (Sint64)(base + h.toc_offset), SDL_IO_SEEK_SET) >= 0 && SDL_ReadIO(io, toc, toc_size) == toc_size) {
             ok = hw_pack_parse(&mt->pack, &h, toc, toc_size, (uint64_t)size, err, cap);
         } else if (!err[0]) {
             snprintf(err, cap, "can't read %s", path);
@@ -65,14 +67,26 @@ static bool open_pack(mount *mt, const char *path, char *err, size_t cap)
     return ok;
 }
 
-bool hw_vfs_mount_packs(hw_vfs *v, const char *dir, char *err, size_t cap)
+bool hw_vfs_find_embedded(const char *exe, uint64_t *offset, uint64_t *size)
 {
-    err[0] = 0;
-    char path[1100];
-    snprintf(path, sizeof path, "%s%sdata.hwp", dir, dir[0] && dir[strlen(dir) - 1] != '/' && dir[strlen(dir) - 1] != '\\' ? "/" : "");
+    SDL_IOStream *io = SDL_IOFromFile(exe, "rb");
+    if (!io) return false;
+    uint8_t head[4096], trailer[HW_PACK_TRAILER];
+    Sint64 file_size = SDL_GetIOSize(io);
+    size_t n = SDL_ReadIO(io, head, sizeof head);
+    uint64_t end = file_size > 0 ? hw_pack_trailer_end(head, n, (uint64_t)file_size) : 0;
+    bool ok = end >= HW_PACK_TRAILER && SDL_SeekIO(io, (Sint64)(end - HW_PACK_TRAILER), SDL_IO_SEEK_SET) >= 0 &&
+              SDL_ReadIO(io, trailer, sizeof trailer) == sizeof trailer && hw_pack_trailer_parse(trailer, end, offset, size);
+    SDL_CloseIO(io);
+    return ok;
+}
+
+/* Mounts the base pack (`size` bytes at `at` in `path`; 0 = the whole file), then the patches in `dir`. */
+static bool mount_base(hw_vfs *v, const char *path, uint64_t offset, uint64_t size, const char *dir, char *err, size_t cap)
+{
     mount base;
     memset(&base, 0, sizeof base);
-    if (!open_pack(&base, path, err, cap)) return false;
+    if (!open_pack(&base, path, offset, size, err, cap)) return false;
     if (base.pack.h.priority != 0) {
         hw_pack_free(&base.pack);
         snprintf(err, cap, "%s is a patch, not a base pack", path);
@@ -90,7 +104,7 @@ bool hw_vfs_mount_packs(hw_vfs *v, const char *dir, char *err, size_t cap)
         snprintf(ppath, sizeof ppath, "%s%s%s", dir, dir[0] && dir[strlen(dir) - 1] != '/' && dir[strlen(dir) - 1] != '\\' ? "/" : "", names[i]);
         mount m;
         memset(&m, 0, sizeof m);
-        if (!open_pack(&m, ppath, perr, sizeof perr)) {
+        if (!open_pack(&m, ppath, 0, 0, perr, sizeof perr)) {
             SDL_Log("packs: skipped %s: %s", names[i], perr);
             continue;
         }
@@ -111,6 +125,31 @@ bool hw_vfs_mount_packs(hw_vfs *v, const char *dir, char *err, size_t cap)
     }
     SDL_free(names);
     return true;
+}
+
+static void join(char *out, size_t cap, const char *dir, const char *name)
+{
+    size_t n = strlen(dir);
+    snprintf(out, cap, "%s%s%s", dir, n && dir[n - 1] != '/' && dir[n - 1] != '\\' ? "/" : "", name);
+}
+
+bool hw_vfs_mount_packs(hw_vfs *v, const char *dir, char *err, size_t cap)
+{
+    err[0] = 0;
+    char path[1100];
+    join(path, sizeof path, dir, "data.hwp");
+    return mount_base(v, path, 0, 0, dir, err, cap);
+}
+
+bool hw_vfs_mount_embedded(hw_vfs *v, const char *exe, const char *dir, char *err, size_t cap)
+{
+    err[0] = 0;
+    uint64_t at = 0, size = 0;
+    if (!hw_vfs_find_embedded(exe, &at, &size)) {
+        snprintf(err, cap, "%s has no game inside it", exe);
+        return false;
+    }
+    return mount_base(v, exe, at, size, dir, err, cap);
 }
 
 /* The pack entry that answers for `path`, or NULL (then *removed says whether a patch removed it). */
@@ -247,7 +286,7 @@ static uint8_t *read_entry(const mount *mt, const hw_pack_entry *e)
     if (!io) return NULL;
     uint8_t *stored = SDL_malloc(e->stored ? e->stored : 1);
     uint8_t *out = e->codec == HW_CODEC_STORE ? stored : SDL_malloc(e->size ? e->size : 1);
-    bool ok = stored && out && SDL_SeekIO(io, e->offset, SDL_IO_SEEK_SET) >= 0 && SDL_ReadIO(io, stored, e->stored) == e->stored;
+    bool ok = stored && out && SDL_SeekIO(io, (Sint64)(mt->base + e->offset), SDL_IO_SEEK_SET) >= 0 && SDL_ReadIO(io, stored, e->stored) == e->stored;
     SDL_CloseIO(io);
     if (ok) {
         hw_pack_unmask(&mt->pack.h, e->hash, 0, stored, e->stored);
@@ -272,7 +311,7 @@ SDL_IOStream *hw_vfs_open(hw_vfs *v, const char *path)
         window *w = SDL_calloc(1, sizeof *w);
         if (!w) return NULL;
         w->file = SDL_IOFromFile(mt->path, "rb");
-        w->start = e->offset;
+        w->start = mt->base + e->offset;
         w->size = e->size;
         w->h = mt->pack.h;
         w->hash = e->hash;

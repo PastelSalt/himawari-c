@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { lineIdToNumber, numberToLineId } from "../ids.js";
 import { type ProjectInput, checkProject } from "../project/check.js";
+import { readManifest } from "../project/manifest.js";
 import { compile } from "./compiler.js";
 import { crc32 } from "./crc32.js";
 import { disassemble } from "./disasm.js";
@@ -299,5 +300,35 @@ describe("instruction size limits (255 arguments)", () => {
   test("one more is an error, not a broken file", () => {
     expect(errors(project(`scene start:\n    menu:\n${options(127)}\n`))).toEqual(["HW0332"]);
     expect(errors(project(`scene start:\n    hana ${words(249)} "Hi."\n    end\n`))).toEqual(["HW0333"]);
+  });
+});
+
+describe("META credit (FINALIZATION.md OC-10)", () => {
+  const withCredit = (credit?: unknown) => {
+    const manifest = { ...JSON.parse(MANIFEST), ...(credit === undefined ? {} : { credit }) };
+    const input: ProjectInput = { ...project(), manifest: { file: "himawari.json", text: JSON.stringify(manifest) } };
+    return checkProject(input);
+  };
+
+  test("none (the default) writes nothing: the file is byte-identical to one without the field", () => {
+    const plain = writeHwb(compile(withCredit()).module!);
+    expect(writeHwb(compile(withCredit("none")).module!)).toEqual(plain);
+    expect(readHwb(plain).meta.credit).toBeUndefined();
+    expect(disassemble(readHwb(plain))).not.toContain("credit");
+  });
+
+  test("title and window are a trailing META word that round-trips", () => {
+    for (const [mode, n] of [["title", 1], ["window", 2]] as const) {
+      const m = readHwb(writeHwb(compile(withCredit(mode)).module!));
+      expect(m.meta.credit).toBe(n);
+      expect(m.minor).toBe(0); // older players ignore trailing META words, so the minor stays
+      expect(disassemble(m)).toContain(`; credit: ${mode}`);
+    }
+  });
+
+  test("an unknown value is an error in himawari.json", () => {
+    const d = readManifest(JSON.stringify({ ...JSON.parse(MANIFEST), credit: "splash" })).diagnostics;
+    expect(d.map((x) => [x.code, x.params["field"]])).toContainEqual(["HW0102", '"credit"']);
+    expect(compile(withCredit("splash")).module).toBeNull();
   });
 });

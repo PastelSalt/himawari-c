@@ -12,8 +12,12 @@
 
 #include <stdbool.h>
 
-/* The GPU renderer if possible (*device set), else the default renderer (*device NULL). */
-SDL_Renderer *hw_create_renderer(SDL_Window *win, bool allow_gpu, SDL_GPUDevice **device);
+/*
+ * The GPU renderer if possible (*device set), else the default renderer (*device NULL), else SDL's software
+ * renderer (no usable graphics driver: some VMs, Remote Desktop; RA-3). `name` (--renderer) asks for one SDL
+ * renderer by name instead ("software", "direct3d11", …), still falling back to software.
+ */
+SDL_Renderer *hw_create_renderer(SDL_Window *win, bool allow_gpu, const char *name, SDL_GPUDevice **device);
 
 typedef struct hw_rulewipe hw_rulewipe;
 

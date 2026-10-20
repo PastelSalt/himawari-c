@@ -55,8 +55,11 @@ typedef struct hw_ext_statement {
     /* After a load, a rewind, a reload, a warp, or a new start: show what the statement's most recent call left on
      * screen, at once (no animation). `last` is NULL when the statement hasn't run in this story. */
     void (*restore)(void *user, const hw_ext_call *last);
-    /* Draws over the scene, under the textbox, every frame of play. Optional. */
+    /* Draws over the scene, under the textbox, every frame of play. Optional. `now` is in seconds of SDL_GetTicksNS(). */
     void (*draw)(void *user, SDL_Renderer *ren, float w, float h, double now);
+    /* Whether what draw shows is still changing (an animation in progress). Optional: the player stops redrawing
+     * while nothing moves (RA-6), and without this it keeps redrawing as long as a statement with draw has run. */
+    bool (*animating)(void *user, double now);
 } hw_ext_statement;
 
 /* Registers a statement (copied). Returns false when the name is taken or the registry is full. */

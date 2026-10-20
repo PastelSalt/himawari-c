@@ -24,6 +24,8 @@ export interface Manifest {
   resolution: [number, number];
   positions: Record<string, [number, number]>;
   variables: Record<string, VariableDecl>;
+  /** How the game credits Himawari (OC-10): nothing visible (the default), a line on the title screen, or the window title. */
+  credit?: "none" | "title" | "window";
 }
 
 /** Positions used when the manifest declares none. */
@@ -133,5 +135,12 @@ export function readManifest(text: string): { manifest: Manifest | null; diagnos
     }
   }
 
-  return { manifest: { name, id, entry, sourceLanguage, languages, resolution, positions, variables }, diagnostics };
+  let credit: Manifest["credit"] = "none";
+  if (m["credit"] !== undefined) {
+    const c = m["credit"];
+    if (c === "none" || c === "title" || c === "window") credit = c;
+    else problem("credit", "must be \"none\", \"title\" (a small line on the title screen), or \"window\" (in the window title)");
+  }
+
+  return { manifest: { name, id, entry, sourceLanguage, languages, resolution, positions, variables, credit }, diagnostics };
 }

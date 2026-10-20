@@ -43,6 +43,7 @@ typedef struct hw_ui_layout {
     int quick_align;
     float title_x, title_y, title_size;
     bool title_show;
+    float credit_x, credit_y, credit_size; /* "Made with Himawari" (credit: "title"): anchor and baseline (fractions), px */
     hw_ui_column title_menu, game_menu;
     float radius, border, shadow;
     int hover;

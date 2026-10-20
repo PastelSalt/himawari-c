@@ -148,6 +148,34 @@ void hw_pack_unmask(const hw_pack_header *h, uint64_t entry_hash, uint64_t at, u
     }
 }
 
+/* ---- single-file games ---- */
+
+static const uint8_t TRAILER_MAGIC[8] = { 0x48, 0x57, 0x50, 0x45, 0x58, 0x45, 0x01, 0x00 }; /* "HWPEXE" 1 0 */
+
+uint64_t hw_pack_trailer_end(const uint8_t *head, size_t n, uint64_t file_size)
+{
+    /* MZ header, PE header, optional header, then data directory 4: the certificate table (a file offset). */
+    if (n < 64 || head[0] != 'M' || head[1] != 'Z') return file_size;
+    uint64_t pe = rd32(head + 0x3C);
+    if (pe + 26 > n || memcmp(head + pe, "PE\0\0", 4) != 0) return file_size;
+    size_t opt = (size_t)pe + 24;
+    unsigned magic = (unsigned)head[opt] | ((unsigned)head[opt + 1] << 8);
+    size_t dirs = opt + (magic == 0x20b ? 112u : magic == 0x10b ? 96u : 0u); /* PE32+, PE32 */
+    if (dirs == opt || dirs + 5 * 8 > n || rd32(head + dirs - 4) < 5) return file_size; /* NumberOfRvaAndSizes */
+    uint64_t at = rd32(head + dirs + 4 * 8), size = rd32(head + dirs + 4 * 8 + 4);
+    return size > 0 && at <= file_size && at + size == file_size ? at : file_size;
+}
+
+bool hw_pack_trailer_parse(const uint8_t t[HW_PACK_TRAILER], uint64_t trailer_end, uint64_t *offset, uint64_t *size)
+{
+    if (trailer_end < HW_PACK_TRAILER + HW_PACK_HEADER || memcmp(t + 16, TRAILER_MAGIC, 8) != 0) return false;
+    uint64_t o = rd64(t), s = rd64(t + 8);
+    if (s < HW_PACK_HEADER || o > trailer_end - HW_PACK_TRAILER || s != trailer_end - HW_PACK_TRAILER - o) return false;
+    *offset = o;
+    *size = s;
+    return true;
+}
+
 bool hw_pack_header_parse(hw_pack_header *h, const uint8_t *b, size_t size, uint64_t file_size, char *err, size_t cap)
 {
     memset(h, 0, sizeof *h);

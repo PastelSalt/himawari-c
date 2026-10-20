@@ -113,7 +113,13 @@ export interface MetaInfo {
   /** Every language the game offers, source first. */
   languages: number[];
   positions: { name: number; x: number; y: number }[];
+  /** How the game credits Himawari (a CREDIT_MODES index); absent or 0 = none, and then not written. */
+  credit?: number;
 }
+
+/** META `credit` values (himawari.json `credit`): nothing visible, a line on the title screen, or the window title. */
+export const CREDIT_MODES = ["none", "title", "window"] as const;
+export type CreditMode = (typeof CREDIT_MODES)[number];
 
 /** One target language's compiled translations (LOCL). */
 export interface LocaleEntry {
