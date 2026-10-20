@@ -32,7 +32,7 @@ static void begin(void *user, const hw_ext_call *call)
     tint *t = user;
     t->from = t->to;
     t->to = color_of(call);
-    t->start = t->now;
+    t->start = (double)SDL_GetTicksNS() / 1e9; /* the clock draw gets; t->now may be old if nothing was drawn for a while */
     t->ms = hw_ext_int(call, "ms");
 }
 
@@ -68,9 +68,16 @@ static void draw(void *user, SDL_Renderer *ren, float w, float h, double now)
     SDL_RenderFillRect(ren, &all);
 }
 
+/* Still fading: the player keeps drawing frames until the fade is done. */
+static bool animating(void *user, double now)
+{
+    const tint *t = user;
+    return t->ms > 0 && (now - t->start) * 1000.0 < t->ms;
+}
+
 void hw_ext_register_screen_tint(void);
 void hw_ext_register_screen_tint(void)
 {
-    hw_ext_statement s = { "screen_tint", &T, begin, NULL, NULL, finish, restore, draw };
+    hw_ext_statement s = { "screen_tint", &T, begin, NULL, NULL, finish, restore, draw, animating };
     hw_register_statement(&s);
 }

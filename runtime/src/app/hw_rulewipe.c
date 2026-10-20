@@ -31,10 +31,10 @@ struct hw_rulewipe {
     int next;
 };
 
-SDL_Renderer *hw_create_renderer(SDL_Window *win, bool allow_gpu, SDL_GPUDevice **device)
+SDL_Renderer *hw_create_renderer(SDL_Window *win, bool allow_gpu, const char *name, SDL_GPUDevice **device)
 {
     *device = NULL;
-    if (allow_gpu) {
+    if (allow_gpu && !name) {
         /* The GPU renderer is never SDL's default, so ask for it (rfcs/0002). */
         SDL_GPUDevice *dev = SDL_CreateGPUDevice(SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_SPIRV, false, NULL);
         if (dev) {
@@ -49,7 +49,10 @@ SDL_Renderer *hw_create_renderer(SDL_Window *win, bool allow_gpu, SDL_GPUDevice 
             SDL_Log("renderer: no GPU device (%s); rule wipes will dissolve", SDL_GetError());
         }
     }
-    return SDL_CreateRenderer(win, NULL);
+    SDL_Renderer *ren = SDL_CreateRenderer(win, name);
+    if (ren || (name && SDL_strcmp(name, SDL_SOFTWARE_RENDERER) == 0)) return ren;
+    SDL_Log("renderer: %s renderer failed (%s); using software rendering", name ? name : "the default", SDL_GetError());
+    return SDL_CreateRenderer(win, SDL_SOFTWARE_RENDERER);
 }
 
 static SDL_GPURenderState *state_for(hw_rulewipe *w, SDL_Texture *mask)

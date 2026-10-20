@@ -27,6 +27,10 @@ void hw_vfs_destroy(hw_vfs *v);
  * Returns false (with a reason) when data.hwp is missing or damaged.
  */
 bool hw_vfs_mount_packs(hw_vfs *v, const char *dir, char *err, size_t cap);
+/* A single-file game (spec/pack.md §7): whether `exe` has a pack appended, and where it is. */
+bool hw_vfs_find_embedded(const char *exe, uint64_t *offset, uint64_t *size);
+/* Mounts the pack inside `exe` as the base pack, then every `dir`/patch*.hwp, as hw_vfs_mount_packs does. */
+bool hw_vfs_mount_embedded(hw_vfs *v, const char *exe, const char *dir, char *err, size_t cap);
 /* Loose files: `path` is looked up as `root`/`path` after the packs. "" turns it off. */
 void hw_vfs_set_root(hw_vfs *v, const char *root);
 int hw_vfs_pack_count(const hw_vfs *v);

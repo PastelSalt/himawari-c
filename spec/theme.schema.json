@@ -378,6 +378,24 @@
             }
           }
         },
+        "credit": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "The \"Made with Himawari\" line on the title screen, shown when himawari.json has \"credit\": \"title\". x and y are its anchor and baseline; it is right-aligned in the right third of the screen, left-aligned in the left third, and centered between. Drawn in the dim color.",
+          "properties": {
+            "x": {
+              "$ref": "#/$defs/pct"
+            },
+            "y": {
+              "$ref": "#/$defs/pct"
+            },
+            "size": {
+              "type": "integer",
+              "minimum": 10,
+              "maximum": 60
+            }
+          }
+        },
         "title_menu": {
           "type": "object",
           "additionalProperties": false,

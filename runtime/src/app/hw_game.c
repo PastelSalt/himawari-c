@@ -722,6 +722,7 @@ static void handle(game *g, const hw_event *ev)
         g->focus = -1;
         g->skip_mode = false;
         g->blk = B_MENU;
+        g->autosave_pending = true; /* at each choice (P-2), once the frame is drawn for the thumbnail */
         break;
     case HW_EV_SHOW: case HW_EV_HIDE: case HW_EV_MOVE: case HW_EV_BG: case HW_EV_CG:
         if (ev->kind == HW_EV_BG) g->have_line = false; /* a new scene starts with an empty textbox */
@@ -847,6 +848,7 @@ void start_story(game *g)
     g->auto_mode = g->skip_mode = false;
     g->playtime_ms = 0;
     g->play_start = g->now;
+    g->last_save = g->now; /* nothing to lose yet */
     g->scr = SCR_PLAY;
     pump(g);
 }
@@ -891,10 +893,11 @@ static bool thumbnail(game *g, void **png, size_t *size)
     return ok;
 }
 
-void save_slot(game *g, int slot)
+/* Writes a save of the current state to `slot`, or to `path` when slot < 0. */
+static bool write_save(game *g, int slot, const char *path_override)
 {
     const void *snap = hw_history_peek(&g->hist, 0);
-    if (!snap || (slot >= 0 && !g->persist.dir[0])) return;
+    if (!snap || (slot >= 0 && !g->persist.dir[0])) return false;
     uint32_t pcs[HW_SAVE_HISTORY];
     uint32_t n = 0;
     for (uint32_t i = 1; i < g->hist.count && n < HW_SAVE_HISTORY; i++) pcs[n++] = hw_snapshot_pc(hw_history_peek(&g->hist, i));
@@ -922,23 +925,63 @@ void save_slot(game *g, int slot)
     hw_buf out = { 0 };
     char path[1100];
     if (slot >= 0) hw_persist_slot_path(&g->persist, slot, path, sizeof path);
-    else snprintf(path, sizeof path, "%s", g->save_to);
+    else snprintf(path, sizeof path, "%s", path_override);
     bool ok = hw_save_write(&g->vm, snap, pcs, n, &info, &out) && hw_persist_write(path, out.data, out.len);
     hw_buf_free(&out);
     SDL_free(png);
     g->slots_cached = false;
+    if (ok) g->last_save = g->now;
     save_global(g);
+    return ok;
+}
+
+void save_slot(game *g, int slot)
+{
+    bool ok = write_save(g, slot, g->save_to);
     notify(g, ok ? ui(g, UI_SAVED) : SDL_GetError());
 }
 
-bool load_slot(game *g, int slot)
+/* A story is under way: its screens, or a menu opened from them (not from the title screen). */
+static bool in_story(const game *g)
 {
-    char path[1100];
-    hw_persist_slot_path(&g->persist, slot, path, sizeof path);
+    if (!g->vm_ready || g->hist.count == 0 || g->blk == B_DONE) return false;
+    switch (g->scr) {
+    case SCR_PLAY: case SCR_SYSMENU: case SCR_HISTORY: return true;
+    case SCR_SLOTS: case SCR_CONFIRM_QUIT: case SCR_CONFIG: case SCR_CONTROLS: return g->back_to != SCR_TITLE;
+    default: return false;
+    }
+}
+
+/* --autosave-to FILE: where an unattended run's autosaves go (tests); it never writes the player's own folder. */
+static const char *autosave_to;
+
+void autosave(game *g)
+{
+    g->autosave_pending = false;
+    if (g->link || !in_story(g)) return;
+    if (unattended) {
+        if (autosave_to) write_save(g, -1, autosave_to);
+        return;
+    }
+    if (!write_save(g, HW_SLOT_AUTO, NULL)) SDL_Log("autosave: %s", SDL_GetError());
+}
+
+int newest_slot(game *g)
+{
+    int best = -1;
+    for (int s = 0; s < HW_SLOT_COUNT; s++) {
+        if (g->slot_used[s] && (best < 0 || g->slot_info[s].time > g->slot_info[best].time)) best = s;
+    }
+    return best;
+}
+
+/* Loads a save file; `missing` is the notice when there's no such file. */
+static bool load_file(game *g, const char *path, hw_ui_string missing)
+{
     size_t size = 0;
     uint8_t *data = SDL_LoadFile(path, &size);
     if (!data) {
-        notify(g, ui(g, UI_NO_QUICK_SAVE));
+        notify(g, ui(g, missing));
         return false;
     }
     char err[200], msg[300];
@@ -957,11 +1000,19 @@ bool load_slot(game *g, int slot)
     g->auto_mode = g->skip_mode = false;
     g->playtime_ms = (uint64_t)info.playtime_s * 1000;
     g->play_start = g->now;
+    g->last_save = g->now;
     g->scr = SCR_PLAY;
     sync_audio(g);
     notify(g, r == HW_SAVE_EXACT ? ui(g, UI_LOADED) : r == HW_SAVE_REMAPPED ? ui(g, UI_LOAD_REMAPPED) : ui(g, UI_LOAD_FALLBACK));
     pump(g);
     return true;
+}
+
+bool load_slot(game *g, int slot)
+{
+    char path[1100];
+    hw_persist_slot_path(&g->persist, slot, path, sizeof path);
+    return load_file(g, path, UI_NO_QUICK_SAVE);
 }
 
 /* ---- language ---- */
@@ -1479,6 +1530,102 @@ void apply_settings(game *g)
     if (g->vm_ready && g->vm.s.display.textbox == HW_TEXTBOX_NVL) layout_page(g);
 }
 
+/* ---- RA-6: no redrawing while nothing moves ---- */
+
+/* Shaking text ({shake}) moves every frame. */
+static bool shakes(const hw_rich_text *rt)
+{
+    for (uint32_t i = 0; i < rt->run_count; i++) {
+        if (rt->styles[i].flags & HW_TS_SHAKE) return true;
+    }
+    return false;
+}
+
+static bool blinks(const game *g, const hw_sprite *sp)
+{
+    for (uint32_t i = 0; i < sp->group_count; i++) {
+        if (g->m.sprite_groups[sp->group_first + i].flags & HW_SPRITE_BLINK) return true;
+    }
+    return false;
+}
+
+/*
+ * Seconds until what's on screen changes by itself: 0 while something moves (a transition, text appearing,
+ * the continue mark pulsing, a voice with lip-flap, an animation), else the time of the next change (a
+ * blink, a wait ending, a notice going away), or an hour when only the player can change anything.
+ */
+static double next_change(game *g)
+{
+    double next = 3600;
+#define AT(t) do { double d_ = (t) - g->now; if (d_ < next) next = d_ > 0 ? d_ : 0; } while (0)
+    if (g->autosave_pending || g->rebind >= 0) return 0;
+    if (g->notice_until > g->now) AT(g->notice_until);
+    if (g->now < g->shake_until || g->now < g->flash_until) return 0;
+    bool story = g->scr == SCR_PLAY || g->scr == SCR_SYSMENU || g->scr == SCR_HISTORY || g->scr == SCR_END || g->scr == SCR_ERROR ||
+                 ((g->scr == SCR_SLOTS || g->scr == SCR_CONFIRM_QUIT || g->scr == SCR_CONFIG || g->scr == SCR_CONTROLS) && g->back_to != SCR_TITLE);
+    if (story && g->vm_ready) {
+        /* Blinks: a 150 ms cycle every few seconds, per character whose sprite has blink frames. */
+        for (uint32_t i = 0; i < g->shown.stage_count && i < HW_VM_MAX_STAGE; i++) {
+            const hw_sprite *sp = hw_module_sprite_of(&g->m, g->shown.stage[i].id);
+            if (!sp || !blinks(g, sp)) continue;
+            double at = g->blink_at[i];
+            if (at <= 0 || (g->now >= at && g->now < at + 0.2)) return 0;
+            AT(at);
+        }
+        for (uint32_t i = 0; g->ext_of && i < g->m.ext_count && i < HW_VM_MAX_EXT; i++) {
+            const hw_ext_statement *h = g->ext_of[i];
+            if (!h || !h->draw || !((g->shown.ext_called >> i) & 1u)) continue;
+            if (!h->animating || h->animating(h->user, g->now)) return 0;
+        }
+        if (g->vm.s.display.textbox == HW_TEXTBOX_NVL) {
+            for (uint32_t i = 0; i < g->page_built && i < HW_VM_MAX_PAGE; i++) {
+                if (shakes(&g->page_text[i])) return 0;
+            }
+        }
+        if (g->have_line && shakes(&g->text)) return 0;
+    }
+    if (g->scr == SCR_PLAY) {
+        if (g->trans_active || g->blk == B_TRANS || g->blk == B_EXT || g->blk == B_NONE || g->auto_mode || skipping(g)) return 0;
+        if (g->blk == B_WAIT) AT(g->wait_until);
+        if (g->blk == B_SAY) {
+            if (g->reveal < (float)g->text.chars || g->done_at < 0 || g->text.no_wait || hw_audio_voice_playing(g->audio)) return 0;
+            if (g->now < g->done_at + CONTINUE_PULSE) return 0; /* the continue mark pulses a few times, then holds */
+        }
+        if (g->blk == B_MENU) {
+            for (uint32_t i = 0; i < g->option_count; i++) {
+                if (shakes(&g->option_text[i])) return 0;
+            }
+            if (g->ui.motion != HW_MOTION_NONE && (g->now - g->menu_t0) * 1000.0 < g->ui.motion_ms + 40.0 * g->option_count + 50.0) return 0;
+        }
+    }
+#undef AT
+    return next;
+}
+
+/*
+ * Waits for input or for the next change on screen. SDL sleeps in the window system's wait; with a gamepad open
+ * it would poll every millisecond instead, so then this checks for events every 10 ms (a gamepad press is never
+ * more than a frame late).
+ */
+static void idle_wait(game *g)
+{
+    double frame_now = g->now; /* the next frame's dt is measured from this frame, not from the end of the wait */
+    for (;;) {
+        g->now = (double)SDL_GetTicksNS() / 1e9;
+        double wait = next_change(g);
+        g->now = frame_now;
+        if (wait <= 0 || !g->running) return;
+        int ms = wait > 0.5 ? 500 : (int)ceil(wait * 1000.0); /* wakes now and then: audio ends, the story link */
+        if (g->pad) {
+            SDL_DelayNS(10 * SDL_NS_PER_MS);
+            SDL_PumpEvents();
+            if (SDL_HasEvents(SDL_EVENT_FIRST, SDL_EVENT_LAST)) return;
+        } else if (SDL_WaitEventTimeout(NULL, ms)) {
+            return; /* the event stays queued for the main loop */
+        }
+    }
+}
+
 /* Startup phases for --perf: when each one was done, in ms since the process started. */
 typedef struct perf_mark { const char *name; double ms; } perf_mark;
 static perf_mark marks[16];
@@ -1544,6 +1691,105 @@ static int fatal(SDL_Window *win, const char *msg)
     return 2;
 }
 
+/* Whether a remembered window's top edge (where its title bar is grabbed) is on some display. */
+static bool on_a_display(const hw_settings *s)
+{
+    int n = 0;
+    SDL_DisplayID *ids = SDL_GetDisplays(&n);
+    SDL_Rect top = { s->win_x, s->win_y, s->win_w, 40 }, usable, part;
+    bool ok = false;
+    for (int i = 0; ids && i < n && !ok; i++) {
+        ok = SDL_GetDisplayUsableBounds(ids[i], &usable) && SDL_GetRectIntersection(&top, &usable, &part) && part.w >= 120 && part.h >= 30;
+    }
+    SDL_free(ids);
+    return ok;
+}
+
+/*
+ * The window (P-5, P-6): where and as large as the player left it; on first launch (or when that place is off every
+ * display now), centered and as large as the game's size times the display's scale, within 85 % of the usable screen.
+ * Tests and Studio's preview keep the size they always had. The title credits Himawari when the game asks (OC-10).
+ */
+static SDL_Window *open_window(game *g, bool hidden, bool preview)
+{
+    char title[300];
+    const char *name = hw_str(&g->m, g->m.title);
+    if (g->m.credit == HW_CREDIT_WINDOW) snprintf(title, sizeof title, "%s (made with Himawari)", name);
+    else snprintf(title, sizeof title, "%s", name);
+    const hw_settings *s = &g->settings;
+    SDL_DisplayID display = SDL_GetPrimaryDisplay();
+    int x = SDL_WINDOWPOS_CENTERED, y = SDL_WINDOWPOS_CENTERED, w = (int)g->W, h = (int)g->H;
+    SDL_Rect usable;
+    if (unattended || preview) {
+        x = y = SDL_WINDOWPOS_UNDEFINED;
+        const SDL_DisplayMode *dm = SDL_GetDesktopDisplayMode(display);
+        if (dm && (float)dm->h * 0.85f < g->H) {
+            h = (int)((float)dm->h * 0.80f);
+            w = (int)((float)h * g->W / g->H);
+        }
+    } else if (s->win_w > 0 && on_a_display(s)) {
+        x = s->win_x;
+        y = s->win_y;
+        w = s->win_w;
+        h = s->win_h;
+    } else if (SDL_GetDisplayUsableBounds(display, &usable)) {
+        float scale = SDL_GetDisplayContentScale(display);
+        float k = fminf(scale > 0.0f ? scale : 1.0f, fminf(0.85f * (float)usable.w / g->W, 0.85f * (float)usable.h / g->H));
+        w = (int)(g->W * k);
+        h = (int)(g->H * k);
+    }
+    SDL_PropertiesID props = SDL_CreateProperties();
+    SDL_SetStringProperty(props, SDL_PROP_WINDOW_CREATE_TITLE_STRING, title);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_X_NUMBER, x);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_Y_NUMBER, y);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_WIDTH_NUMBER, w);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_CREATE_HEIGHT_NUMBER, h);
+    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_RESIZABLE_BOOLEAN, true);
+    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_HIGH_PIXEL_DENSITY_BOOLEAN, true);
+    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_HIDDEN_BOOLEAN, hidden);
+    SDL_SetBooleanProperty(props, SDL_PROP_WINDOW_CREATE_MAXIMIZED_BOOLEAN, !unattended && !preview && s->win_maximized);
+    SDL_Window *win = SDL_CreateWindowWithProperties(props);
+    SDL_DestroyProperties(props);
+    return win;
+}
+
+void remember_window(game *g)
+{
+    if (unattended || g->link || !g->win) return;
+    SDL_WindowFlags f = SDL_GetWindowFlags(g->win);
+    if (f & (SDL_WINDOW_FULLSCREEN | SDL_WINDOW_MINIMIZED)) return;
+    g->settings.win_maximized = (f & SDL_WINDOW_MAXIMIZED) != 0;
+    if (g->settings.win_maximized) return; /* the size to restore to stays the one from before */
+    int x, y, w, h;
+    if (SDL_GetWindowPosition(g->win, &x, &y) && SDL_GetWindowSize(g->win, &w, &h)) {
+        g->settings.win_x = x;
+        g->settings.win_y = y;
+        g->settings.win_w = w;
+        g->settings.win_h = h;
+    }
+}
+
+/* The offscreen textures every frame is drawn through; false when the renderer can't make them. */
+static bool make_canvas(game *g, bool compare)
+{
+    SDL_SetRenderLogicalPresentation(g->ren, (int)g->W, (int)g->H, SDL_LOGICAL_PRESENTATION_LETTERBOX);
+    g->scene_tex = SDL_CreateTexture(g->ren, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, (int)g->W, (int)g->H);
+    g->prev_tex = SDL_CreateTexture(g->ren, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, (int)g->W, (int)g->H);
+    if (compare) g->canvas_tex = SDL_CreateTexture(g->ren, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, (int)g->W, (int)g->H);
+    if (!g->scene_tex || !g->prev_tex || (compare && !g->canvas_tex)) return false;
+    SDL_SetTextureBlendMode(g->scene_tex, SDL_BLENDMODE_BLEND);
+    SDL_SetTextureBlendMode(g->prev_tex, SDL_BLENDMODE_BLEND);
+    return true;
+}
+
+static void free_canvas(game *g)
+{
+    if (g->scene_tex) SDL_DestroyTexture(g->scene_tex);
+    if (g->prev_tex) SDL_DestroyTexture(g->prev_tex);
+    if (g->canvas_tex) SDL_DestroyTexture(g->canvas_tex);
+    g->scene_tex = g->prev_tex = g->canvas_tex = NULL;
+}
+
 int hw_game_main(int argc, char **argv, const char *game_path, const char *project)
 {
     static game G; /* large; zero-initialized */
@@ -1579,8 +1825,9 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
     g->vfs = hw_vfs_create();
     if (!g->vfs) return fatal(NULL, "Out of memory.");
     size_t gl = strlen(game_path);
-    if (gl > 4 && SDL_strcasecmp(game_path + gl - 4, ".hwp") == 0) {
-        if (!hw_vfs_mount_packs(g->vfs, dir, err, sizeof err)) {
+    bool exe = gl > 4 && SDL_strcasecmp(game_path + gl - 4, ".exe") == 0; /* a single-file game: the pack is inside the exe */
+    if (exe || (gl > 4 && SDL_strcasecmp(game_path + gl - 4, ".hwp") == 0)) {
+        if (!(exe ? hw_vfs_mount_embedded(g->vfs, game_path, dir[0] ? dir : ".", err, sizeof err) : hw_vfs_mount_packs(g->vfs, dir, err, sizeof err))) {
             char msg[400];
             snprintf(msg, sizeof msg, "Can't start the game.\n\n%s", err);
             SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Himawari", msg, NULL);
@@ -1601,15 +1848,11 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
     g->H = (float)g->m.height;
     g->S = g->H / 1080.0f;
 
-    /* A window that fits the screen, in the game's aspect ratio. */
-    int ww = (int)g->W, wh = (int)g->H;
-    const SDL_DisplayMode *dm = SDL_GetDesktopDisplayMode(SDL_GetPrimaryDisplay());
-    if (dm && (float)dm->h * 0.85f < g->H) {
-        wh = (int)((float)dm->h * 0.80f);
-        ww = (int)((float)wh * g->W / g->H);
-    }
-    g->win = SDL_CreateWindow(hw_str(&g->m, g->m.title), ww, wh,
-                              SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIGH_PIXEL_DENSITY | (parent ? SDL_WINDOW_HIDDEN : 0));
+    /* The player's settings come first: the window opens where it was (P-5). The rest of global.dat is read below. */
+    hw_settings_default(&g->settings);
+    hw_persist_open(&g->persist, hw_str(&g->m, g->m.game_id));
+    if (!unattended) hw_global_load(&g->persist, NULL, NULL, NULL, NULL, &g->settings);
+    g->win = open_window(g, parent != 0, link);
     if (g->win && parent && !hw_link_embed(g->win, parent)) {
         SDL_Log("link: can't dock into window %llu; using a separate window", (unsigned long long)parent);
         parent = 0;
@@ -1617,27 +1860,39 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
     }
     /* The GPU renderer (~200 ms to start) is only needed for rule wipes (rfcs/0002). A shipped game that has none
      * starts on the default renderer (plan §8.1: start ≤ 250 ms); development runs always get it, so previews match. */
-    bool allow_gpu = g->dev || uses_rule_wipes(&g->m);
+    bool allow_gpu = g->dev || uses_rule_wipes(&g->m), compare = false;
+    const char *renderer = NULL;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--no-gpu") == 0) allow_gpu = false;
         if (strcmp(argv[i], "--gpu") == 0) allow_gpu = true;
+        /* --renderer NAME: one SDL renderer ("software" checks the fallback for PCs without a graphics driver, RA-3). */
+        if (strcmp(argv[i], "--renderer") == 0 && i + 1 < argc) renderer = argv[i + 1];
+        /* --compare: frames are drawn at the game's own size, whatever the window, so goldens match on any PC. */
+        if (strcmp(argv[i], "--compare") == 0) compare = true;
     }
     mark("window");
-    g->ren = g->win ? hw_create_renderer(g->win, allow_gpu, &g->gpu) : NULL;
+    g->ren = g->win ? hw_create_renderer(g->win, allow_gpu, renderer, &g->gpu) : NULL;
+    if (g->ren && !make_canvas(g, compare) && SDL_strcmp(SDL_GetRendererName(g->ren), SDL_SOFTWARE_RENDERER) != 0) {
+        /* A renderer that starts but can't draw offscreen is no use: draw in software instead (RA-3). */
+        SDL_Log("renderer: %s can't draw offscreen (%s); using software rendering", SDL_GetRendererName(g->ren), SDL_GetError());
+        free_canvas(g);
+        SDL_DestroyRenderer(g->ren);
+        if (g->gpu) SDL_DestroyGPUDevice(g->gpu);
+        g->gpu = NULL;
+        g->ren = SDL_CreateRenderer(g->win, SDL_SOFTWARE_RENDERER);
+        if (g->ren && !make_canvas(g, compare)) {
+            free_canvas(g);
+            SDL_DestroyRenderer(g->ren);
+            g->ren = NULL;
+        }
+    }
     mark("renderer");
-    if (!g->ren) return fatal(NULL, SDL_GetError());
-    SDL_SetRenderVSync(g->ren, 1);
+    if (!g->ren || !g->scene_tex) return fatal(NULL, SDL_GetError());
+    g->software = SDL_strcmp(SDL_GetRendererName(g->ren), SDL_SOFTWARE_RENDERER) == 0;
+    if (g->software) SDL_Log("renderer: software (no graphics acceleration)");
+    if (!SDL_SetRenderVSync(g->ren, 1)) g->no_vsync = true; /* frames are paced by the main loop instead */
     g->wipe = hw_rulewipe_open(g->ren, g->gpu);
     mark("rule_wipes");
-    SDL_SetRenderLogicalPresentation(g->ren, (int)g->W, (int)g->H, SDL_LOGICAL_PRESENTATION_LETTERBOX);
-    g->scene_tex = SDL_CreateTexture(g->ren, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, (int)g->W, (int)g->H);
-    g->prev_tex = SDL_CreateTexture(g->ren, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, (int)g->W, (int)g->H);
-    for (int i = 1; i < argc; i++) {
-        /* --compare: frames are drawn at the game's own size, whatever the window, so goldens match on any PC. */
-        if (strcmp(argv[i], "--compare") == 0) g->canvas_tex = SDL_CreateTexture(g->ren, SDL_PIXELFORMAT_RGBA32, SDL_TEXTUREACCESS_TARGET, (int)g->W, (int)g->H);
-    }
-    SDL_SetTextureBlendMode(g->scene_tex, SDL_BLENDMODE_BLEND);
-    SDL_SetTextureBlendMode(g->prev_tex, SDL_BLENDMODE_BLEND);
 
     g->assets = hw_assets_open(g->ren, g->vfs);
     g->fonts_font = -1;
@@ -1660,11 +1915,10 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
     bind_theme(g);
     bind_extensions(g);
 
-    hw_settings_default(&g->settings);
     g->rebind = -1;
+    g->confirm_slot = -1;
     g->music_track = HW_NONE;
     if (!hw_unlocks_build(&g->unlocks, &g->m)) return fatal(g->win, "Out of memory.");
-    hw_persist_open(&g->persist, hw_str(&g->m, g->m.game_id));
     /* The log and crash reports go to the save folder; never for unattended runs, unless testing the crash handler. */
     bool crash_test = false;
     for (int i = 1; i < argc; i++) crash_test |= g->dev && strcmp(argv[i], "--crash-test") == 0;
@@ -1707,7 +1961,14 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
         if (strcmp(argv[i], "--compare") == 0 && i + 1 < argc) shot = g->compare = argv[i + 1];
         /* --save-to FILE: save the last frame's state there (tests; never the player's own save folder). */
         if (strcmp(argv[i], "--save-to") == 0 && i + 1 < argc) g->save_to = argv[i + 1];
+        /* --autosave-to FILE: an unattended run's autosaves (at menus, on quitting) go there (tests). */
+        if (strcmp(argv[i], "--autosave-to") == 0 && i + 1 < argc) autosave_to = argv[i + 1];
         if (strcmp(argv[i], "--start") == 0) start_story(g);
+        /* --load FILE: plays on from a save file. */
+        if (strcmp(argv[i], "--load") == 0 && i + 1 < argc) {
+            if (!load_file(g, argv[i + 1], UI_LOAD) && unattended) warp_failed = true;
+            else if (unattended) g->notice_until = 0; /* tests compare the frame without the "Loaded." notice */
+        }
         if (strcmp(argv[i], "--warp") == 0 && i + 1 < argc) {
             char msg[600];
             if (!warp_to(g, argv[i + 1], msg, sizeof msg)) {
@@ -1778,6 +2039,7 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
         link_report(g);
         if (shot && frames == 1) g->shot = shot;
         render(g); /* presents, which waits for vsync: CPU time is measured up to here minus that wait (see render) */
+        if (g->autosave_pending) autosave(g); /* a menu appeared: the frame just drawn is the thumbnail */
         if (frame_ms && frame_count < 100000) frame_ms[frame_count++] = (double)(g->present_at - frame_t0) / 1e6;
         if (first_frame_ms < 0) {
             first_frame_ms = hw_since_process_start_ms();
@@ -1788,7 +2050,17 @@ int hw_game_main(int argc, char **argv, const char *game_path, const char *proje
         }
         if (frames == 1 && g->save_to) save_slot(g, -1);
         if (frames > 0 && --frames == 0) g->running = false;
+        if (g->no_vsync) {
+            /* No vsync (some software renderers): about 60 frames a second, not as many as the CPU can draw. */
+            uint64_t spent = SDL_GetTicksNS() - frame_t0, frame = SDL_NS_PER_SECOND / 60;
+            if (spent < frame) SDL_DelayNS(frame - spent);
+        }
+        /* RA-6: while nothing moves, sleep until the player does something or something is due (unattended runs
+         * count frames, so they always draw). */
+        if (frames < 0) idle_wait(g);
     }
+    remember_window(g);
+    autosave(g); /* quitting during a story (P-2) */
 
     if (perf) write_perf(g, perf, first_frame_ms, frame_ms, frame_count);
     SDL_free(frame_ms);

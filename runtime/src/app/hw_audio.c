@@ -142,6 +142,11 @@ void hw_audio_stop_all(hw_audio *au)
     au->music_name[0] = au->ambient_name[0] = 0;
 }
 
+void hw_audio_set_muted(hw_audio *au, bool muted)
+{
+    if (au) MIX_SetMixerGain(au->mixer, muted ? 0.0f : 1.0f);
+}
+
 void hw_audio_set_volume(hw_audio *au, int channel, float volume)
 {
     if (!au || channel < 0 || channel > 3) return;

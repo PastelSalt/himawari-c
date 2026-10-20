@@ -35,6 +35,7 @@ typedef enum block { B_NONE, B_SAY, B_MENU, B_WAIT, B_TRANS, B_EXT, B_DONE } blo
 typedef enum trans_kind { T_FADE, T_DISSOLVE, T_SLIDE_LEFT, T_SLIDE_RIGHT, T_SLIDE_UP, T_SLIDE_DOWN, T_WIPE, T_RULE } trans_kind;
 
 #define BACKLOG 100
+#define CONTINUE_PULSE (3.0 * 2.0 * SDL_PI_D / 5.0) /* seconds: three pulses of the continue mark (RA-6) */
 #define MAX_HITS 64
 #define HISTORY_DEPTH 256
 
@@ -57,6 +58,7 @@ enum {
     BTN_START = 1, BTN_LOAD, BTN_LANGUAGE, BTN_QUIT, BTN_RESUME, BTN_SAVE, BTN_HISTORY, BTN_TITLE,
     BTN_BACK, BTN_AUTO, BTN_SKIP, BTN_MENU, BTN_ROLLBACK, BTN_YES, BTN_NO,
     BTN_CONFIG, BTN_EXTRAS, BTN_GALLERY, BTN_MUSIC, BTN_CONTINUE, BTN_RESET_CONTROLS, BTN_STOP_MUSIC,
+    BTN_RESUME_LATEST, BTN_OVERWRITE_YES, BTN_OVERWRITE_NO,
     BTN_OPTION = 1000, BTN_SLOT = 2000, BTN_CFG = 3000, BTN_BIND_KEY = 4000, BTN_BIND_PAD = 4100,
     BTN_CG = 5000, BTN_TRACK = 6000, BTN_VOICE = 7000
 };
@@ -174,15 +176,22 @@ typedef struct game {
     uint32_t music_track;        /* the music room's track (index into unlocks.music), or HW_NONE */
     int scroll;                  /* first row shown in the gallery */
     bool slots_cached;           /* the save screen's slots were read */
-    bool slot_used[HW_SLOTS + 1];
-    hw_save_info slot_info[HW_SLOTS + 1]; /* thumb is not kept: see slot_thumb */
-    SDL_Texture *slot_thumb[HW_SLOTS + 1];
+    bool slot_used[HW_SLOT_COUNT];
+    hw_save_info slot_info[HW_SLOT_COUNT]; /* thumb is not kept: see slot_thumb */
+    SDL_Texture *slot_thumb[HW_SLOT_COUNT];
     const char *save_to;         /* --save-to: a save of the last frame goes here (tests) */
 
     /* --perf (plan §8.1 budgets). */
     uint64_t present_at;         /* when this frame's drawing was done, before waiting for vsync */
     double perf_load_ms, perf_read_ms;
     size_t perf_hwb_bytes;
+
+    /* Finalization (FINALIZATION.md P-2, P-4, RA-6). */
+    bool autosave_pending;       /* a menu appeared: autosave once the next frame is drawn (the thumbnail) */
+    double last_save;            /* g->now when this playthrough was last saved, started, or loaded */
+    int confirm_slot;            /* the save screen asks before overwriting this slot; -1 = not asking */
+    bool software;               /* drawing with SDL's software renderer (no usable graphics driver, or --renderer software) */
+    bool no_vsync;               /* the renderer can't wait for vsync: the main loop paces frames itself */
 } game;
 
 /* An unattended run (--frames: smoke tests, render_line) never writes the player's data. */
@@ -218,6 +227,10 @@ void choose(game *g, uint32_t k);
 void start_story(game *g);
 void rollback(game *g);
 void save_slot(game *g, int slot);
+/* The autosave (P-2): quietly, only during a story, never in unattended runs or Studio's preview. */
+void autosave(game *g);
+/* The newest save of any kind (manual, quick, auto), or -1. Reads the slots' headers when needed. */
+int newest_slot(game *g);
 bool load_slot(game *g, int slot);
 void next_language(game *g);
 void reload(game *g);
@@ -227,6 +240,7 @@ void on_event(game *g, SDL_Event *e);
 
 /* hw_game.c */
 void apply_settings(game *g);    /* after a settings change: colors, sizes, fonts, volumes, layouts */
+void remember_window(game *g);   /* after the window moved or changed size: kept for next time (P-5) */
 void open_fonts(game *g);
 void stop_title_music(game *g);
 void choose_language(game *g, const char *lang);

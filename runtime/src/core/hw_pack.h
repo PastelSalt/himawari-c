@@ -14,7 +14,7 @@
 #include <stdint.h>
 
 #define HW_PACK_MAJOR 1
-#define HW_PACK_MINOR 0
+#define HW_PACK_MINOR 1 /* 1.1: a pack may be appended to the player exe (single-file games); packs themselves are unchanged */
 #define HW_PACK_HEADER 48
 #define HW_PACK_ENTRY 32
 #define HW_PACK_OBFUSCATED 1u
@@ -68,6 +68,18 @@ bool hw_pack_normalize(const char *path, char *out, size_t cap);
 
 /* Undoes (or applies) obfuscation of `n` bytes that start at byte `at` of an entry. */
 void hw_pack_unmask(const hw_pack_header *h, uint64_t entry_hash, uint64_t at, uint8_t *bytes, size_t n);
+
+/*
+ * Single-file games (spec/pack.md §7): a pack appended to the player exe, then a 24-byte trailer
+ * { u64 pack_offset, u64 pack_size, u8[8] magic "HWPEXE" 01 00 }. The trailer ends the file, or, in a signed
+ * exe, ends where the Authenticode certificate table starts.
+ */
+#define HW_PACK_TRAILER 24
+/* Where a trailer would end in an exe whose first `n` bytes are `head` (4096 are plenty): the start of the
+ * certificate table when the PE file has one that ends the file, else the file size. */
+uint64_t hw_pack_trailer_end(const uint8_t *head, size_t n, uint64_t file_size);
+/* Reads a trailer that ends at `trailer_end`: true, with the pack's place, when it is one and the pack fits right before it. */
+bool hw_pack_trailer_parse(const uint8_t trailer[HW_PACK_TRAILER], uint64_t trailer_end, uint64_t *offset, uint64_t *size);
 
 uint64_t hw_xxh64(const void *data, size_t len, uint64_t seed);
 

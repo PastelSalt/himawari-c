@@ -96,6 +96,9 @@ typedef struct hw_locale {
     const uint32_t *char_names; /* char_count entries: a string index or 0 */
 } hw_locale;
 
+/* How a game credits Himawari in play (himawari.json "credit", META). */
+enum { HW_CREDIT_NONE = 0, HW_CREDIT_TITLE = 1, HW_CREDIT_WINDOW = 2 };
+
 typedef struct hw_module {
     uint16_t major, minor;
     uint32_t crc; /* identifies this exact build (saves remap when it changes) */
@@ -106,6 +109,7 @@ typedef struct hw_module {
     uint32_t *languages;
     uint32_t position_count;
     hw_position *positions;
+    uint32_t credit; /* HW_CREDIT_*: an optional trailing META word; 0 when absent */
 
     uint32_t string_count;
     const char **strings; /* NUL-terminated UTF-8 */

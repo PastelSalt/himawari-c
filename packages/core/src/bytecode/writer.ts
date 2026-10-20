@@ -50,7 +50,7 @@ export function writeHwb(m: HwbModule): Uint8Array {
   const mt = m.meta;
   const sections: [string, Uint8Array][] = [
     ["META", words(mt.title, mt.id, mt.width, mt.height, mt.sourceLanguage, mt.languages.length, mt.languages,
-      mt.positions.length, mt.positions.flatMap((p) => [p.name, p.x, p.y]))],
+      mt.positions.length, mt.positions.flatMap((p) => [p.name, p.x, p.y]), mt.credit ? [mt.credit] : [])],
     ["STRS", stringsSection(m.strings)],
     ["VARS", words(m.vars.length, varEntries, enumValues.length, enumValues)],
     ["CHAR", words(m.chars.length, m.chars.flatMap((c) => [c.id, c.name, c.color]))],

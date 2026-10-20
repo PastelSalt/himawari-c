@@ -41,10 +41,11 @@ static void textbox_panel(game *g, SDL_FRect r, float alpha)
     panel(g, r, g->pal.textbox, alpha);
 }
 
-/* The blinking "click to continue" mark. */
+/* The "click to continue" mark: it pulses three times, then holds still, so a waiting game draws nothing new (RA-6). */
 static void continue_mark(game *g, float x, float y)
 {
-    float a = 0.5f + 0.5f * sinf((float)g->now * 5.0f);
+    double t = g->done_at >= 0 ? g->now - g->done_at : 0;
+    float a = t < CONTINUE_PULSE ? 0.5f + 0.5f * cosf((float)t * 5.0f) : 1.0f;
     rounded(g, (SDL_FRect){ x, y, sc(g, 18), sc(g, 18) }, fminf(sc(g, g->ui.radius), sc(g, 9)), g->pal.accent, a);
 }
 
@@ -172,6 +173,18 @@ static void button_column(game *g, const hw_ui_column *c, const char *const *lab
     }
 }
 
+static void cache_slots(game *g);
+
+/* "Made with Himawari" on the title screen when the game credits the engine there (OC-10), placed by layout.credit. */
+static void draw_credit(game *g)
+{
+    if (g->m.credit != HW_CREDIT_TITLE) return;
+    const char *text = "Made with Himawari";
+    float x = g->W * g->ui.credit_x, px = sc(g, g->ui.credit_size);
+    int align = g->ui.credit_x > 2.0f / 3.0f ? 2 : g->ui.credit_x < 1.0f / 3.0f ? 0 : 1;
+    hw_text_draw(g->fonts, text, px, 0, x, g->H * g->ui.credit_y, align, col(g->pal.dim), col(g->pal.ink), px > 20 ? g->ui.outline : 0.0f);
+}
+
 static void draw_title(game *g)
 {
     SDL_Texture *t = theme_image(g, "title.background");
@@ -186,14 +199,17 @@ static void draw_title(game *g)
         hw_text_draw(g->fonts, hw_str(&g->m, g->m.title), sc(g, g->ui.title_size), HW_TS_BOLD, g->W * g->ui.title_x, g->H * g->ui.title_y, 1,
                      col(g->pal.text), col(g->pal.ink), g->ui.outline * 2.0f);
     }
+    draw_credit(g);
     char lang[64];
     snprintf(lang, sizeof lang, "%s: %s", ui(g, UI_LANGUAGE), hw_language_name(g->lang));
-    const char *labels[] = { ui(g, UI_START), ui(g, UI_LOAD), ui(g, UI_CONFIG), ui(g, UI_EXTRAS), lang, ui(g, UI_QUIT) };
-    int ids[] = { BTN_START, BTN_LOAD, BTN_CONFIG, BTN_EXTRAS, BTN_LANGUAGE, BTN_QUIT };
+    const char *labels[] = { ui(g, UI_CONTINUE), ui(g, UI_START), ui(g, UI_LOAD), ui(g, UI_CONFIG), ui(g, UI_EXTRAS), lang, ui(g, UI_QUIT) };
+    int ids[] = { BTN_RESUME_LATEST, BTN_START, BTN_LOAD, BTN_CONFIG, BTN_EXTRAS, BTN_LANGUAGE, BTN_QUIT };
     int skip = 0;
-    if (g->m.language_count < 2) skip |= 1 << 4;
-    if (g->unlocks.cg_count == 0 && g->unlocks.music_count == 0) skip |= 1 << 3;
-    button_column(g, &g->ui.title_menu, labels, ids, 6, skip);
+    cache_slots(g);
+    if (newest_slot(g) < 0) skip |= 1 << 0; /* Continue: the newest save of any kind (P-2, P-3) */
+    if (g->m.language_count < 2) skip |= 1 << 5;
+    if (g->unlocks.cg_count == 0 && g->unlocks.music_count == 0) skip |= 1 << 4;
+    button_column(g, &g->ui.title_menu, labels, ids, 7, skip);
 }
 
 /* Behind the menus: the theme's menu background, else the story dimmed. */
@@ -220,18 +236,19 @@ static void draw_sysmenu(game *g)
     button_column(g, &g->ui.game_menu, labels, ids, 7, 0);
 }
 
-/* Reads every slot's header and thumbnail once, when the save screen opens or after a save. */
+/* Reads every slot's header and thumbnail once, when the save screen opens or after a save. Unattended runs (tests)
+ * see no saves, so what they draw doesn't depend on this PC. */
 static void cache_slots(game *g)
 {
     if (g->slots_cached) return;
-    for (int s = 0; s <= HW_SLOTS; s++) {
+    for (int s = 0; s < HW_SLOT_COUNT; s++) {
         if (g->slot_thumb[s]) SDL_DestroyTexture(g->slot_thumb[s]);
         g->slot_thumb[s] = NULL;
         g->slot_used[s] = false;
         char path[1100];
         hw_persist_slot_path(&g->persist, s, path, sizeof path);
         size_t size = 0;
-        uint8_t *data = g->persist.dir[0] ? SDL_LoadFile(path, &size) : NULL;
+        uint8_t *data = g->persist.dir[0] && !unattended ? SDL_LoadFile(path, &size) : NULL;
         hw_save_info info;
         if (data && hw_save_peek(data, size, &info)) {
             g->slot_used[s] = true;
@@ -257,9 +274,15 @@ static void draw_slots(game *g)
     dim_background(g, 0.85f);
     label(g, ui(g, g->slots_saving ? UI_SAVE : UI_LOAD), 56, g->W / 2, sc(g, 100), 1, col(g->pal.text));
     float cw = g->W * 0.40f, ch = sc(g, 170);
-    int first = g->slots_saving ? 1 : 0; /* the quick save can be loaded, not chosen as a target */
-    for (int s = first; s <= HW_SLOTS; s++) {
-        int i = s - first;
+    /* Loading: the autosave, the quick save, then the slots. Saving: only the slots (the others aren't targets). */
+    int order[HW_SLOT_COUNT], count = 0;
+    if (!g->slots_saving) {
+        order[count++] = HW_SLOT_AUTO;
+        order[count++] = HW_SLOT_QUICK;
+    }
+    for (int s = 1; s <= HW_SLOTS; s++) order[count++] = s;
+    for (int i = 0; i < count; i++) {
+        int s = order[i];
         float x = i % 2 == 0 ? g->W * 0.08f : g->W * 0.52f;
         float y = sc(g, 150) + (float)(i / 2) * (ch + sc(g, 20));
         SDL_FRect r = { x, y, cw, ch };
@@ -274,28 +297,53 @@ static void draw_slots(game *g)
         float tx = thumb.x + tw + sc(g, 20);
         char title[64];
         if (s == HW_SLOT_QUICK) snprintf(title, sizeof title, "%s", ui(g, UI_QUICK_SLOT));
+        else if (s == HW_SLOT_AUTO) snprintf(title, sizeof title, "%s", ui(g, UI_AUTO_SLOT));
         else snprintf(title, sizeof title, ui(g, UI_SLOT), s);
         if (g->slot_used[s]) {
             if (g->slot_thumb[s]) SDL_RenderTexture(g->ren, g->slot_thumb[s], NULL, &thumb);
             else fill(g, thumb, g->pal.panel, 1.0f);
             const hw_save_info *info = &g->slot_info[s];
-            label(g, title, 28, tx, r.y + sc(g, 42), 0, hover ? col(g->pal.accent) : col(g->pal.text));
+            label(g, title, 28, tx, r.y + sc(g, 40), 0, hover ? col(g->pal.accent) : col(g->pal.text));
+            /* When, how long played, and where (P-4). */
             SDL_DateTime dt;
             char when[96] = "";
             if (SDL_TimeToDateTime((SDL_Time)info->time * SDL_NS_PER_SECOND, &dt, true)) {
                 snprintf(when, sizeof when, "%04d-%02d-%02d %02d:%02d   %u:%02u:%02u", dt.year, dt.month, dt.day, dt.hour,
                          dt.minute, info->playtime_s / 3600, info->playtime_s / 60 % 60, info->playtime_s % 60);
             }
-            label(g, when, 20, tx, r.y + sc(g, 76), 0, col(g->pal.dim));
+            label(g, when, 20, tx, r.y + sc(g, 70), 0, col(g->pal.dim));
+            char scene[80];
+            snprintf(scene, sizeof scene, "%.60s", info->scene);
+            for (char *c = scene; *c; c++) {
+                if (*c == '_') *c = ' '; /* scene names are identifiers: summer_field reads as "summer field" */
+            }
+            label(g, scene, 20, tx, r.y + sc(g, 98), 0, col(g->pal.dim));
             char preview[160];
             snprintf(preview, sizeof preview, "%.34s", info->preview);
-            label(g, preview, 22, tx, r.y + sc(g, 122), 0, col(g->pal.text));
+            label(g, preview, 22, tx, r.y + sc(g, 136), 0, col(g->pal.text));
         } else {
             label(g, title, 28, r.x + sc(g, 24), r.y + sc(g, 44), 0, hover ? col(g->pal.accent) : col(g->pal.text));
             label(g, ui(g, UI_EMPTY_SLOT), 24, r.x + sc(g, 24), r.y + sc(g, 100), 0, col(g->pal.dim));
         }
     }
     button(g, (SDL_FRect){ g->W / 2 - sc(g, 160), g->H - sc(g, 110), sc(g, 320), sc(g, 64) }, ui(g, UI_BACK), BTN_BACK, 30, false);
+    if (g->confirm_slot >= 0) {
+        /* Overwriting a save asks first (P-4); only this question takes clicks. */
+        g->hit_count = 0;
+        dim_background(g, 0.6f);
+        label(g, ui(g, UI_OVERWRITE), 44, g->W / 2, g->H * 0.42f, 1, col(g->pal.text));
+        button(g, (SDL_FRect){ g->W / 2 - sc(g, 300), g->H * 0.5f, sc(g, 260), sc(g, 68) }, ui(g, UI_YES), BTN_OVERWRITE_YES, 32, false);
+        button(g, (SDL_FRect){ g->W / 2 + sc(g, 40), g->H * 0.5f, sc(g, 260), sc(g, 68) }, ui(g, UI_NO), BTN_OVERWRITE_NO, 32, false);
+    }
+}
+
+/* "Last saved 12 min ago." for the quit question during a story (P-2): autosaving on quit keeps the place anyway. */
+static void last_saved(const game *g, char *out, size_t cap)
+{
+    double minutes = (g->now - g->last_save) / 60.0;
+    if (minutes < 1.0) snprintf(out, cap, "%s", ui(g, UI_LAST_SAVED_NOW));
+    else if (minutes < 60.0) snprintf(out, cap, ui(g, UI_LAST_SAVED_MINUTES), (int)minutes);
+    else snprintf(out, cap, ui(g, UI_LAST_SAVED_HOURS), (int)(minutes / 60.0));
 }
 
 static void draw_history(game *g)
@@ -463,11 +511,15 @@ void render(game *g)
             if (g->dev) draw_center_card(g, ui(g, UI_ERROR_TITLE), g->error, "Fix the script, run hwc build, then press F5 to reload.");
             else draw_center_card(g, ui(g, UI_ERROR_TITLE), ui(g, UI_ERROR_RELEASE), ui(g, UI_CLICK_TO_CONTINUE));
             break;
-        case SCR_CONFIRM_QUIT:
-            draw_center_card(g, ui(g, UI_CONFIRM_QUIT), NULL, NULL);
-            button(g, (SDL_FRect){ g->W / 2 - sc(g, 300), g->H * 0.5f, sc(g, 260), sc(g, 68) }, ui(g, UI_YES), BTN_YES, 32, false);
-            button(g, (SDL_FRect){ g->W / 2 + sc(g, 40), g->H * 0.5f, sc(g, 260), sc(g, 68) }, ui(g, UI_NO), BTN_NO, 32, false);
+        case SCR_CONFIRM_QUIT: {
+            char saved[160];
+            last_saved(g, saved, sizeof saved);
+            draw_center_card(g, ui(g, UI_CONFIRM_QUIT), saved, NULL);
+            float y = g->H * 0.5f + sc(g, 40);
+            button(g, (SDL_FRect){ g->W / 2 - sc(g, 300), y, sc(g, 260), sc(g, 68) }, ui(g, UI_YES), BTN_YES, 32, false);
+            button(g, (SDL_FRect){ g->W / 2 + sc(g, 40), y, sc(g, 260), sc(g, 68) }, ui(g, UI_NO), BTN_NO, 32, false);
             break;
+        }
         default: break;
         }
     }
@@ -543,6 +595,17 @@ void activate(game *g, int id)
     if (menus_activate(g, id)) return;
     switch (id) {
     case BTN_START: start_story(g); break;
+    case BTN_RESUME_LATEST: {
+        int s = newest_slot(g);
+        if (s >= 0) load_slot(g, s);
+        break;
+    }
+    case BTN_OVERWRITE_YES:
+        save_slot(g, g->confirm_slot);
+        g->confirm_slot = -1;
+        g->scr = SCR_PLAY;
+        break;
+    case BTN_OVERWRITE_NO: g->confirm_slot = -1; g->focus = -1; break;
     case BTN_LOAD: open_slots(g, false); break;
     case BTN_SAVE: if (g->vm_ready && g->hist.count > 0) open_slots(g, true); break;
     case BTN_LANGUAGE: next_language(g); break;
@@ -553,6 +616,7 @@ void activate(game *g, int id)
     case BTN_MENU: g->scr = SCR_SYSMENU; g->focus = -1; break;
     case BTN_HISTORY: g->back_to = g->scr; g->history_scroll = 0; g->scr = SCR_HISTORY; break;
     case BTN_TITLE:
+        autosave(g); /* Continue picks up here (P-2) */
         end_story(g);
         g->scr = SCR_TITLE;
         break;
@@ -561,9 +625,12 @@ void activate(game *g, int id)
     case BTN_SKIP: g->skip_mode = !g->skip_mode; break;
     case BTN_ROLLBACK: rollback(g); break;
     default:
-        if (id >= BTN_SLOT && id <= BTN_SLOT + HW_SLOTS) {
+        if (id >= BTN_SLOT && id < BTN_SLOT + HW_SLOT_COUNT) {
             int slot = id - BTN_SLOT;
-            if (g->slots_saving) {
+            if (g->slots_saving && g->slot_used[slot]) {
+                g->confirm_slot = slot; /* overwriting asks first (P-4) */
+                g->focus = -1;
+            } else if (g->slots_saving) {
                 save_slot(g, slot);
                 g->slots_cached = false;
                 g->scr = SCR_PLAY;
@@ -621,6 +688,11 @@ static void escape(game *g)
 {
     if (g->ui_hidden) {
         g->ui_hidden = false;
+        return;
+    }
+    if (g->confirm_slot >= 0) {
+        g->confirm_slot = -1; /* not overwriting after all */
+        g->focus = -1;
         return;
     }
     switch (g->scr) {
@@ -772,6 +844,13 @@ void on_event(game *g, SDL_Event *e)
     }
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         g->skip_mode = false;
+        if (g->settings.mute_background) hw_audio_set_muted(g->audio, true); /* P-7: only when the player asked */
+        break;
+    case SDL_EVENT_WINDOW_FOCUS_GAINED:
+        hw_audio_set_muted(g->audio, false);
+        break;
+    case SDL_EVENT_WINDOW_MOVED: case SDL_EVENT_WINDOW_RESIZED: case SDL_EVENT_WINDOW_MAXIMIZED: case SDL_EVENT_WINDOW_RESTORED:
+        remember_window(g); /* P-5: it opens there next time */
         break;
     default:
         break;

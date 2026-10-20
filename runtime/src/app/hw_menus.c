@@ -17,13 +17,13 @@
 
 typedef enum cfg_row {
     CFG_LANGUAGE, CFG_TEXT_SPEED, CFG_AUTO_SPEED, CFG_TEXT_SIZE, CFG_LINE_SPACING, CFG_FONT, CFG_OPACITY, CFG_CONTRAST,
-    CFG_MOTION, CFG_SKIP_UNREAD, CFG_FULLSCREEN, CFG_VOL_MUSIC, CFG_VOL_AMBIENT, CFG_VOL_SFX, CFG_VOL_VOICE, CFG_CONTROLS,
+    CFG_MOTION, CFG_SKIP_UNREAD, CFG_FULLSCREEN, CFG_MUTE_BACKGROUND, CFG_VOL_MUSIC, CFG_VOL_AMBIENT, CFG_VOL_SFX, CFG_VOL_VOICE, CFG_CONTROLS,
     CFG_COUNT
 } cfg_row;
 
 static const hw_ui_string CFG_LABEL[CFG_COUNT] = {
     UI_LANGUAGE, UI_TEXT_SPEED, UI_AUTO_SPEED, UI_TEXT_SIZE, UI_LINE_SPACING, UI_FONT, UI_TEXTBOX_OPACITY, UI_HIGH_CONTRAST,
-    UI_REDUCE_MOTION, UI_SKIP_UNREAD, UI_FULLSCREEN, UI_VOLUME_MUSIC, UI_VOLUME_AMBIENT, UI_VOLUME_SFX, UI_VOLUME_VOICE, UI_CONTROLS,
+    UI_REDUCE_MOTION, UI_SKIP_UNREAD, UI_FULLSCREEN, UI_MUTE_BACKGROUND, UI_VOLUME_MUSIC, UI_VOLUME_AMBIENT, UI_VOLUME_SFX, UI_VOLUME_VOICE, UI_CONTROLS,
 };
 
 static const float SPEEDS[5] = { 20, 40, 60, 100, 1000 };
@@ -62,6 +62,7 @@ static void cfg_value(const game *g, cfg_row row, char *out, size_t cap)
     case CFG_MOTION: snprintf(out, cap, "%s", on_off(g, s->reduce_motion)); break;
     case CFG_SKIP_UNREAD: snprintf(out, cap, "%s", on_off(g, s->skip_unread)); break;
     case CFG_FULLSCREEN: snprintf(out, cap, "%s", on_off(g, s->fullscreen)); break;
+    case CFG_MUTE_BACKGROUND: snprintf(out, cap, "%s", on_off(g, s->mute_background)); break;
     case CFG_VOL_MUSIC: case CFG_VOL_AMBIENT: case CFG_VOL_SFX: case CFG_VOL_VOICE:
         snprintf(out, cap, "%d%%", (int)lroundf(s->volume[row - CFG_VOL_MUSIC] * 100.0f));
         break;
@@ -99,6 +100,7 @@ static void cfg_adjust(game *g, cfg_row row, int dir)
     case CFG_MOTION: s->reduce_motion = !s->reduce_motion; break;
     case CFG_SKIP_UNREAD: s->skip_unread = !s->skip_unread; break;
     case CFG_FULLSCREEN: s->fullscreen = !s->fullscreen; break;
+    case CFG_MUTE_BACKGROUND: s->mute_background = !s->mute_background; break;
     case CFG_VOL_MUSIC: case CFG_VOL_AMBIENT: case CFG_VOL_SFX: case CFG_VOL_VOICE: {
         float *v = &s->volume[row - CFG_VOL_MUSIC];
         int step = wrap((int)lroundf(*v * 10.0f) + dir, 11);

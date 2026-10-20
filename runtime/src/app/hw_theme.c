@@ -94,6 +94,9 @@ void hw_theme_layout(const hw_module *m, hw_ui_layout *u)
     u->title_y = frac(m, "layout.title.y", 0.28f);
     u->title_size = px(m, "layout.title.size", 88);
     u->title_show = hw_theme_int(m, "layout.title.show", 1) != 0;
+    u->credit_x = frac(m, "layout.credit.x", 0.985f);
+    u->credit_y = frac(m, "layout.credit.y", 0.975f);
+    u->credit_size = px(m, "layout.credit.size", 20);
     column(m, "title_menu", &u->title_menu, 0.40f, 440, 66, 16);
     column(m, "game_menu", &u->game_menu, 0.14f, 520, 68, 20);
     u->radius = px(m, "shape.radius", 0);

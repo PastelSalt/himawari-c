@@ -1,6 +1,6 @@
 # Himawari Pack (`.hwp`) Specification
 
-> **Version:** 1.0 · **Status:** draft (rfcs/0009). · **License:** CC-BY-4.0.
+> **Version:** 1.1 · **Status:** draft (rfcs/0009). **1.1** (2026-10-20, FINALIZATION.md OC-6) adds single-file games (§7): a pack appended to the player exe. The pack format itself is unchanged, so writers still emit minor 0. · **License:** CC-BY-4.0.
 > **Producer:** `@himawari/core` packer (`writePack`, used by `hwc build --release` and Studio's export) · **Consumer:** Himawari-C runtime (`runtime/src/core/hw_pack.c`, `runtime/src/app/hw_vfs.c`).
 > Plan references: DETAILED_PLAN.md §8.8, §14.4.
 
@@ -72,3 +72,28 @@ A reader validates once, before use, and refuses the pack with a friendly error 
 ## 6. Hashes
 
 xxHash64 is the [reference algorithm](https://github.com/Cyan4973/xxHash) with seed 0. Test vectors: `""` → `0xEF46DB3751D8E999`, `"abc"` → `0x44BC2CF5AD770999`, `"Nobody inspects the spammish repetition"` → `0xFBCEA83C8A378BF1`.
+
+## 7. Single-file games (1.1)
+
+A game can ship as one file: the base pack appended to the player exe, followed by a 24-byte trailer.
+
+```
+Player exe (unchanged)
+Pack (exactly as data.hwp would be; its offsets are from the pack's own start)
+Trailer (24 bytes)
+[Authenticode certificate table, when the exe is signed afterwards]
+```
+
+| Offset in the trailer | Type | Field | Value |
+|---|---|---|---|
+| 0 | u64 | pack_offset | where the pack's header starts, from the start of the exe |
+| 8 | u64 | pack_size | the pack's bytes; `pack_offset + pack_size` is where the trailer starts |
+| 16 | u8[8] | magic | `48 57 50 45 58 45 01 00` (`"HWPEXE"`, 1, 0) |
+
+**Where the trailer is.** It ends the file. If the exe is a PE file whose certificate table (optional header data directory 4, a file offset) ends the file, the trailer ends where that table starts instead, so an exe signed after the pack was appended still works. Sign after appending; appending after signing breaks the signature.
+
+**Reading.** A reader checks the magic, that `pack_size ≥ 48`, and that the pack ends exactly at the trailer; then it reads the pack as in §1–§5 with every offset shifted by `pack_offset` and the pack's size as the file size.
+
+**Mounting.** The runtime uses the pack inside its own exe when there is no `data.hwp` beside it (`data.hwp` wins, so a folder export next to a single-file exe still plays its own data). The embedded pack is the base pack (priority 0); `patch*.hwp` beside the exe apply on top of it as in §3. `himawari game.exe` (and `--headless game.exe`) plays the pack inside another exe, which tests use.
+
+**Writing.** `appendPackToExe(exe, pack)` in `@himawari/tools` (`packages/tools/src/embed.ts`) writes exe, pack, trailer, and refuses an exe that already has a pack; `embeddedPack(exe)` reads one back.

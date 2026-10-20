@@ -1,6 +1,6 @@
 /** Human-readable listing of an HwbModule (`hwc disasm`, golden conformance files). */
 import { numberToLineId } from "../ids.js";
-import { type HwbModule, NONE, OP_NAMES, POSITION_SCALE, TEXTBOX_MODES, TextOp, XPARAM_BOOL, XPARAM_INT, XPARAM_TEXT, XPARAM_TYPES, XTNS_BLOCKING } from "./format.js";
+import { CREDIT_MODES, type HwbModule, NONE, OP_NAMES, POSITION_SCALE, TEXTBOX_MODES, TextOp, XPARAM_BOOL, XPARAM_INT, XPARAM_TEXT, XPARAM_TYPES, XTNS_BLOCKING } from "./format.js";
 
 export function disassemble(m: HwbModule): string {
   const s = (i: number) => JSON.stringify(m.strings[i] ?? `?${i}`);
@@ -14,6 +14,7 @@ export function disassemble(m: HwbModule): string {
   const mt = m.meta;
   out.push(`; game: ${s(mt.title)} ${m.strings[mt.id]} ${mt.width}x${mt.height}, languages ${mt.languages.map((l) => m.strings[l]).join(" ")}`);
   out.push(`; positions: ${mt.positions.map((p) => `${m.strings[p.name]}(${p.x / POSITION_SCALE}, ${p.y / POSITION_SCALE})`).join(" ")}`);
+  if (mt.credit) out.push(`; credit: ${CREDIT_MODES[mt.credit] ?? mt.credit}`);
   out.push("");
 
   for (const [i, v] of m.vars.entries()) {

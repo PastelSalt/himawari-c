@@ -30,10 +30,13 @@ export const THEME_STRING_KEYS: readonly string[] = [
   "reset_controls", "accessibility", "a11y_prompt", "a11y_prompt_body", "continue", "on", "off", "default", "replay_voice",
   "now_playing", "stop", "action_advance", "action_back", "action_up", "action_down", "action_left", "action_right",
   "action_rollback", "action_skip", "action_auto", "action_history", "action_hide", "action_quick_save", "action_quick_load",
+  "auto_slot", "overwrite", "last_saved_now", "last_saved_minutes", "last_saved_hours", "mute_background",
 ];
 
 /** UI strings that are formats: a theme's version must keep exactly these placeholders (the runtime ignores it otherwise). */
-const FORMATS: Readonly<Record<string, string>> = { slot: "%d", load_failed: "%s", reload_failed: "%s" };
+const FORMATS: Readonly<Record<string, string>> = {
+  slot: "%d", load_failed: "%s", reload_failed: "%s", last_saved_minutes: "%d", last_saved_hours: "%d",
+};
 
 /** The printf placeholders in a string ("%%" is a literal percent sign). */
 const placeholders = (s: string) => (s.replace(/%%/g, "").match(/%./g) ?? []).join("");
@@ -117,6 +120,10 @@ export const THEME_SETTINGS: Readonly<Record<string, Spec>> = {
   "layout.title.y": pct(0, 100),
   "layout.title.size": int(16, 200),
   "layout.title.show": BOOL,
+  // The "Made with Himawari" line (himawari.json credit: "title"). Its alignment follows x: left third, middle, right third.
+  "layout.credit.x": pct(0, 100),
+  "layout.credit.y": pct(0, 100),
+  "layout.credit.size": int(10, 60),
   ...column("layout.title_menu"),
   ...column("layout.game_menu"),
   "motion.choices": oneOf("none", "fade", "rise"),
@@ -155,6 +162,7 @@ export const THEME_DEFAULTS = {
     choices: { x: 50, y: 40, width: 55, height: 76, gap: 18 },
     quickbar: { show: true, align: "right" },
     title: { x: 50, y: 28, size: 88, show: true },
+    credit: { x: 98.5, y: 97.5, size: 20 },
     title_menu: { x: 50, y: 40, width: 440, height: 66, gap: 16 },
     game_menu: { x: 50, y: 14, width: 520, height: 68, gap: 20 },
   },

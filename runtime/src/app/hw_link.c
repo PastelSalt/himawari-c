@@ -27,6 +27,11 @@ static void push(hw_link *link, char *line)
     }
     SDL_UnlockMutex(link->lock);
     SDL_free(line); /* dropped: Studio sends far fewer than QUEUE commands per frame */
+    /* Wake the main loop: it sleeps while nothing on screen moves (RA-6). */
+    SDL_Event wake;
+    SDL_zero(wake);
+    wake.type = SDL_EVENT_USER;
+    SDL_PushEvent(&wake);
 }
 
 static int SDLCALL reader(void *user)
@@ -43,8 +48,10 @@ static int SDLCALL reader(void *user)
                 continue;
             }
             while (n > 0 && (buf[n - 1] == '\n' || buf[n - 1] == '\r')) buf[--n] = 0;
-            if (n == 0) continue;
-            char *line = SDL_strdup(buf);
+            /* Some writers (PowerShell, .NET) start the stream with a UTF-8 byte order mark. */
+            size_t skip = n >= 3 && memcmp(buf, "\xEF\xBB\xBF", 3) == 0 ? 3 : 0;
+            if (n == skip) continue;
+            char *line = SDL_strdup(buf + skip);
             if (line) push(link, line);
         }
         SDL_free(buf);

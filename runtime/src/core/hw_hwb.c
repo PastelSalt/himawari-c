@@ -137,6 +137,11 @@ static void load_meta(ctx *c, section *s)
         m->positions[i].x = (int32_t)next(c, s);
         m->positions[i].y = (int32_t)next(c, s);
     }
+    /* Optional trailing words: the credit (an unknown value means none); later minors may add more. */
+    if (!c->failed && words_left(s) > 0) {
+        m->credit = next(c, s);
+        if (m->credit > HW_CREDIT_WINDOW) m->credit = HW_CREDIT_NONE;
+    }
     if (c->failed) return;
     if (m->width == 0 || m->height == 0 || m->width > 16384 || m->height > 16384) fail(c, "invalid resolution");
     else if (m->language_count == 0 || m->languages[0] != m->source_language) fail(c, "the first language must be the source language");

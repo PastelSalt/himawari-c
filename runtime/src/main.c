@@ -1,7 +1,7 @@
 /*
  * Himawari-C, the game runtime (plan §8). One executable:
  *
- *   himawari [game.hwb]                       play (default: data.hwp beside the exe, else game.hwb)
+ *   himawari [game.hwb]                       play (default: data.hwp beside the exe, else a pack inside the exe, else game.hwb)
  *   himawari --project DIR [--dev]            play DIR/build/game.hwb with loose assets
  *   himawari --headless … --playtest | --transcript   no window (plan §8.12)
  */
@@ -20,13 +20,25 @@
 #include "hw_hwb.h"
 #include "hw_pack.h"
 #include "hw_version.h"
+#include "hw_vfs.h"
+
+/* This exe's own path in UTF-8 (a single-file game keeps its pack inside it). */
+static bool own_path(char *out, size_t cap)
+{
+    wchar_t w[32768];
+    DWORD n = GetModuleFileNameW(NULL, w, (DWORD)(sizeof w / sizeof w[0]));
+    if (n == 0 || n >= sizeof w / sizeof w[0]) return false;
+    return WideCharToMultiByte(CP_UTF8, 0, w, (int)n + 1, out, (int)cap, NULL, NULL) > 0;
+}
 
 static const char *USAGE =
     "Himawari-C " HW_VERSION_STRING "\n"
     "Usage:\n"
-    "  himawari [game.hwb] [--lang xx]       play (default: data.hwp and patch*.hwp beside himawari.exe, else game.hwb)\n"
+    "  himawari [game.hwb | game.exe] [--lang xx]  play (default: data.hwp and patch*.hwp beside himawari.exe, else the\n"
+    "                                        pack inside it (a single-file game; patches still apply), else game.hwb)\n"
     "  himawari --project DIR [--dev]        play DIR/build/game.hwb, assets from DIR/assets (dev mode: F3, F5)\n"
     "           [--no-gpu | --gpu]           renderer: default (rule wipes become dissolves) or GPU\n"
+    "           [--renderer software|NAME]   one SDL renderer by name (software: no graphics driver needed)\n"
     "           [--warp scene | file:line | #lineid]  start at that line, with a state reconstructed along a real path\n"
     "           [--text-speed N]             characters per second for this run (1000 = instant)\n"
     "           [--screen config|controls|accessibility|extras|gallery|music|load|menu|history] [--unlock-all]\n"
@@ -72,7 +84,10 @@ int main(int argc, char **argv)
             return 0;
         } else {
             size_t n = strlen(argv[i]);
-            if (n > 4 && (SDL_strcasecmp(argv[i] + n - 4, ".hwb") == 0 || SDL_strcasecmp(argv[i] + n - 4, ".hwp") == 0)) game = argv[i];
+            if (n > 4 && (SDL_strcasecmp(argv[i] + n - 4, ".hwb") == 0 || SDL_strcasecmp(argv[i] + n - 4, ".hwp") == 0 ||
+                          SDL_strcasecmp(argv[i] + n - 4, ".exe") == 0)) {
+                game = argv[i];
+            }
         }
     }
 
@@ -81,10 +96,14 @@ int main(int argc, char **argv)
         snprintf(path, sizeof path, "%s/build/game.hwb", project);
         game = path;
     } else if (!game) {
-        /* A shipped game: data.hwp beside the exe (plan §8.12); else game.hwb with loose assets. */
+        /* A shipped game: data.hwp beside the exe (plan §8.12); else a pack inside the exe (a single-file game,
+         * spec/pack.md §7); else game.hwb with loose assets. */
         const char *base = SDL_GetBasePath();
+        uint64_t at, size;
         snprintf(path, sizeof path, "%sdata.hwp", base ? base : "");
-        if (!SDL_GetPathInfo(path, NULL)) snprintf(path, sizeof path, "%sgame.hwb", base ? base : "");
+        if (!SDL_GetPathInfo(path, NULL) && !(own_path(path, sizeof path) && hw_vfs_find_embedded(path, &at, &size))) {
+            snprintf(path, sizeof path, "%sgame.hwb", base ? base : "");
+        }
         game = path;
     }
 

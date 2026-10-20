@@ -66,6 +66,9 @@ export function readHwb(bytes: Uint8Array): HwbModule {
         pos += 4;
         return v;
       },
+      left(): number {
+        return Math.floor((end - pos) / 4);
+      },
       take(n: number): number[] {
         if (n > (end - pos) / 4) fail(`section ${tag} is truncated`);
         return Array.from({ length: n }, () => this.next());
@@ -102,6 +105,8 @@ export function readHwb(bytes: Uint8Array): HwbModule {
       const [name, x, y] = ms.take(3) as [number, number, number];
       return { name: str(name, "position name"), x: x | 0, y: y | 0 };
     }),
+    // Optional trailing word: how the game credits Himawari. Anything after it is for later readers.
+    ...(ms.left() > 0 ? { credit: ms.next() } : {}),
   };
   if (width === 0 || height === 0 || width > 16384 || height > 16384) fail("invalid resolution");
   if (meta.languages[0] !== meta.sourceLanguage) fail("the first language must be the source language");

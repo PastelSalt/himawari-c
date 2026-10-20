@@ -1,6 +1,6 @@
 /*
  * Himawari-C: the default theme's UI strings (plan §8.10, P10: the default
- * theme ships localized). English and Japanese. A theme replaces them per
+ * theme ships localized). English, Japanese, and Simplified Chinese. A theme replaces them per
  * language by key (`strings.<lang>.<key>` in theme/theme.json, hw_theme_ui);
  * the keys are kept in step with @himawari/core THEME_STRING_KEYS
  * (tests/theme-keys.test.ts).
@@ -23,10 +23,12 @@ typedef enum hw_ui_string {
     UI_CONTINUE, UI_ON, UI_OFF, UI_DEFAULT, UI_REPLAY_VOICE, UI_NOW_PLAYING, UI_STOP, UI_ACTION_ADVANCE,
     UI_ACTION_BACK, UI_ACTION_UP, UI_ACTION_DOWN, UI_ACTION_LEFT, UI_ACTION_RIGHT, UI_ACTION_ROLLBACK,
     UI_ACTION_SKIP, UI_ACTION_AUTO, UI_ACTION_HISTORY, UI_ACTION_HIDE, UI_ACTION_QUICK_SAVE, UI_ACTION_QUICK_LOAD,
+    /* Finalization: autosave, overwriting, how long ago the last save was, muting in the background. */
+    UI_AUTO_SLOT, UI_OVERWRITE, UI_LAST_SAVED_NOW, UI_LAST_SAVED_MINUTES, UI_LAST_SAVED_HOURS, UI_MUTE_BACKGROUND,
     UI_COUNT
 } hw_ui_string;
 
-/* The string in `language` ("ja" or anything else for English). */
+/* The string in `language` ("ja", "zh-Hans" and other Simplified Chinese tags, or anything else for English). */
 const char *hw_ui(const char *language, hw_ui_string id);
 /* The theme key of a string ("start", "text_speed", …). */
 const char *hw_ui_key(hw_ui_string id);

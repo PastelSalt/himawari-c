@@ -27,6 +27,8 @@ bool hw_audio_line_voice(hw_audio *au, const char *language, const char *line_id
 bool hw_audio_voice_playing(const hw_audio *au);
 /* Volume 0..1 per channel. */
 void hw_audio_set_volume(hw_audio *au, int channel, float volume);
+/* Silences everything (the window is in the background and the player asked for that), or not. */
+void hw_audio_set_muted(hw_audio *au, bool muted);
 /* Whether the last play on this channel found no file (for the dev overlay). */
 const char *hw_audio_missing(const hw_audio *au, int channel);
 
