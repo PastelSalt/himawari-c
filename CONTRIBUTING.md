@@ -20,7 +20,7 @@ Some things are decided already, so please don't spend effort on them. The full 
 Himawari is **Windows only** (Windows 10/11, 64-bit), for games and for development. You need:
 
 - Git, Node.js 24 or newer, and pnpm (used through corepack: `corepack pnpm …`).
-- For the runtime: MSYS2 **UCRT64** with GCC, CMake, and Ninja on your `PATH`. Setup is in `DETAILED_PLAN.md` §14.2.
+- For the runtime: MSYS2 **UCRT64** with GCC, CMake, and Ninja on your `PATH`. Setup is in `planning/DETAILED_PLAN.md` §14.2.
 
 ### The TypeScript parts (compiler, CLI, MCP, Studio)
 ```bash
@@ -88,7 +88,7 @@ Anything that changes the Script Data Contract (`spec/`: the language, bytecode,
 1. Copy `rfcs/0000-template.md` to `rfcs/NNNN-short-title.md` with the next free number.
 2. Open a pull request. Discussion happens there.
 3. The project lead accepts or rejects it. Accepted RFCs are merged with status **Accepted**.
-4. The spec change itself follows in its own pull request, with conformance tests. Spec versions bump according to `DETAILED_PLAN.md` §5.6.
+4. The spec change itself follows in its own pull request, with conformance tests. Spec versions bump according to `planning/DETAILED_PLAN.md` §5.6.
 
 Bug fixes, docs, and changes that don't touch the contract don't need an RFC.
 

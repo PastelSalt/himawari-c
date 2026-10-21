@@ -2,11 +2,11 @@
 
 > A running record of how the project was planned and why each decision was made. Newest entries are at the **bottom**. Add a new entry for every work session.
 >
-> **Files:** [DETAILED_PLAN.md](DETAILED_PLAN.md) (the plan, currently **v0.6**) · [RESEARCH.md](RESEARCH.md) (evidence, **v1.2**) · [CLAUDE.md](CLAUDE.md) (context for AI coding sessions) · [rfcs/](rfcs/) (accepted spike decisions) · this file.
+> **Files** (in `planning/` since session 24): [DETAILED_PLAN.md](DETAILED_PLAN.md) (the plan, **v0.7**) · [FINALIZATION.md](FINALIZATION.md) (Phase 8's finalization half, **v0.5**) · [BREAK_IT.md](BREAK_IT.md) (breaking it on purpose, with the findings log) · [RESEARCH.md](RESEARCH.md) (evidence, **v1.3**) · [CLAUDE.md](../CLAUDE.md) (context for AI coding sessions) · [rfcs/](../rfcs/) (accepted decisions) · [tests/README.md](../tests/README.md) (where every test lives) · this file.
 
 ---
 
-## Project at a Glance (as of 2026-10-18)
+## Project at a Glance (as of 2026-10-21)
 
 | | |
 |---|---|
@@ -22,6 +22,9 @@
 | **Phase 4** | **Built** (session 13): Himawari Studio (Electron), docked preview, Screenplay and Script views, panels, AI proposals, Mode A live sync, Mode B. M2 hallway test pending |
 | **Phase 5** | **Done** (session 14): macros, extension statements, NVL, themes (bytecode 1.1); config, accessibility, gamepad, gallery, music room; `.hwp` packs and patches; JPEG/WebP; crash reports; budgets met; `examples/sunflower-demo` in English, Japanese, and Simplified Chinese; golden images |
 | **Phase 6** | **Built** (session 15): theme 2.0 (layout, shapes, presets, rfcs/0010), a data-driven runtime UI, Studio's **UI Designer**, and Studio's light/dark/system themes. Hallway test pending. Next: Phase 7 AI depth and polish, Phase 8 launch |
+| **Phase 7** | **Built** (session 17): review notes, continuity hints, the glossary and "Translate with AI", recipes, MCP Apps views (experimental), the eval suite |
+| **Phase 8** | **In progress** (sessions 18–24): the finalization plan and most of it built (quiet AI, one language by default, local history and the Recycle Bin, forms for every stage direction, `himawari-tools.exe`, branded exports, writer hints, the usual Windows installer, single-file games; the runtime's idle redraw, software fallback, and autosave); the launch documents; the rename to Moeko Works (session 20); breaking it on purpose (sessions 21–23: 14 findings, 13 fixed). Next: usability rounds, then the launch |
+| **Testing** | `corepack pnpm check` (532 tests), Studio e2e and the Studio monkey, ctest (debug, ASan, fuzz), seven fuzz targets, golden images, generated stories; the map is [tests/README.md](../tests/README.md) |
 | **Owner** | Moeko Works (GitHub: `PastelSalt`) |
 | **Repo** | **https://github.com/PastelSalt/himawari-c** (public) |
 
@@ -1115,6 +1118,32 @@ Four questions are open in BREAK_IT.md §9: where findings live, the AI cost of 
 - Golden images: 22.
 - 200 generated stories.
 
+## Session 24: 2026-10-21 · Housekeeping: pushes, the repo layout, and the log
+**You asked:** to push everything, then to clean up and organize the workspace without deleting any testing code, and to make sure the log is complete since the rename.
+
+**Pushed** (not logged until now):
+- `fe18e49`: the rename to Moeko Works, with the six commits before it (session 20).
+- `764aad3` and `d4eb60f`: break-it weeks 1–3 (sessions 22–23).
+
+`main` matches GitHub.
+
+**Organized:**
+- The five planning documents moved to `planning/` with `git mv`, so their history follows them: the plan, finalization, break-it, research, and this log. Every relative link in the repo's 72 Markdown files was rewritten and checked.
+- The root keeps `README.md`, `CLAUDE.md`, the licenses, and GitHub's community files.
+- Test code stays where its tools look for it: unit tests beside the code, `tests/`, `packages/studio/e2e/`, `runtime/tests/`, and `runtime/fuzz/`. Three new READMEs signpost it:
+  - `tests/README.md` maps every test and how to run it;
+  - `scripts/README.md` covers `break/`, `stress/`, and `release/`;
+  - `runtime/fuzz/README.md` covers the targets, seeds, and regressions.
+- `scripts/check-links.mjs` checks every relative Markdown link, and is now part of `corepack pnpm check`.
+- CLAUDE.md has a "Repository layout" section. The README's status was "Phases 0–6 built" and now reflects Phases 7–8.
+- About 890 MB of regenerable output was removed: old installer builds (`packages/studio/release/`), the generated test stories (`runtime/build/break/`), and the examples' `build/` folders. Build outputs the tests use were kept.
+
+**The log, caught up:**
+- This overview now covers Phases 7–8, the rename, and the testing.
+- The header lists the current document versions.
+- The decision register gained D68–D73, from sessions 22–24.
+- The next steps are rewritten (the old list still said to commit session 19).
+
 ---
 
 ## Decision Register
@@ -1186,6 +1215,12 @@ Four questions are open in BREAK_IT.md §9: where findings live, the AI cost of 
 | D65 | Studio's e2e suite gates releases on a no-code test (every kind of step from menus and forms) and on axe (no serious or critical WCAG 2 A/AA problems on the main screens) | session 19 | ✅ Active |
 | D66 | The gallery and music room follow the story (`cg` and `music` lines unlock them); Studio lists what will unlock instead of adding switches | session 19 | ✅ Active |
 | D67 | The maker is **Moeko Works** (renamed from Moesoft on 2026-10-21); IDs use `dev.moekoworks.*`, with no alias for the old ones (nothing was released) | session 20 | ✅ Active |
+| D68 | Break-it findings live in [BREAK_IT.md](BREAK_IT.md) §8 until v1.0 (security ones stay out of public issues until fixed); every fix comes with a test that failed before it | session 22 | ✅ Active |
+| D69 | Long unattended runs (the overnight fuzz run, multi-hour soaks) are optional, run before a release on request; CI fuzzes every target for 60 s | session 23 | ✅ Active |
+| D70 | Studio's saves carry a fingerprint of the text they started from; if the disk moved on, the main process refuses and Studio asks which to keep; an outside change over an unsaved edit asks too; conflicts queue (BREAK_IT.md B-11) | session 23 | ✅ Active |
+| D71 | The shared file layer (`ProjectFs`) is the sandbox for Studio, `hwc`, export, and MCP: paths are checked by where they really lead (links), never with `.` or `..` parts, never with reserved device names, and a missing project folder is never recreated | sessions 22–23 | ✅ Active |
+| D72 | libunibreak 8.0 is patched at download (`runtime/cmake/patch-libunibreak.cmake`) until upstream fixes the out-of-bounds write (BREAK_IT.md B-6); the layout always passes it valid UTF-8 | session 22 | ✅ Active |
+| D73 | Planning documents live in `planning/`; the root holds the README, CLAUDE.md, the licenses, and GitHub's community files; [tests/README.md](../tests/README.md) maps every test | session 24 | ✅ Active |
 | D58 | **One click** (P15): ~~a one-click per-user Studio installer~~ (the installer is D61) with everything inside (`hwc` and `himawari-mcp` run through Studio's executable, no Node); export is one button; an optional single-file game | session 18 | ✅ Active |
 | D52 | AI quality is measured by `packages/evals`: deterministic scores, JSON results by date, `TREND.md`; real runs are started by hand with a key (never by default in CI) | session 17 | ✅ Active |
 
@@ -1198,21 +1233,27 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 19)
+## Next Steps (after session 24)
 
-0. ~~Merge the side sessions' branches~~ ✅ merged in session 19, with single-file export in Studio and `hwc`.
-1. **Commit sessions 18–19** when you've looked them over: try the forms in the Screenplay, Settings → This game, the Versions dialog, and an export (folder and one file). Then re-package the installer (`corepack pnpm --filter @himawari/studio package`) and run ctest under ASan.
-2. **Run the clean-machine test** once Windows Sandbox is on (`node scripts/release/clean-machine.mjs`), and the manual torture tests: a full disk, and online-only OneDrive files.
-3. Finalization items still open (FINALIZATION.md):
-   - NC-9 "Save these steps as…" (macros from a selection).
-   - A volume slider (NC-3).
-   - "he/she/they by a choice" in the toolbar (NC-8).
-   - Per-row "Show as script" (C-3) and "Show line IDs" (C-7).
-   - W-12's mixed "..." and "…", and W-14's renamed-character offer.
-   - Ctrl+Y outside text boxes; D-3 (a game's first language follows Windows); asking about settings on uninstall (OC-9).
-   - A real app icon for Studio itself.
-4. **Usability rounds 1–3** (§11.2) with five or six writers each; the M2 and Phase 6 hallway tests can be round 1.
-5. The first real eval runs (`node packages/evals/dist/main.js run --model claude-haiku-5-5`, then Sonnet and Opus; a few cents to a dollar each), then `trend --write`.
-6. Human review of the Japanese UI (now 1 010 messages) and of AI-written Japanese in the examples.
-7. Before v1.0: code signing (Azure Artifact Signing or an OV certificate); betas ship unsigned with a SmartScreen explanation.
-8. Earlier follow-ups (session 18's list, items 3, 5, 7, 8) still stand.
+1. **Usability rounds 1–3** ([FINALIZATION.md](FINALIZATION.md) §11.2) with five or six writers each; the M2 and Phase 6 hallway tests can be round 1.
+2. **The two break-it sessions with you** ([BREAK_IT.md](BREAK_IT.md) §4). They also cover what machines can't:
+   - abusing a running game (E-17 to E-21);
+   - weak machines (E-23);
+   - the installer (S-18).
+3. **The clean-machine test** once Windows Sandbox is on: re-package the installer first (`corepack pnpm --filter @himawari/studio package`), then run `node scripts/release/clean-machine.mjs`.
+4. **Break-it leftovers:**
+   - S-25 (prompt injection; set `ANTHROPIC_API_KEY`; a few cents a run);
+   - fonts and audio fuzzing (E-2, E-4; SDL in the fuzz build);
+   - B-5 (decode big images at display size);
+   - report libunibreak's bug upstream (a public issue, on your OK).
+5. **Finalization items still open** ([FINALIZATION.md](FINALIZATION.md)):
+   - "Save these steps as…" (NC-9);
+   - a volume slider (NC-3);
+   - "he/she/they by a choice" (NC-8);
+   - per-row "Show as script" (C-3) and "Show line IDs" (C-7);
+   - W-12 and W-14;
+   - Ctrl+Y outside text boxes, D-3, and OC-9;
+   - a real Studio icon.
+6. The first real eval runs (`node packages/evals/dist/main.js run --model claude-haiku-5-5`, then Sonnet and Opus; a few cents to a dollar each), then `trend --write`.
+7. Human review of the Japanese UI (1 014 messages) and of AI-written Japanese in the examples.
+8. Before v1.0: code signing (Azure Artifact Signing or an OV certificate); betas ship unsigned with a SmartScreen explanation.

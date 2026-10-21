@@ -41,9 +41,9 @@ The README in the repository has [the build and command details](../../README.md
 | Document | What it covers |
 |---|---|
 | [RFCs](../../rfcs/README.md) | Written records of language and engine decisions |
-| [The plan](../../DETAILED_PLAN.md) | The full design and roadmap |
-| [Research](../../RESEARCH.md) | The evidence behind decisions |
-| [Log](../../LOG.md) | Progress and the decision register |
+| [The plan](../../planning/DETAILED_PLAN.md) | The full design and roadmap |
+| [Research](../../planning/RESEARCH.md) | The evidence behind decisions |
+| [Log](../../planning/LOG.md) | Progress and the decision register |
 
 ## Project policies
 [Contributing](../../CONTRIBUTING.md) · [Governance](../../GOVERNANCE.md) · [Privacy](../../PRIVACY.md) · [Security](../../SECURITY.md) · [Third-party notices](../../THIRD_PARTY_NOTICES.md)

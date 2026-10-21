@@ -15,7 +15,7 @@ In practice, that means:
 3. **Games run on any Windows 10/11 PC**, from a double-click, with nothing to install.
 4. **AI is an optional helper**, never required and never in the way.
 
-Being "BDFL" doesn't mean decisions are made in secret or on a whim. Reasons are written down in public, in [`LOG.md`](LOG.md) (the decision register) and in [`rfcs/`](rfcs/).
+Being "BDFL" doesn't mean decisions are made in secret or on a whim. Reasons are written down in public, in [`LOG.md`](planning/LOG.md) (the decision register) and in [`rfcs/`](rfcs/).
 
 ## How things get decided
 | Kind of change | How it's decided |

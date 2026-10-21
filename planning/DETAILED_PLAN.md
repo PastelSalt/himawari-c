@@ -1,7 +1,7 @@
 # Himawari — Detailed Project Plan
 
 > **Status:** Draft **v0.7** · 2026-10-20 · Nothing here is final. **Phases 0–3 and 5 done; Phases 4 (Studio), 6 (UI Designer), and 7 (AI depth) built**, their hallway tests pending (§18); RFCs 0001–0011 accepted. Next: Phase 8, finalization ([FINALIZATION.md](FINALIZATION.md)) and launch.
-> **Companion files:** [FINALIZATION.md](FINALIZATION.md) (the finalization plan and the core concept) · [RESEARCH.md](RESEARCH.md) (evidence) · [LOG.md](LOG.md) (decision history and next steps) · [CLAUDE.md](CLAUDE.md) (context for AI coding sessions)
+> **Companion files:** [FINALIZATION.md](FINALIZATION.md) (the finalization plan and the core concept) · [RESEARCH.md](RESEARCH.md) (evidence) · [LOG.md](LOG.md) (decision history and next steps) · [CLAUDE.md](../CLAUDE.md) (context for AI coding sessions)
 > Decisions marked 🔬 cite RESEARCH.md by section number (e.g. 🔬§3 = RESEARCH.md §3).
 
 ---
@@ -434,7 +434,7 @@ Every dialogue line and menu option has a permanent ID. It anchors AI patches, s
   - `XTNS` (extension statement table)
   - `DBUG` (pc ↔ file:line; stripped in release)
 - **ISA:** a fixed-width stack VM. Story ops: `SAY`, `SHOW`, `HIDE`, `MOVE`, `BG`, `CG`, `MUSIC`, `SFX`, `VOICE`, `WAIT`, `MENU`, `JMP`, `JZ`, `CALL`, `RET`, `XCALL` (extension), `END`. Expression ops: `PUSH_I`, `LOAD`, `STORE`, arithmetic, comparisons, `NOT`, `RAND`.
-- **As built** (the authority is [`spec/bytecode.md`](spec/bytecode.md), 1.0, frozen): instructions are word-aligned and variable-length (an op word with its argument count), music/ambient/sfx/voice share one `AUDIO` op, and the sections are `META`, `STRS`, `VARS`, `CHAR`, `SCNE`, `LINE`, `TEXT`, `CODE`, plus optional `LOCL` (translations, instead of per-language `LOCx`), `SPRT` (layer tables, a separate section rather than inside `CHAR`), and `DBUG` (rfcs/0004, rfcs/0005). `XCALL` and `ASST` are reserved for later minor versions.
+- **As built** (the authority is [`spec/bytecode.md`](../spec/bytecode.md), 1.0, frozen): instructions are word-aligned and variable-length (an op word with its argument count), music/ambient/sfx/voice share one `AUDIO` op, and the sections are `META`, `STRS`, `VARS`, `CHAR`, `SCNE`, `LINE`, `TEXT`, `CODE`, plus optional `LOCL` (translations, instead of per-language `LOCx`), `SPRT` (layer tables, a separate section rather than inside `CHAR`), and `DBUG` (rfcs/0004, rfcs/0005). `XCALL` and `ASST` are reserved for later minor versions.
 - **Loader:** bounds-checks every offset, index, and jump target once at load. Fuzzed in CI.
 
 ### 5.5 Project layout

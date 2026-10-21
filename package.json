@@ -14,7 +14,7 @@
     "test": "vitest run",
     "lint": "eslint .",
     "check:i18n": "node packages/studio/scripts/check-locales.mjs",
-    "check": "tsc -b && tsc -p tests && tsc -p packages/studio/tsconfig.node.json && tsc -p packages/studio/tsconfig.web.json && eslint . && vitest run && node packages/studio/scripts/check-locales.mjs"
+    "check": "tsc -b && tsc -p tests && tsc -p packages/studio/tsconfig.node.json && tsc -p packages/studio/tsconfig.web.json && eslint . && vitest run && node packages/studio/scripts/check-locales.mjs && node scripts/check-links.mjs"
   },
   "devDependencies": {
     "@formatjs/icu-messageformat-parser": "3.5.21",
