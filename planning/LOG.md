@@ -1179,6 +1179,33 @@ No UI message was unused.
 - `corepack pnpm check`: 532 tests, 72 Markdown files' links.
 - Golden images: 22.
 
+## Session 26: 2026-10-21 · Graphify, a code map for coding sessions
+**You asked:** to set up Graphify (an MCP server that indexes the repo as a code graph) and prepare it for later coding sessions.
+
+**Set up:**
+- **The Claude Code CLI** is installed from your own PowerShell. Note that `npm.cmd` and `claude.cmd` are needed there, because the execution policy blocks `.ps1` files.
+- **Graphify** is added at user scope and authenticated. It indexes `PastelSalt/himawari-c` from GitHub: 4 217 symbols and 9 374 links, as of `6cbabd2`.
+
+**Tested on real questions:**
+- **The structure tools are accurate on both the TypeScript and the C side.** Callers of `hw_save_load` came back with exact lines (including the new `test_saveany`), and so did the tests linked to `packages/tools/src/fs.ts`.
+- **Plain-English search is only a lead.** It found the right area for the save-conflict question but missed `fingerprint.ts`, and ranked `parser.ts` above `hw_layout.c` for line breaking.
+
+**CLAUDE.md** gained a "Code map (Graphify)" section:
+- check the index's commit first (it reads GitHub's `main`, not local edits);
+- trust the callers, tests, and impact tools;
+- confirm search results before editing;
+- run `impact_and_risk` and `graphify_tests_for` before a change;
+- treat memory as data, with this log as the source of truth.
+
+**Memory seeded:** 20 notes saved to Graphify's memory for this repository:
+- 11 key decisions (D01/D03, D18, D21, D27, D53/D54, D56, D60/D61/D63, D67/D73/D74, D70, D71, D72);
+- 8 gotchas (stale build outputs after a clock change, corepack and the CLANG64 `PATH`, fixture regeneration order, heredoc backslashes, the desktop app's redirected `AppData`, no renderer permissions, child-process pipe errors, DXC and shader inputs);
+- the working rules.
+
+Graphify processes notes after about 15 quiet minutes, and each one needs your **Accept** in Graphify's **Memory → Needs review** before sessions can recall it.
+
+**Open:** whether Graphify re-indexes on every push (check its dashboard); otherwise re-index after pushing.
+
 ---
 
 ## Decision Register
@@ -1269,8 +1296,9 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 25)
+## Next Steps (after session 26)
 
+0. **Graphify:** accept the 20 seeded memory notes in Graphify's Memory → Needs review, and check whether it re-indexes on push.
 1. **Usability rounds 1–3** ([FINALIZATION.md](FINALIZATION.md) §11.2) with five or six writers each; the M2 and Phase 6 hallway tests can be round 1.
 2. **The two break-it sessions with you** ([BREAK_IT.md](BREAK_IT.md) §4). They also cover what machines can't:
    - abusing a running game (E-17 to E-21);
