@@ -119,7 +119,6 @@ export interface MetaInfo {
 
 /** META `credit` values (himawari.json `credit`): nothing visible, a line on the title screen, or the window title. */
 export const CREDIT_MODES = ["none", "title", "window"] as const;
-export type CreditMode = (typeof CREDIT_MODES)[number];
 
 /** One target language's compiled translations (LOCL). */
 export interface LocaleEntry {

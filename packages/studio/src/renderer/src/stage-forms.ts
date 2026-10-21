@@ -8,7 +8,7 @@
  * left as text: `formOf` and `conditionOf` return null and the row keeps its
  * "edit as script" box, so nothing a coder wrote is ever lost or rewritten.
  */
-import { type Expr, type Stmt, type Transition, exprToString } from "@himawari/core";
+import { type Expr, type Stmt, type Transition } from "@himawari/core";
 
 export const TRANSITION_TYPES = ["fade", "dissolve", "slide_left", "slide_right", "slide_up", "slide_down", "wipe", "rule"] as const;
 
@@ -199,4 +199,3 @@ export function conditionSource(c: CondForm): string {
 }
 
 /** An expression as source (for the "as script" view of anything a form can't show). */
-export const exprSource = (e: Expr) => exprToString(e);

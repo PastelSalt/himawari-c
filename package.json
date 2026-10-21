@@ -20,7 +20,6 @@
     "@formatjs/icu-messageformat-parser": "3.5.21",
     "@types/node": "26.6.5",
     "ajv": "8.20.0",
-    "ajv-formats": "3.0.1",
     "eslint": "10.12.0",
     "typescript": "6.0.3",
     "typescript-eslint": "8.71.2",

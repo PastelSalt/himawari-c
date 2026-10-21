@@ -80,7 +80,7 @@ jobs:
         run: ctest --preset win64-release
       - name: Check the .exe files import no non-system DLLs
         run: |
-          for exe in himawari spike_a; do
+          for exe in himawari; do
             objdump -p build/win64-release/$exe.exe | grep "DLL Name" | tee imports.txt
             if grep -Eiv "DLL Name: (kernel32|user32|gdi32|winmm|imm32|ole32|oleaut32|version|uuid|advapi32|setupapi|shell32|dinput8|cfgmgr32|hid|api-ms-win-[a-z0-9-]+)\.dll" imports.txt; then
               echo "::error::$exe.exe imports a non-system DLL"; exit 1
@@ -104,30 +104,13 @@ jobs:
           ./build/win64-release/himawari.exe ../tests/conformance/cases/l10n/expected.hwb --start --advance 4 --frames 300 --perf perf.json
           cat perf.json
           sh tests/check_budgets.sh perf.json build/win64-release/himawari.exe
-      - name: Spike A smoke test (window, audio on the dummy driver, JP text)
-        env:
-          SDL_AUDIO_DRIVER: dummy
-        run: ./build/win64-release/spike_a.exe --frames 60
-      - name: Spike B smoke test (GPU rule wipe, or the crossfade fallback on a GPU-less runner)
-        run: ./build/win64-release/spike_b.exe --frames 60
-      - name: Spike C kinsoku check on real font metrics (needs Yu Gothic on the runner)
-        run: |
-          if [ -f /c/Windows/Fonts/YuGothM.ttc ]; then
-            for w in 600 900 1200 1600; do ./build/win64-release/spike_c_ft.exe --check-only --width $w; done
-          else
-            echo "::notice::Yu Gothic not installed on this runner; skipped (test_layout still ran under ctest)"
-          fi
       - uses: actions/upload-artifact@v7
         with:
-          name: spikes-windows-x64
+          name: runtime-windows-x64
           path: |
             runtime/build/win64-release/himawari.exe
             runtime/player-ja.png
             runtime/perf.json
-            runtime/build/win64-release/spike_a.exe
-            runtime/build/win64-release/spike_b.exe
-            runtime/build/win64-release/spike_c_ft.exe
-            runtime/build/win64-release/spike_c_ttf.exe
 
   runtime-asan:
     name: Runtime, Windows (ASan/UBSan + libFuzzer, MSYS2 CLANG64)
@@ -179,7 +162,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v8
         with:
-          name: spikes-windows-x64
+          name: runtime-windows-x64
           path: runtime
       - uses: actions/setup-node@v5
         with:

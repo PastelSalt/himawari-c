@@ -17,7 +17,7 @@ Should Himawari-C use SDL3_ttf as its font, atlas, and shaping layer under our o
   - Output: positioned glyphs with a **reveal index** for typewriter display. Ruby appears with the first character of its base group.
   - Input is pre-structured runs (`{text, ruby}`), never markup: the runtime does not parse source text (D01). Core compiles `{rb=…}…{/rb}` into runs.
   - Tests: `runtime/tests/test_layout.c`, deterministic with fixed advances. Covers every kinsoku class, hanging on and off, inseparables, Latin wrapping, emergency splits, and both ruby spreading cases.
-- **Two glyph backends** behind one interface (`runtime/spikes/c_text/glyphs.h`) with a shared shelf-packed atlas and an outline-under-fill renderer:
+- **Two glyph backends** behind one interface (`runtime/spikes/c_text/glyphs.h`, retired in LOG session 25 and kept in git history) with a shared shelf-packed atlas and an outline-under-fill renderer:
   - `glyphs_ft.c`: FreeType directly. Fallback chain by `FT_Get_Char_Index`, outlines with `FT_Stroker`. 141 lines.
   - `glyphs_ttf.c`: SDL3_ttf 3.2.2 glyph API: `TTF_AddFallbackFont`, `TTF_SetFontOutline`, `TTF_GetGlyphImage`, `TTF_GetGlyphMetrics`. 124 lines.
   - Built as `spike_c_ft.exe` and `spike_c_ttf.exe`, so each size can be measured alone.
@@ -72,4 +72,4 @@ Both backends gave identical results. Screenshots: [paragraph](assets/0003-parag
 - [ ] Atlas pages + LRU; glyph rasterization off the main thread (plan §8.5 prefetch).
 - [ ] The layout allocates with `malloc` per paragraph; fine per line shown, but the runtime should use its arena (no frame-loop allocations, §8.1).
 - [x] First CI run (38997022400): `test_layout` passed under `ctest`; the runner has Yu Gothic, and the kinsoku check found 0 violations at widths 600, 900, 1200, 1600.
-- [ ] Remove SDL3_ttf from `HimawariDeps.cmake` and the `spike_c_ttf` target once the spikes are retired (Phase 2), since it was not adopted.
+- [x] Remove SDL3_ttf from `HimawariDeps.cmake` and the `spike_c_ttf` target once the spikes are retired (Phase 2), since it was not adopted. Done in LOG session 25.

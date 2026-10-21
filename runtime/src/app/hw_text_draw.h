@@ -20,8 +20,6 @@
 
 typedef struct hw_fonts hw_fonts;
 
-/* Opens the faces of a fallback chain (the first that has a character wins). */
-hw_fonts *hw_fonts_open(SDL_Renderer *ren, const char *const *paths, int count);
 /*
  * A face from a stream (read on demand, so a 10 MB font file isn't loaded whole; the fonts take
  * it over, even on failure), else from a file path (streamed the same way).

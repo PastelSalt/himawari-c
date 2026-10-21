@@ -15,7 +15,7 @@ Can Himawari-C ship as **one fully static Windows x64 `.exe`** built natively wi
 - SDL3_mixer: `BUILD_SHARED_LIBS=OFF`, `SDLMIXER_DEPS_SHARED=OFF`, `SDLMIXER_VENDORED=OFF`, external codecs off. Enabled backends: `vorbis_stb mp3_drmp3 wave aiff voc au`. Linked as `SDL3_mixer::SDL3_mixer-static`.
 - FreeType: zlib, bzip2, PNG, HarfBuzz, and Brotli disabled.
 - Shipping flags (`win64-release`): `-O2` + IPO/LTO, `-static -static-libgcc -mwindows -s`.
-- Code: `runtime/spikes/a_static/main.c`. Accepts `--frames N` (auto-quit) and `--screenshot FILE`.
+- Code: `runtime/spikes/a_static/main.c` (retired in LOG session 25 once the real runtime covered it; it's in git history before then). Accepts `--frames N` (auto-quit) and `--screenshot FILE`.
 
 ## Results on the dev PC (Windows 11 Pro, AMD Radeon RX 580, GCC 16.2.0 UCRT64, CMake 4.4.4, Ninja 1.13.2)
 

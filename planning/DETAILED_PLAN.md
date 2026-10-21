@@ -630,7 +630,7 @@ runtime/
 │   ├── debug/       # debug pipe, dev overlay, warp, reload-in-place
 │   └── main.c
 ├── shaders/         # HLSL sources + generated/ DXIL and SPIR-V headers (committed)
-├── spikes/  tests/  fuzz/  cmake/
+├── tests/  fuzz/  cmake/
 ```
 **Rule:** `core/` has no SDL and no I/O. It's shared by the game, headless playtests, tests, fuzzers, and a future WASM build. `text/hw_layout.c` (line breaking, kinsoku, ruby) also has no SDL and no font library. Keeping these portable is also what keeps a future Linux port cheap (§18.9).
 

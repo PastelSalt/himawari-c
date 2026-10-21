@@ -12,14 +12,9 @@ hw_dependency(sdl3
 hw_dependency(sdl3_mixer
   https://github.com/libsdl-org/SDL_mixer/archive/refs/tags/release-3.2.4.tar.gz
   f2ea848ccdf2f394cd4973ee0f6c482e04511044695cccfd46bab6dcd7f780aa)
-# OVERRIDE_FIND_PACKAGE: SDL3_ttf's find_package(Freetype) resolves to this copy.
 hw_dependency(freetype
   https://github.com/freetype/freetype/archive/refs/tags/VER-2-14-3.tar.gz
-  dc49de6b01a266eef4876a4dd34d9842c475d3e28ff2eff63bd2fb760ab56261
-  OVERRIDE_FIND_PACKAGE)
-hw_dependency(sdl3_ttf
-  https://github.com/libsdl-org/SDL_ttf/archive/refs/tags/release-3.2.2.tar.gz
-  ff6b81d3dc39d843cc3ead6dedd68043a79513d266792ea89445547ef4e9b073)
+  dc49de6b01a266eef4876a4dd34d9842c475d3e28ff2eff63bd2fb760ab56261)
 
 # Never build dependencies as DLLs.
 hw_force(BUILD_SHARED_LIBS OFF)
@@ -79,12 +74,6 @@ hw_force(FT_DISABLE_HARFBUZZ ON)
 hw_force(FT_DISABLE_BROTLI ON)
 hw_force(SKIP_INSTALL_ALL ON)
 
-# SDL3_ttf 3.2: our FreeType, no HarfBuzz (Tier 2), no PlutoSVG color emoji.
-hw_force(SDLTTF_VENDORED OFF)
-hw_force(SDLTTF_HARFBUZZ OFF)
-hw_force(SDLTTF_PLUTOSVG OFF)
-hw_force(SDLTTF_SAMPLES OFF)
-hw_force(SDLTTF_INSTALL OFF)
 
 FetchContent_MakeAvailable(sdl3 sdl3_mixer freetype)
 
@@ -94,11 +83,6 @@ FetchContent_MakeAvailable(sdl3 sdl3_mixer freetype)
 target_compile_definitions(freetype PRIVATE "$<$<COMPILE_LANGUAGE:C>:FT_CONFIG_MODULES_H=<hw_ftmodule.h$<ANGLE-R>>")
 target_include_directories(freetype PRIVATE "${PROJECT_SOURCE_DIR}/cmake/freetype")
 
-# SDL3_ttf links Freetype::Freetype; FreeType's own build only defines `freetype`.
-if(NOT TARGET Freetype::Freetype)
-  add_library(Freetype::Freetype ALIAS freetype)
-endif()
-FetchContent_MakeAvailable(sdl3_ttf)
 
 # Line breaking and the image decoders (SDL-free, shared with the fuzz build).
 include(${CMAKE_CURRENT_LIST_DIR}/HimawariCodecs.cmake)

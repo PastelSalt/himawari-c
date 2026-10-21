@@ -52,14 +52,6 @@ struct hw_fonts {
 
 /* ---- faces ---- */
 
-hw_fonts *hw_fonts_open(SDL_Renderer *ren, const char *const *paths, int count)
-{
-    hw_font_source src[MAX_FACES];
-    int n = 0;
-    for (int i = 0; i < count && n < MAX_FACES; i++) src[n++] = (hw_font_source){ paths[i], NULL };
-    return hw_fonts_open_sources(ren, src, n);
-}
-
 /* FreeType reads faces through SDL streams: UTF-8 paths, packs, and no whole-file loads. */
 static unsigned long stream_read(FT_Stream s, unsigned long offset, unsigned char *buffer, unsigned long count)
 {

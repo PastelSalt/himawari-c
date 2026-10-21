@@ -9,7 +9,7 @@ if(NOT WIN32)
   message(FATAL_ERROR "Himawari-C builds for Windows only (plan v0.5). Use MSYS2 UCRT64 and a win64-* preset.")
 endif()
 
-option(HW_WITH_SDL "Build the SDL-based targets (spikes, later the game runtime)" ON)
+option(HW_WITH_SDL "Build the SDL-based targets (the game runtime)" ON)
 option(HW_SANITIZE "Build with AddressSanitizer and UBSan (MSYS2 CLANG64)" OFF)
 option(HW_FUZZ "Build libFuzzer targets (MSYS2 CLANG64)" OFF)
 option(HW_RELEASE_STATIC "Shipping build: LTO, fully static, GUI subsystem, stripped (plan §14.3)" OFF)
@@ -216,25 +216,4 @@ ${hw_ext_calls}}
     COMMAND himawari --headless "${HW_CONFORMANCE_DIR}/basic/expected.hwb" --playtest)
   add_test(NAME playtest_flow
     COMMAND himawari --headless "${HW_CONFORMANCE_DIR}/flow/expected.hwb" --playtest)
-
-  # Spike A: static SDL3 + SDL3_mixer + FreeType window, sound, and JP text (rfcs/0001).
-  add_executable(spike_a spikes/a_static/main.c)
-  target_link_libraries(spike_a PRIVATE
-    hw_core hw_warnings
-    SDL3::SDL3-static SDL3_mixer::SDL3_mixer-static freetype)
-
-  # Spike B: rule-wipe transition via SDL_GPURenderState on D3D12 / Vulkan (rfcs/0002).
-  # Shaders are precompiled into shaders/generated/ by shaders/compile-shaders.cmake.
-  add_executable(spike_b spikes/b_rule_wipe/main.c)
-  target_include_directories(spike_b PRIVATE shaders/generated)
-  target_link_libraries(spike_b PRIVATE hw_core hw_warnings SDL3::SDL3-static)
-
-  # Spike C: JP paragraph with ruby + kinsoku; FreeType directly vs SDL3_ttf (rfcs/0003).
-  # Two executables so each backend's size can be measured on its own.
-  foreach(backend ft ttf)
-    add_executable(spike_c_${backend} spikes/c_text/main.c spikes/c_text/glyphs_${backend}.c)
-    target_link_libraries(spike_c_${backend} PRIVATE hw_text hw_warnings SDL3::SDL3-static)
-  endforeach()
-  target_link_libraries(spike_c_ft PRIVATE freetype)
-  target_link_libraries(spike_c_ttf PRIVATE SDL3_ttf::SDL3_ttf)
 endif()

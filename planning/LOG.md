@@ -1144,6 +1144,41 @@ Four questions are open in BREAK_IT.md §9: where findings live, the AI cost of 
 - The decision register gained D68–D73, from sessions 22–24.
 - The next steps are rewritten (the old list still said to commit session 19).
 
+## Session 25: 2026-10-21 · Removing what isn't used
+**You asked:** to remove unneeded or unused files, keeping all testing code.
+
+**How it was found:**
+- **knip,** run with the packages' real entry points (Electron's main, preload, and renderer; the CLI and MCP entries; tests; scripts), for unused files, exports, and dependencies.
+- A scan of Studio's 1 014 UI messages and 376 CSS classes against the code, counting dynamic prefixes like `` `tool.${name}` `` as used.
+- A scan of the runtime's public C functions for ones nothing calls.
+
+Each candidate was checked by hand before removing.
+
+**Removed:**
+- **`runtime/spikes/`** (the Phase 0 prototypes A, B, and C), their CMake targets, and their CI steps. Their questions were settled in rfcs/0001–0003, and the real runtime replaced them. The CI artifact that carried them is now `runtime-windows-x64` (it still carries `himawari.exe` to the later jobs). The code stays in git history; the RFCs say so.
+- **The SDL3_ttf dependency.** Only `spike_c_ttf` used it, and the runtime draws text with FreeType directly. This closes rfcs/0003's to-do, and every runtime build stops downloading and compiling it (38 MB of build files cleared).
+- **Dead code:**
+  - `hw_fonts_open` (a font wrapper nothing called; fonts come from packs through `hw_fonts_open_sources`);
+  - `exprSource` (an unused Studio export);
+  - `CreditMode` (an unused Core type);
+  - `ajv-formats` (an unused dev dependency).
+
+**Kept on purpose** (they looked unused, but aren't):
+- `hw_ext_bool` and `hw_ext_text`: the public C extension API for game developers (rfcs/0007).
+- `axe-core`: the accessibility test loads it by file path.
+- `env.d.ts`: types for CSS imports.
+- The CodeMirror and React Flow CSS hooks.
+- The examples' `make-art.mjs`: how their placeholder art is made.
+- All test code.
+
+No UI message was unused.
+
+**Verified:**
+- Debug and release runtimes rebuilt; ctest 11 of 11.
+- The game exe is still 2.6 MB, with only Windows system DLLs.
+- `corepack pnpm check`: 532 tests, 72 Markdown files' links.
+- Golden images: 22.
+
 ---
 
 ## Decision Register
@@ -1221,6 +1256,7 @@ Four questions are open in BREAK_IT.md §9: where findings live, the AI cost of 
 | D71 | The shared file layer (`ProjectFs`) is the sandbox for Studio, `hwc`, export, and MCP: paths are checked by where they really lead (links), never with `.` or `..` parts, never with reserved device names, and a missing project folder is never recreated | sessions 22–23 | ✅ Active |
 | D72 | libunibreak 8.0 is patched at download (`runtime/cmake/patch-libunibreak.cmake`) until upstream fixes the out-of-bounds write (BREAK_IT.md B-6); the layout always passes it valid UTF-8 | session 22 | ✅ Active |
 | D73 | Planning documents live in `planning/`; the root holds the README, CLAUDE.md, the licenses, and GitHub's community files; [tests/README.md](../tests/README.md) maps every test | session 24 | ✅ Active |
+| D74 | The Phase 0 spikes (`runtime/spikes/`) and the SDL3_ttf dependency are retired: the real runtime and its tests cover what they proved (rfcs/0001–0003); the code stays in git history | session 25 | ✅ Active |
 | D58 | **One click** (P15): ~~a one-click per-user Studio installer~~ (the installer is D61) with everything inside (`hwc` and `himawari-mcp` run through Studio's executable, no Node); export is one button; an optional single-file game | session 18 | ✅ Active |
 | D52 | AI quality is measured by `packages/evals`: deterministic scores, JSON results by date, `TREND.md`; real runs are started by hand with a key (never by default in CI) | session 17 | ✅ Active |
 
@@ -1233,7 +1269,7 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 24)
+## Next Steps (after session 25)
 
 1. **Usability rounds 1–3** ([FINALIZATION.md](FINALIZATION.md) §11.2) with five or six writers each; the M2 and Phase 6 hallway tests can be round 1.
 2. **The two break-it sessions with you** ([BREAK_IT.md](BREAK_IT.md) §4). They also cover what machines can't:
