@@ -6,16 +6,19 @@
  * clean Windows install) are manual, in the release checklist.
  */
 import { spawn } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { readPack } from "@himawari/core";
+import { findRuntime } from "@himawari/tools";
 import { afterAll, describe, expect, test } from "vitest";
 import { buildModel } from "../renderer/src/model.js";
 import { Project } from "./project.js";
 
 const DEMO = fileURLToPath(new URL("../../../../examples/sunflower-demo/", import.meta.url));
 const work = mkdtempSync(join(tmpdir(), "hw-torture-"));
+const RELEASE = ((r) => (r && existsSync(r) ? r : null))(findRuntime());
 afterAll(() => rmSync(work, { recursive: true, force: true }));
 
 /** A copy of the demo at `root`, opened the way Studio opens it. */
@@ -103,4 +106,60 @@ describe("never lose work (FINALIZATION.md §11.7)", () => {
     reopened.close();
     p.close();
   });
+
+  // BREAK_IT.md S-6: random disk faults (held files, access denied, a full disk, I/O errors) while saving.
+  test("S-6: under random disk faults, a save is all or nothing and no temporary file is left", () => {
+    const p = open(join(work, "faults"));
+    const file = "script/start.hws";
+    let good = p.fs.read(file);
+    let failed = 0;
+    process.env["HW_FAULTS"] = "0.3";
+    try {
+      for (let i = 0; i < 300; i++) {
+        const next = `${good}# version ${i}\n`;
+        let ok = false;
+        try {
+          ok = p.write(file, next).ok;
+        } catch {
+          failed++;
+        }
+        delete process.env["HW_FAULTS"];
+        const disk = p.fs.read(file);
+        process.env["HW_FAULTS"] = "0.3";
+        expect(disk === next || disk === good, `after attempt ${i}`).toBe(true);
+        if (ok) good = next;
+        else if (disk === next) good = next; // the rename landed, then a later step failed
+      }
+    } finally {
+      delete process.env["HW_FAULTS"];
+    }
+    expect(failed).toBeGreaterThan(10); // the faults really happened
+    expect(readdirSync(join(p.root, "script")).filter((f) => f.includes(".tmp-"))).toEqual([]);
+    expect(p.write(file, `${good}# after\n`)).toEqual({ ok: true });
+    p.close();
+  }, 60000); // injected "busy file" faults wait out the real retry backoff
+
+  // BREAK_IT.md S-7: a full disk during export never leaves a half-written game behind.
+  test.skipIf(!RELEASE)("S-7: an export that runs out of disk leaves only whole files", () => {
+    const p = open(join(work, "full-disk"));
+    expect(p.exportGame(RELEASE!, false).ok).toBe(true);
+    const dir = join(p.root, "build", "windows", "Sunflower Days");
+    const exe = readFileSync(join(dir, "Sunflower Days.exe"));
+    let failed = 0;
+    for (let i = 0; i < 30; i++) {
+      process.env["HW_FAULTS"] = "0.2:ENOSPC";
+      try {
+        p.exportGame(RELEASE!, false);
+      } catch {
+        failed++;
+      } finally {
+        delete process.env["HW_FAULTS"];
+      }
+      expect(readFileSync(join(dir, "Sunflower Days.exe")).equals(exe)).toBe(true);
+      expect(() => readPack(new Uint8Array(readFileSync(join(dir, "data.hwp"))))).not.toThrow();
+      expect(readdirSync(dir).filter((f) => f.includes(".tmp-"))).toEqual([]);
+    }
+    expect(failed).toBeGreaterThan(0);
+    p.close();
+  }, 120000);
 });

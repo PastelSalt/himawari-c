@@ -1011,5 +1011,6 @@
   "problems.whereCode": "{file}:{line}:{col} · {code}",
   "build.singleFile": "ゲーム全体を 1 つのファイルにまとめる",
   "build.singleFileHint": "ゲームの .exe にストーリーと素材が入るので、そのファイル 1 つだけを送れます。パッチもそのまま使えます。",
-  "build.doneOneFile": "完了：{path}。このファイル 1 つでゲーム全体です。"
+  "build.doneOneFile": "完了：{path}。このファイル 1 つでゲーム全体です。",
+  "notice.copied": "コピーしました。"
 }

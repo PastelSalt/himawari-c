@@ -139,7 +139,7 @@ export function SettingsPage() {
               </span>
               <pre className="copy-block">{mcp.claudeCodeCommand}</pre>
               <div className="row">
-                <button className="small-button" onClick={() => void navigator.clipboard.writeText(mcp.claudeCodeCommand)}>
+                <button className="small-button" onClick={() => void studio.app.copyText(mcp.claudeCodeCommand).then(() => useStudio.getState().notify({ id: "notice.copied" }))}>
                   <FormattedMessage id="settings.copy" />
                 </button>
                 <button
@@ -163,7 +163,7 @@ export function SettingsPage() {
                 <FormattedMessage id="settings.desktopApp" />
               </span>
               <pre className="copy-block">{mcp.desktopConfig}</pre>
-              <button className="small-button" onClick={() => void navigator.clipboard.writeText(mcp.desktopConfig)}>
+              <button className="small-button" onClick={() => void studio.app.copyText(mcp.desktopConfig).then(() => useStudio.getState().notify({ id: "notice.copied" }))}>
                 <FormattedMessage id="settings.copy" />
               </button>
             </div>

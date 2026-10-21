@@ -53,3 +53,44 @@ describe.skipIf(!runtime)("single-file export (FINALIZATION.md OC-6)", () => {
     expect(p.entries).toBeGreaterThan(0);
   });
 });
+
+// BREAK_IT.md finding B-8: game titles that made exe and folder names Windows can't use.
+describe("export names from any title", () => {
+  test("reserved device names, long titles, and nothing usable", async () => {
+    const { safeName } = await import("./package.js");
+    expect(safeName("CON")).toBe("CON game");
+    expect(safeName("nul")).toBe("nul game");
+    expect(safeName("Com1")).toBe("Com1 game");
+    expect(safeName("Console")).toBe("Console");
+    expect(Array.from(safeName("あ".repeat(300))).length).toBe(64);
+    expect(safeName("a".repeat(63) + " b")).toBe("a".repeat(63));
+    expect(safeName("😀!!!")).toBe("game");
+    expect(safeName("  Sunflower   Days  ")).toBe("Sunflower Days");
+  });
+});
+
+// BREAK_IT.md finding B-13: exporting again while the last exported game still runs.
+describe.skipIf(!runtime)("re-export while the game is running", () => {
+  test("says the game is open, quickly, and leaves the folder as it was", async () => {
+    const { spawn } = await import("node:child_process");
+    const root = join(work, "running");
+    cpSync(DEMO, root, { recursive: true, filter: (s) => !/[\/]build$/.test(s) });
+    const fs = new ProjectFs(root);
+    const exportOnce = () => {
+      const c = compileProject(fs, { debug: false });
+      return packageGame(fs, c.bytes!, c.title, c.gameId, runtime!, { version: c.version });
+    };
+    const first = exportOnce();
+    const game = spawn(fs.path(first.exe), ["--start", "--frames", "100000"], { cwd: fs.path(first.dir), stdio: "ignore" });
+    try {
+      await new Promise((r) => setTimeout(r, 1500));
+      const t0 = Date.now();
+      expect(() => exportOnce()).toThrow(/still running/);
+      expect(Date.now() - t0).toBeLessThan(1000);
+    } finally {
+      game.kill();
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    expect(exportOnce().exe).toBe(first.exe); // closed: it works again
+  }, 60000);
+});

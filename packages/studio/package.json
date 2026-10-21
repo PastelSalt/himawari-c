@@ -14,7 +14,8 @@
     "check:i18n": "node scripts/check-locales.mjs",
     "package": "electron-vite build && node scripts/stage-resources.mjs && electron-builder --win --config electron-builder.yml",
     "stage": "node scripts/stage-resources.mjs",
-    "e2e": "electron-vite build && vitest run --config vitest.e2e.config.ts"
+    "e2e": "electron-vite build && vitest run --config vitest.e2e.config.ts",
+    "chaos": "electron-vite build && vitest run --config vitest.chaos.config.ts"
   },
   "devDependencies": {
     "@anthropic-ai/sdk": "0.135.0",

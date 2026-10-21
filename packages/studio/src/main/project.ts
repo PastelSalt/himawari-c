@@ -8,9 +8,10 @@ import { createHash } from "node:crypto";
 import { type FSWatcher, cpSync, existsSync, mkdirSync, statSync, watch } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { LocalHistory } from "./local-history.js";
-import { ProjectFs, compileProject, imageSizes, initProject, packageGame, safeName } from "@himawari/tools";
+import { ProjectFs, compileProject, imageSizes, initProject, isReservedName, packageGame, safeName } from "@himawari/tools";
 import { zipSync } from "fflate";
 import type { BuildReport, FileChange, ImageSizes, NewProjectOptions, ProjectFile, ProjectSnapshot } from "../shared/api.js";
+import { fingerprint } from "../shared/fingerprint.js";
 
 /** The text files Studio loads and edits. */
 export function isProjectText(file: string): boolean {
@@ -116,13 +117,16 @@ export class Project {
    * The text on disk before the change is kept in the local history. If the file changed outside
    * Studio since Studio last saw it, nothing is written and the caller gets the disk's text to
    * offer a choice (FINALIZATION.md S-6); `force` writes anyway (the user chose theirs).
+   * `base` is the fingerprint of the text the edit started from: if the disk differs from it, the
+   * file changed after Studio's copy was taken (even if the watcher has already seen that change),
+   * so writing would undo someone else's change (BREAK_IT.md finding B-11).
    */
-  write(file: string, text: string, force = false): WriteResult {
+  write(file: string, text: string, force = false, base?: string): WriteResult {
     if (!isWritableText(file)) throw new Error(`Studio doesn't write "${file}" as text.`);
     if (this.fs.exists(file)) {
       const old = this.fs.read(file);
       const known = this.known.get(file);
-      const outside = known !== undefined && hash(old) !== known;
+      const outside = (known !== undefined && hash(old) !== known) || (base !== undefined && fingerprint(old) !== base);
       if (outside && !force && old !== text) return { ok: false, conflict: old };
       if (old !== text) this.history?.save(file, old, outside ? "outside" : "edit");
     }
@@ -264,7 +268,10 @@ export class Project {
 
 /** A folder name for a new project: the name with characters Windows forbids removed. */
 function folderName(name: string): string {
-  const s = name.replace(/[<>:"/\\|?*\p{Cc}]+/gu, "").trim().replace(/[. ]+$/, "");
+  let s = name.replace(/[<>:"/\\|?*\p{Cc}]+/gu, "").trim().replace(/[. ]+$/, "");
+  s = Array.from(s).slice(0, 100).join("").trim();
+  // "CON" and friends can't be used as folder names on Windows (BREAK_IT.md B-8).
+  if (isReservedName(s)) s = `${s} novel`;
   return s || "My Novel";
 }
 

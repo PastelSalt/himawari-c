@@ -45,3 +45,22 @@ describe("the project sandbox", () => {
     expect(fs.read("assets/alias/a.png")).toBe("a");
   });
 });
+
+// BREAK_IT.md finding B-8: files Windows can't use (CON, aux.png, …), whatever names them.
+describe("reserved device names", () => {
+  test("are recognized with any extension, and only whole names", async () => {
+    const { isReservedName } = await import("./fs.js");
+    for (const n of ["CON", "con.hws", "aux.png", "Nul", "COM1.md", "lpt9.json", "prn."]) expect(isReservedName(n), n).toBe(true);
+    for (const n of ["console", "null.png", "auxiliary", "com10", "a_con", "CON game"]) expect(isReservedName(n), n).toBe(false);
+  });
+
+  test("are refused when writing, with a plain message", () => {
+    const fs = new ProjectFs(join(work, "reserved"));
+    mkdirSync(join(work, "reserved"), { recursive: true });
+    for (const bad of ["characters/con.md", "assets/sprites/hana/aux/smile.png", "script/NUL.hws"]) {
+      expect(() => fs.write(bad, "x"), bad).toThrow(/reserves/);
+    }
+    fs.write("characters/connie.md", "x");
+    expect(fs.read("characters/connie.md")).toBe("x");
+  });
+});

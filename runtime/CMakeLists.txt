@@ -59,7 +59,7 @@ add_test(NAME utf8 COMMAND test_utf8)
 
 # Tests that read the conformance cases (tests/conformance/cases/*/expected.hwb, written by the TS half).
 set(HW_CONFORMANCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../tests/conformance/cases")
-foreach(t hwb conformance save sprite json pack)
+foreach(t hwb conformance save sprite json pack saveany)
   add_executable(test_${t} tests/test_${t}.c)
   target_link_libraries(test_${t} PRIVATE hw_core hw_warnings)
   target_compile_definitions(test_${t} PRIVATE HW_CONFORMANCE_DIR="${HW_CONFORMANCE_DIR}")

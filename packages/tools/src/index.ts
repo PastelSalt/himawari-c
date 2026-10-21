@@ -59,7 +59,7 @@ export const TOOLS: readonly ToolDef[] = [
 ] as unknown as readonly ToolDef[];
 
 export * from "./registry.js";
-export { ProjectFs, SandboxError } from "./fs.js";
+export { ProjectFs, SandboxError, isReservedName } from "./fs.js";
 export { check, describeDiagnostics, diagnosticsJson, findScene, imageSizes, loadInput, revisionOf, type DiagnosticJson } from "./project.js";
 export { PROVENANCE_FILE, provenanceNow, readProvenance, stampAi, textHash, type ProvenanceFile } from "./provenance.js";
 export { findRuntime, runRuntime } from "./runtime.js";

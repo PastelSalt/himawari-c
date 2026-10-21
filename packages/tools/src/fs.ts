@@ -8,9 +8,33 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export class SandboxError extends Error {}
 
+/**
+ * Names Windows reserves for devices, with any extension: CON, NUL, COM1, aux.png, … A file named
+ * so can be written through long paths, but Explorer, zip tools, git, and Windows 10 can't use it
+ * (BREAK_IT.md finding B-8).
+ */
+export function isReservedName(name: string): boolean {
+  return /^(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³])(\.|$)/i.test(name.trim());
+}
+
 /** Errors Windows gives while antivirus, OneDrive, or an indexer briefly holds a file. */
 const TRANSIENT = new Set(["EPERM", "EBUSY", "EACCES"]);
 const pause = (ms: number) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+/**
+ * Test-only fault injection (BREAK_IT.md S-6, S-7): HW_FAULTS="0.05" makes about 5 % of disk
+ * operations fail the ways Windows does (a held file, access denied, a full disk, an I/O error);
+ * HW_FAULTS="0.05:ENOSPC" picks the error. Unset in normal use, it costs one lookup.
+ */
+function maybeFail(op: string): void {
+  const spec = process.env["HW_FAULTS"];
+  if (!spec) return;
+  const [rate, only] = spec.split(":");
+  if (Math.random() >= Number(rate)) return;
+  const codes = only ? [only] : ["EBUSY", "EACCES", "ENOSPC", "EIO"];
+  const code = codes[Math.floor(Math.random() * codes.length)]!;
+  throw Object.assign(new Error(`${code}: injected fault during ${op} (HW_FAULTS)`), { code });
+}
 
 /** Runs `op`, retrying for about two seconds while the file is briefly locked (FINALIZATION.md S-1). */
 function retrying<T>(op: () => T): T {
@@ -84,12 +108,18 @@ export class ProjectFs {
   /** Reads, retried while another program (antivirus, OneDrive) holds the file. */
   read(rel: string): string {
     const full = this.path(rel);
-    return retrying(() => readFileSync(full, "utf8"));
+    return retrying(() => {
+      maybeFail("read");
+      return readFileSync(full, "utf8");
+    });
   }
 
   readBytes(rel: string): Buffer {
     const full = this.path(rel);
-    return retrying(() => readFileSync(full));
+    return retrying(() => {
+      maybeFail("read");
+      return readFileSync(full);
+    });
   }
 
   /** The first `n` bytes of a file (fewer if it's shorter). */
@@ -112,10 +142,16 @@ export class ProjectFs {
   /** Writes the whole file or nothing: a flushed temporary file, then renamed over the old one (retried while locked). */
   write(rel: string, data: string | Uint8Array): void {
     const full = this.path(rel);
+    // The project folder itself is never created here: if it was moved, renamed, or deleted while
+    // open, writing would quietly start a new folder holding one file (BREAK_IT.md finding B-9).
+    if (!existsSync(this.root)) throw new Error(`The project folder isn't there anymore (moved, renamed, or deleted): ${this.root}`);
+    const reserved = rel.split(/[\\/]/).find(isReservedName);
+    if (reserved) throw new SandboxError(`"${reserved}" is a name Windows reserves for a device; choose another name`);
     mkdirSync(dirname(full), { recursive: true });
     const tmp = `${full}.tmp-${process.pid}`;
     const bytes = typeof data === "string" ? Buffer.from(data, "utf8") : data;
     try {
+      maybeFail("write");
       const fd = openSync(tmp, "w");
       try {
         let done = 0;
@@ -124,7 +160,10 @@ export class ProjectFs {
       } finally {
         closeSync(fd);
       }
-      retrying(() => renameSync(tmp, full));
+      retrying(() => {
+        maybeFail("rename");
+        renameSync(tmp, full);
+      });
     } catch (e) {
       rmSync(tmp, { force: true });
       throw e;

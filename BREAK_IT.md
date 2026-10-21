@@ -1,6 +1,6 @@
 # Himawari: Break-It Plan
 
-> **Status:** v0.3 · 2026-10-21 · week 1 done except S-25; the first overnight run is going. Findings in §8.
+> **Status:** v0.5 · 2026-10-21 · weeks 1–3 done except what needs people, a key, or real hardware (§8). Findings in §8.
 > **What it is:** a deliberate, organized attempt to break Studio and the engine: wrong inputs, hostile files, abuse, scale, faults, and time. The goal is to find bugs and rough edges **before** players and writers do. Every bug found becomes a regression test.
 > **Where it fits:** FINALIZATION.md §11 (how we test it) and stage I (release readiness). It adds to §11.7's torture tests; it doesn't replace them.
 
@@ -57,7 +57,7 @@ The five existing libFuzzer targets cover bytecode, JSON, packs, saves, and UTF-
 | E-5 | **The debug protocol** (the JSON lines Studio sends the docked runtime) | A bad message must not take the preview down | Recorded Studio sessions |
 | E-6 | **Decompression bombs:** a 30 000 × 30 000 PNG, a WebP claiming huge size, a pack entry claiming 4 GB | Memory budget (RA-5); must be refused, not attempted | Hand-made |
 
-The existing targets also get **longer runs**: 60 s in CI stays, plus an **overnight run** (8 h per target) before each release. The corpus grows from what that finds.
+The existing targets also get **longer runs**: 60 s in CI stays. The **overnight run** (`scripts/break/overnight.mjs`, about an hour per target) is **skipped for now** (your call, 2026-10-21): it's optional, for before a release, and only when you ask. The corpus grows from what that finds.
 
 ### 2.2 The language: property tests on Core (new)
 
@@ -92,7 +92,7 @@ A **story generator** writes random but valid projects: scenes, menus, condition
 | E-19 | Gamepad plugged and unplugged mid-choice | No crash; input keeps working |
 | E-20 | Quit or kill during a save; delete the save folder while playing; make AppData read-only; fill the disk | Old save intact or a plain message; never a corrupt save (P-2) |
 | E-21 | Sleep and resume; change the clock; lock the screen during audio | Audio and timing recover |
-| E-22 | **Soak:** auto-advance a big game for 8 hours (`--frames` with auto) | No memory or handle growth; idle CPU stays near zero (RA-6) |
+| E-22 | **Soak:** auto-advance a big game for a long time (`--frames` with auto); a short run now, the long one only on request | No memory or handle growth; idle CPU stays near zero (RA-6) |
 | E-23 | **Weak machines:** the software renderer, 1366 × 768, a Windows Sandbox VM with no GPU, a hard disk | Budgets (§8.1) hold or degrade gently |
 
 The monkey for E-17 to E-19 is a runtime flag that injects random input events at high speed, so it can run unattended under ASan.
@@ -115,7 +115,7 @@ After every 50 actions it checks the oracles: no errors in the console, the file
 | S-2 | **Edit storms:** 10 edits a second while the preview reloads | Races between autosave, the build, and the preview (the "lost Choice" class of bug from session 19) |
 | S-3 | **Undo and redo storms** across files, the Designer, and accepted proposals | History getting out of step with the files |
 | S-4 | **Same file edited outside** by a script every 2 s while the monkey edits it | S-6's conflict dialog under load; never a silent merge |
-| S-5 | **Soak:** Studio open 8 hours with an edit every minute | Memory growth, history folder growth, slowdowns |
+| S-5 | **Soak:** Studio open for a long time with an edit every minute; a short run now, the long one only on request | Memory growth, history folder growth, slowdowns |
 
 ### 3.2 Fault injection in the file layer (new)
 
@@ -232,11 +232,19 @@ Fixing runs alongside: S1 at once, S2 within the week.
   - E-1, E-3, and E-6 (new fuzz targets `fuzz_image` and `fuzz_layout`, in CI and the overnight run). E-5 was already covered by `fuzz_json`.
   - S-19 to S-22 (the security audit). Electron hardening checks out: context isolation, the sandbox, CSP, navigation and new windows blocked, permissions denied, fuses, and an encrypted key that never reaches the renderer. No HTML is rendered from project content.
   - S-20 (an e2e test that sends every safe IPC method garbage).
-  - `scripts/break/overnight.mjs`.
-- **Not yet:**
+  - `scripts/break/overnight.mjs`. Its first 8-hour run was **stopped at your request** (2026-10-21): long unattended runs are skipped for now and stay available before a release (`node scripts/break/overnight.mjs --hours 8`).
+- **Weeks 2 and 3, done:**
+  - E-12 to E-16: `scripts/break/stories.mjs` generated 200 random valid stories. The runtime explored every path (4 622 lines, every ending). `test_saveany` saved and rolled back at every line (ctest runs it on the conformance cases too), loaded saves into an edited version, and 20 patched releases played like fresh builds. Nothing found.
+  - S-1 to S-4: the Studio monkey (`corepack pnpm --filter @himawari/studio chaos`). It found B-11 and B-12; after the fixes, 6 seeds × 500 actions pass.
+  - S-6, S-7: `HW_FAULTS` fault injection (torture tests): saves are all or nothing under 30 % faults, and an export that runs out of disk leaves only whole files.
+  - S-8 to S-13: hostile projects (`hostile.test.ts`). They found B-8, B-9, and B-10.
+  - S-14 (B-14), S-15 (B-13), S-16 (B-8), and S-23 (every AI tool with hostile arguments: nothing outside the project, no crashes). S-24 holds by design: if Studio doesn't answer, `himawari-mcp` writes directly, and B-11's check catches a clash.
+- **Not yet (needs people, a key, or real hardware):**
   - E-2 (fonts) and E-4 (audio): they need SDL in the fuzz build.
-  - S-25 (prompt injection; costs a little).
-  - Week 2's generators.
+  - E-17 to E-21 (abusing a running game) and E-23 (weak machines): the break-it sessions and the clean-machine test.
+  - S-17 (a 2 GB single-file game) and S-18 (the installer): manual.
+  - S-25 (prompt injection): needs `ANTHROPIC_API_KEY` set; a few cents a run.
+  - E-22 and S-5 (soaks): skipped with the overnight run.
 
 
 | ID | Sev | Area | Finding | Test | Status |
@@ -247,6 +255,13 @@ Fixing runs alongside: S1 at once, S2 within the week.
 | B-4 | S2 | Studio main process (IPC) | Prefix checks like "starts with `assets/`" accepted `assets/..`: the renderer could send the whole project to the Recycle Bin (`project.remove("assets/..")` or `"assets/"`) or plant `.git/hooks/pre-commit` through `writeAsset`. Needs something injected into the renderer first, but the handlers are meant to treat it as untrusted. | `project.test.ts`, `fs.test.ts`, e2e "IPC garbage" | ✅ Fixed: the sandbox refuses `.` and `..` parts; delete takes files only |
 | B-6 | S1 | Runtime, text layout (libunibreak 8.0) | Line breaking wrote one byte **before** its buffer:<br>- three CHAM LETTER characters (`ꨨꨨꨨ`, valid UTF-8; LB28a sets "revert a pending break" without recording which one), so valid story text in a Brahmic script could corrupt the game's memory;<br>- and invalid UTF-8, where libunibreak's decoder and ours disagreed.<br>Found by the new E-3 fuzzer within minutes. | `test_layout.c` (under ASan), `runtime/fuzz/regressions/layout/` | ✅ Fixed: libunibreak is patched at download (`cmake/patch-libunibreak.cmake`), and the layout hands it re-encoded, always-valid UTF-8. Upstream report pending your OK (a public issue) |
 | B-7 | S4 | Runtime, docs | `HwLayout.reveal_count` was documented as "number of base characters", but a line break also takes a reveal step (and draws nothing). The fuzzer's first "crash" was this wrong assumption, not a bug. | – | ✅ Comment corrected |
+| B-8 | S2 | Export, file names | A game titled `CON`, `NUL`, `COM1`, … exported an exe and folder with Windows reserved device names (Explorer, zip tools, and Windows 10 can't use them); a title over about 250 characters failed export with an obscure error. Layer, character, script, and project names could hit the same. | `package.test.ts`, `fs.test.ts` | ✅ Fixed: names are capped at 64 characters and get " game" (or "_") after a reserved name; the file layer refuses reserved names with a plain message, whatever names them |
+| B-9 | S2 | Studio, the file layer | When the open project's folder was renamed, moved, or deleted, the next autosave **recreated the old folder** holding just that one file: the edit split off from the real project, silently. | `hostile.test.ts` (S-13) | ✅ Fixed: writing refuses when the project folder is gone, with a plain message |
+| B-10 | S2 | Core, compiler | Builds were quadratic in the number of scenes per file (the line index was rebuilt per scene): 5 000 scenes took 2.5 s per build, so editing a big one-file story stalled the preview. | `hostile.test.ts` (S-9) | ✅ Fixed: 13 ms for 5 000 scenes, 21 ms for 10 000; the bytes are unchanged (conformance) |
+| B-11 | S1 | Studio, saving | **Lost work**, found by the Studio monkey:<br>- a save based on older text, arriving after the watcher had taken in an outside change (another editor, a `git pull`), overwrote that change;<br>- an outside change arriving while an edit was waiting to save silently replaced the edit;<br>- and with two conflicts at once, the first was dropped.<br> | `project.test.ts`, the monkey (`e2e/monkey.chaos.ts`) | ✅ Fixed: each save carries a fingerprint of the text it started from and is refused (Studio asks) if the disk moved on; an outside change over an unsaved edit asks; conflicts queue |
+| B-12 | S2 | Studio, Settings | Both "Copy" buttons (the Claude app setup commands) threw "Write permission denied": the window has no browser permissions, the clipboard included. | the monkey | ✅ Fixed: copying goes through the main process (Electron's clipboard), with a "Copied" notice |
+| B-13 | S3 | Export | Exporting again while the last exported game still ran waited about 4 s, then failed with a raw `EPERM … rename` error. | `package.test.ts` | ✅ Fixed: says the game is still running, at once, before writing anything |
+| B-14 | S1 | Studio, the preview | A command sent just as the preview's game died (a crash, or a window resize at the wrong moment) raised an unhandled `EPIPE` that took down Studio's main process. | `preview.test.ts` | ✅ Fixed: the game's pipes have error handlers; the exit event reports the stop |
 | B-5 | S3 | Runtime, images | A JPEG or WebP up to 16 384 × 16 384 is accepted, which needs about 2 GB while loading (decoded pixels plus the surface copy), against the plan's 150 MB per scene on 4 GB PCs. The HW0358 hint warns writers, but a player's PC pays the cost. | – | Open: decode at display size (RA-5), or a lower limit |
 
 ---

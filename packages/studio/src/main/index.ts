@@ -11,7 +11,7 @@ import { execFile, spawn } from "node:child_process";
 import { dirname, extname, join, normalize, sep } from "node:path";
 import { CORE_VERSION } from "@himawari/core";
 import { TOOLS } from "@himawari/tools";
-import { BrowserWindow, Menu, app, dialog, ipcMain, nativeTheme, protocol, session, shell } from "electron";
+import { BrowserWindow, Menu, app, clipboard, dialog, ipcMain, nativeTheme, protocol, session, shell } from "electron";
 import { type BundledProject, CHANNELS, type MethodName, type PreviewEvent, type ProjectSnapshot, type Settings } from "../shared/api.js";
 import { AssistantHost } from "./assistant.js";
 import { TranslateHost } from "./translate.js";
@@ -199,6 +199,12 @@ const handlers: Record<MethodName, (...args: unknown[]) => unknown> = {
     if (u.protocol !== "https:") throw new Error("Only https links open in the browser.");
     await shell.openExternal(u.toString());
   },
+  // The window has no browser permissions (not even the clipboard), so Copy goes through here (BREAK_IT.md B-12).
+  "app.copyText": (text) => {
+    const t = str(text, "text");
+    if (t.length > 100_000) throw new Error("too much text to copy");
+    clipboard.writeText(t);
+  },
   "app.reveal": (path) => {
     const p = needProject();
     shell.showItemInFolder(p.fs.path(str(path, "path")));
@@ -257,7 +263,7 @@ const handlers: Record<MethodName, (...args: unknown[]) => unknown> = {
     return openProject(copyBundled(projects[n], documentsDir(), folder));
   },
   "project.close": () => closeProject(),
-  "project.write": (file, text, force) => needProject().write(str(file, "file"), str(text, "text"), force === true),
+  "project.write": (file, text, force, base) => needProject().write(str(file, "file"), str(text, "text"), force === true, typeof base === "string" ? base : undefined),
   "project.versions": (file) => needProject().history?.list(str(file, "file")) ?? [],
   "project.version": (file, at) => {
     if (typeof at !== "number") throw new Error("at must be a number");

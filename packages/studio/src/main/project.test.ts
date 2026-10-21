@@ -76,6 +76,32 @@ describe("never losing work", () => {
     }
   });
 
+  // BREAK_IT.md finding B-11, found by the Studio monkey: a save based on older text, arriving after the
+  // watcher had already taken in an outside change, overwrote that change (a git pull, another editor).
+  test("B-11: a save based on text older than the disk asks, even after the watcher saw the change", async () => {
+    const { writeFileSync, rmSync } = await import("node:fs");
+    const { fingerprint } = await import("../shared/fingerprint.js");
+    const { root, base, dir } = await copy();
+    try {
+      const p = new Project(root, { changed: () => {}, built: () => {} }, { historyBase: base });
+      p.snapshot();
+      p.watch();
+      const file = "script/start.hws";
+      const old = p.fs.read(file);
+      const outside = `${old}# from another editor\n`;
+      writeFileSync(p.fs.path(file), outside);
+      await new Promise((r) => setTimeout(r, 600)); // the watcher takes it in
+      const mine = `${old}# typed in Studio before the change arrived\n`;
+      expect(p.write(file, mine, false, fingerprint(old))).toEqual({ ok: false, conflict: outside });
+      expect(p.fs.read(file)).toBe(outside);
+      // Based on the current disk text, the same save goes through.
+      expect(p.write(file, `${outside}# mine\n`, false, fingerprint(outside))).toEqual({ ok: true });
+      p.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   // BREAK_IT.md finding B-4: the renderer is untrusted, and "assets/…" prefix checks met ".." paths.
   test("B-4: delete and asset writes refuse the project, a folder, or a path that climbs out of assets/", async () => {
     const { rmSync } = await import("node:fs");

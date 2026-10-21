@@ -8,6 +8,7 @@ import { addLineIds, aiHelpAllowed, applyTranslations, collectLines, parseTable,
 import { create } from "zustand";
 import type { AppInfo, AssistantEvent, AssistantUsage, FileChange, ImageSizes, PreviewEvent, ProjectSnapshot, Proposal, Settings, TranslateEvent } from "../../shared/api";
 import { studio } from "./api";
+import { fingerprint } from "../../shared/fingerprint";
 import { type ProjectModel, buildModel, isScript } from "./model";
 import { applyPatch } from "../../shared/patch";
 
@@ -169,6 +170,10 @@ const initialPreview: PreviewState = {
 
 let modelTimer: ReturnType<typeof setTimeout> | null = null;
 const saveTimers = new Map<string, ReturnType<typeof setTimeout>>();
+/** Per file, the fingerprint of the disk text Studio's copy is based on (B-11): set on open, on an outside change taken in, and after each save. */
+const bases = new Map<string, string>();
+/** Conflicts waiting behind the one on screen: asked one after another, never dropped (B-11). */
+const waitingConflicts: { file: string; mine: string; theirs: string }[] = [];
 let nextHistory = 1;
 let revealSeq = 0;
 
@@ -192,6 +197,18 @@ export const useStudio = create<State>((set, get) => {
     }, delay);
   };
 
+  /** Shows a conflict, or queues it behind the one on screen (a newer one for the same file replaces the older). */
+  const raiseConflict = (c: { file: string; mine: string; theirs: string }) => {
+    const open = get().conflict;
+    if (!open || open.file === c.file) {
+      set({ conflict: c });
+      return;
+    }
+    const i = waitingConflicts.findIndex((w) => w.file === c.file);
+    if (i >= 0) waitingConflicts[i] = c;
+    else waitingConflicts.push(c);
+  };
+
   /** Autosave a file shortly after the last change. Scripts get line IDs for new lines first. */
   const scheduleSave = (file: string) => {
     const t = saveTimers.get(file);
@@ -212,10 +229,11 @@ export const useStudio = create<State>((set, get) => {
         }
         const mine = text;
         studio.project
-          .write(file, mine)
+          .write(file, mine, false, bases.get(file))
           .then((r) => {
             // The file changed outside Studio meanwhile: nothing was written; the writer chooses (FINALIZATION.md S-6).
-            if (!r.ok) set({ conflict: { file, mine, theirs: r.conflict } });
+            if (!r.ok) raiseConflict({ file, mine, theirs: r.conflict });
+            else bases.set(file, fingerprint(mine));
           })
           .catch((e: unknown) => get().log("output.saveFailed", { file, reason: friendlyError(e) }, "error"));
       }, 250),
@@ -276,11 +294,12 @@ export const useStudio = create<State>((set, get) => {
     resolveConflict(keep) {
       const c = get().conflict;
       if (!c) return;
-      set({ conflict: null });
+      set({ conflict: waitingConflicts.shift() ?? null });
       if (keep === "mine") {
         const now = get().files[c.file] ?? c.mine;
-        void studio.project.write(c.file, now, true);
+        void studio.project.write(c.file, now, true).then(() => bases.set(c.file, fingerprint(now)));
       } else {
+        bases.set(c.file, fingerprint(c.theirs));
         get().edit(c.file, c.theirs, "outside", { id: "history.outside", values: { files: c.file } });
         void studio.project.write(c.file, c.theirs, true);
       }
@@ -302,7 +321,17 @@ export const useStudio = create<State>((set, get) => {
         const files = { ...get().files };
         const recorded: HistoryEntry["changes"] = [];
         for (const c of changes) {
+          if (c.text !== null) bases.set(c.file, fingerprint(c.text));
+          else bases.delete(c.file);
           if ((files[c.file] ?? null) === c.text) continue;
+          // An unsaved edit here (its save is still waiting): ask which to keep instead of dropping it (B-11).
+          const pending = saveTimers.get(c.file);
+          if (pending && c.text !== null && !origin) {
+            clearTimeout(pending);
+            saveTimers.delete(c.file);
+            raiseConflict({ file: c.file, mine: files[c.file] ?? "", theirs: c.text });
+            continue;
+          }
           recorded.push({ file: c.file, before: files[c.file] ?? null, after: c.text });
           if (c.text === null) delete files[c.file];
           else files[c.file] = c.text;
@@ -439,7 +468,12 @@ export const useStudio = create<State>((set, get) => {
 
     openSnapshot(s) {
       const files: Record<string, string> = {};
-      for (const f of s.files) files[f.file] = f.text;
+      bases.clear();
+      waitingConflicts.length = 0;
+      for (const f of s.files) {
+        files[f.file] = f.text;
+        bases.set(f.file, fingerprint(f.text));
+      }
       const first = Object.keys(files).filter(isScript).sort()[0];
       set({
         root: s.root,

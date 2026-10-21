@@ -1011,5 +1011,6 @@
   "problems.whereCode": "{file}:{line}:{col} · {code}",
   "build.singleFile": "Put the whole game in one file",
   "build.singleFileHint": "The game's .exe carries its story and assets inside, so you can send just that one file. Patches still work beside it.",
-  "build.doneOneFile": "Done: {path}. That one file is the whole game."
+  "build.doneOneFile": "Done: {path}. That one file is the whole game.",
+  "notice.copied": "Copied."
 }

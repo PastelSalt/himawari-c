@@ -1084,6 +1084,37 @@ Four questions are open in BREAK_IT.md §9: where findings live, the AI cost of 
 - Golden images: 22. Studio e2e: 8 of 8.
 - The first 8-hour overnight run started at the end of the session.
 
+## Session 23: 2026-10-21 · Break-it, weeks 2 and 3
+**You said:** skip the 8-hour run (it's noted as optional, before a release, on request), then carry on with the rest of the testing.
+
+**Built:**
+- **`scripts/break/stories.mjs`:** random valid stories, played for real. The runtime explores every path, and `test_saveany` (new; also in ctest on the conformance cases) saves and rolls back at every line and loads saves into edited stories. Patched releases are checked to play like fresh builds. 200 stories, nothing found: the VM, saves, rollback, and patches held.
+- **The Studio monkey** (`… chaos`, `e2e/monkey.chaos.ts`): random clicks, typing, keys, tool switches, and outside edits, checking for errors and that the disk matches Studio.
+- **`HW_FAULTS`:** disk-fault injection in the file layer, for the torture tests.
+- **Hostile tests:** for projects (`hostile.test.ts`), the preview's process (`preview.test.ts`), and every AI tool (`tools/hostile.test.ts`).
+
+**Found and fixed** (BREAK_IT.md §8):
+- **B-8:** reserved Windows names (`CON`, `NUL`, …) and over-long titles in export names. The file layer now refuses reserved names.
+- **B-9:** a moved or deleted project folder got recreated by the next autosave.
+- **B-10:** builds were quadratic in scenes per file: 2.5 s down to 13 ms at 5 000 scenes.
+- **B-11 (S1, lost work):** saves could overwrite an outside change the watcher had already taken in, an outside change could silently replace an unsaved edit, and a second conflict dropped the first. Saves now carry a fingerprint of their starting text, and conflicts queue.
+- **B-12:** Studio's Copy buttons never worked (no clipboard permission). Copying now goes through the main process.
+- **B-13:** re-export while the game runs now says so at once.
+- **B-14 (S1):** the preview's game dying mid-command crashed Studio's main process with `EPIPE`.
+
+**Open:**
+- E-2 and E-4 (fuzzing fonts and audio need SDL in the fuzz build).
+- Abusing a running game, weak machines, the installer, and a 2 GB single-file game: for the break-it sessions and the clean-machine test.
+- S-25: needs `ANTHROPIC_API_KEY`.
+- B-5: big images.
+
+**Verified:**
+- `corepack pnpm check`: 532 tests.
+- Studio e2e: 8 of 8. The monkey: 6 seeds × 500 actions.
+- ctest: debug 11 of 11, ASan 11 of 11.
+- Golden images: 22.
+- 200 generated stories.
+
 ---
 
 ## Decision Register

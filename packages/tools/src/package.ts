@@ -6,10 +6,11 @@
  * A single-file export puts data.hwp inside the exe instead (spec/pack.md §7).
  * Shared by the `build` tool, hwc, and Studio's export.
  */
-import { readFileSync } from "node:fs";
+import { closeSync, openSync, readFileSync } from "node:fs";
 import { type PackFile, compile, diffForPatch, readPack, writeHwb, writePack } from "@himawari/core";
 import { brandExe } from "./brand.js";
 import { appendPackToExe, embeddedPack } from "./embed.js";
+import { isReservedName } from "./fs.js";
 import type { ProjectFs } from "./fs.js";
 import { check, describeDiagnostics, diagnosticsJson } from "./project.js";
 
@@ -41,9 +42,16 @@ export function compileProject(fs: ProjectFs, options: { debug?: boolean } = {})
   return { bytes: writeHwb(r.module), errors: "", title: c.manifest?.name ?? "game", gameId: c.manifest?.id ?? "game", version };
 }
 
-/** A file name from the game's title: letters, digits, spaces, - and _ only. */
+
+/**
+ * A file name from the game's title: letters, digits, spaces, - and _ only; at most 64 characters
+ * (Windows allows 255 per name, but players unzip into deep folders); never a reserved device name
+ * (BREAK_IT.md finding B-8).
+ */
 export function safeName(title: string): string {
-  const s = title.replace(/[^\p{L}\p{N} _-]+/gu, "").trim().replace(/\s+/g, " ");
+  let s = title.replace(/[^\p{L}\p{N} _-]+/gu, "").trim().replace(/\s+/g, " ");
+  s = Array.from(s).slice(0, 64).join("").trim();
+  if (isReservedName(s)) s = `${s} game`;
   return s || "game";
 }
 
@@ -97,6 +105,16 @@ export function packageGame(fs: ProjectFs, bytes: Uint8Array, title: string, gam
   const warnings: string[] = [];
   const files = packFiles(fs, bytes);
   const exePath = `${dir}/${name}.exe`;
+  // The game from the last export may still be running: Windows won't let its exe be replaced.
+  // Say so before writing anything, instead of a rename error seconds later (BREAK_IT.md finding B-13).
+  if (!options.patch && fs.exists(exePath)) {
+    try {
+      closeSync(openSync(fs.path(exePath), "r+"));
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (code === "EBUSY" || code === "EPERM" || code === "EACCES") throw new Error(`"${name}.exe" is open: the game from your last export is still running (or the file is read-only). Close it, then export again.`);
+    }
+  }
   let pack: string | null = options.singleFile ? exePath : `${dir}/data.hwp`;
   let entries = files.length;
   let packBytes: Uint8Array | null = null;

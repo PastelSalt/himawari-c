@@ -42,6 +42,8 @@ export function cleanName(raw: string): string {
     .replace(/[^a-z0-9_]+/g, "_")
     .replace(/^_+|_+$/g, "");
   if (!s) return "layer";
+  // A layer called "aux" or "con" would make a file Windows can't use (BREAK_IT.md B-8).
+  if (/^(con|prn|aux|nul|com[0-9]|lpt[0-9])$/.test(s)) return `${s}_`;
   return /^[a-z_]/.test(s) ? s : `_${s}`;
 }
 

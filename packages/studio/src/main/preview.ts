@@ -46,6 +46,11 @@ export class Preview {
       }
     });
     child.stderr.on("data", () => {}); /* runtime logs; drained so the pipe never fills */
+    // A command written just as the game dies fails with EPIPE; unhandled, that error took down
+    // Studio's main process (BREAK_IT.md finding B-14). The exit event below reports the stop.
+    child.stdin.on("error", () => {});
+    child.stdout.on("error", () => {});
+    child.stderr.on("error", () => {});
     child.on("error", () => {
       if (this.child === child) this.child = null;
       this.emit({ ev: "unavailable", reason: "start" });

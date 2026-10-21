@@ -261,6 +261,8 @@ export interface StudioApi {
     info(): Promise<AppInfo>;
     /** Opens an https link in the user's browser. */
     openExternal(url: string): Promise<void>;
+    /** Puts text on the clipboard (through the main process: the window has no permissions, BREAK_IT.md B-12). */
+    copyText(text: string): Promise<void>;
     /** Shows a file or folder in Explorer. */
     reveal(path: string): Promise<void>;
     /** Adds the tools folder to the user's PATH so `hwc` works in any terminal (asked for in Settings → Advanced). */
@@ -283,7 +285,8 @@ export interface StudioApi {
     openBundled(name: BundledProject): Promise<ProjectSnapshot>;
     close(): Promise<void>;
     /** Writes a text file (autosave). Refused (with the disk's text) when the file changed outside Studio meanwhile, unless `force`. */
-    write(file: string, text: string, force?: boolean): Promise<WriteResult>;
+    /** `base`: the fingerprint of the text this edit started from (src/shared/fingerprint.ts). */
+    write(file: string, text: string, force?: boolean, base?: string): Promise<WriteResult>;
     /** Earlier versions of a text file, newest first, and one of them. */
     versions(file: string): Promise<FileVersion[]>;
     version(file: string, at: number): Promise<string | null>;

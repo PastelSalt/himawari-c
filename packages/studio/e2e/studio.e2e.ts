@@ -192,7 +192,7 @@ describe("Himawari Studio", () => {
       const skip = new Set([
         "dialog.pickFolder", "dialog.pickFile", "dialog.saveFile", "app.addToolsToPath", "project.open", "project.openBundled",
         "project.create", "project.close", "project.exportGame", "project.playtest", "preview.start", "preview.stop",
-        "assistant.setKey", "assistant.reset", "mcp.writeClaudeCodeConfig", "settings.set",
+        "assistant.setKey", "assistant.reset", "mcp.writeClaudeCodeConfig", "settings.set", "app.copyText",
       ]);
       const junk: unknown[] = [undefined, null, 0, -1, Number.NaN, "", "assets/..", "assets/", "../../evil", "C:/Windows/win.ini", {}, [], { cmd: "warp", to: 5 }, "x".repeat(2_000_000), new Uint8Array(3)];
       const out: { method: string; ok: number; refused: number }[] = [];

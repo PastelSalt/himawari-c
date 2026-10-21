@@ -136,9 +136,14 @@ class Compiler {
     all.sort((a, b) => (a.scene.id < b.scene.id ? -1 : a.scene.id > b.scene.id ? 1 : 0));
     for (const { scene } of all) this.sceneLabels.set(scene.id, { pc: undefined, refs: [] });
 
+    // One line index per file, not per scene: a file with thousands of scenes was rebuilt
+    // thousands of times, making builds quadratic (BREAK_IT.md finding B-10).
+    const indexes = new Map<string, LineIndex>();
     const scenes = all.map(({ scene, file, source }) => {
       this.file = file;
-      this.index = new LineIndex(source);
+      let index = indexes.get(file);
+      if (!index) indexes.set(file, (index = new LineIndex(source)));
+      this.index = index;
       const label = this.sceneLabels.get(scene.id) as Label;
       this.place(label);
       this.block(scene.body);
