@@ -113,6 +113,31 @@ static bool is_space(uint32_t cp)
     return cp == 0x20 || cp == 0x0A;
 }
 
+/* Writes `cp` (a Unicode scalar value) as UTF-8; returns the bytes written (1 to 4). */
+static size_t utf8_put(char *out, uint32_t cp)
+{
+    if (cp < 0x80u) {
+        out[0] = (char)cp;
+        return 1;
+    }
+    if (cp < 0x800u) {
+        out[0] = (char)(0xC0u | (cp >> 6));
+        out[1] = (char)(0x80u | (cp & 0x3Fu));
+        return 2;
+    }
+    if (cp < 0x10000u) {
+        out[0] = (char)(0xE0u | (cp >> 12));
+        out[1] = (char)(0x80u | ((cp >> 6) & 0x3Fu));
+        out[2] = (char)(0x80u | (cp & 0x3Fu));
+        return 3;
+    }
+    out[0] = (char)(0xF0u | (cp >> 18));
+    out[1] = (char)(0x80u | ((cp >> 12) & 0x3Fu));
+    out[2] = (char)(0x80u | ((cp >> 6) & 0x3Fu));
+    out[3] = (char)(0x80u | (cp & 0x3Fu));
+    return 4;
+}
+
 /* Index of the last item of the unit starting at `i`: a whole ruby group, or one item. */
 static size_t unit_end(const Item *items, const Group *groups, size_t i)
 {
@@ -145,7 +170,10 @@ bool hw_layout_paragraph(const HwRun *runs, size_t run_count, const HwLayoutPara
         return true;
     }
 
-    char *text = (char *)malloc(total);
+    /* The text libunibreak sees is re-encoded from what we decoded, so it is always valid UTF-8
+     * with exactly one code point per item. Raw invalid bytes once made libunibreak write before
+     * its buffer (BREAK_IT.md finding B-6). A bad byte becomes U+FFFD: up to 3 bytes for 1. */
+    char *text = (char *)malloc(total * 3);
     Item *items = (Item *)calloc(total, sizeof *items); /* at most one item per byte */
     char *brks = (char *)malloc(total);
     Group *groups = (Group *)calloc(group_count ? group_count : 1, sizeof *groups);
@@ -157,11 +185,11 @@ bool hw_layout_paragraph(const HwRun *runs, size_t run_count, const HwLayoutPara
     size_t n = 0, pos = 0, g = 0;
     for (size_t r = 0; r < run_count; r++) {
         size_t len = strlen(runs[r].text);
-        memcpy(text + pos, runs[r].text, len);
         size_t first = n;
         for (size_t i = 0; i < len;) {
             uint32_t cp;
             i += hw_utf8_decode((const uint8_t *)runs[r].text + i, len - i, &cp);
+            pos += utf8_put(text + pos, cp);
             items[n].cp = cp;
             items[n].group = runs[r].ruby ? (int32_t)g : -1;
             items[n].run = (uint32_t)r;
@@ -179,7 +207,6 @@ bool hw_layout_paragraph(const HwRun *runs, size_t run_count, const HwLayoutPara
             groups[g].ruby = NULL; /* empty base: ignore the ruby */
             g++;
         }
-        pos += len;
     }
     if (n == 0) { /* unreachable while total > 0, but keeps items[n - 1] provably in bounds */
         ok = true;
@@ -187,7 +214,7 @@ bool hw_layout_paragraph(const HwRun *runs, size_t run_count, const HwLayoutPara
     }
 
     /* 2. UAX #14 break opportunities, one per code point. */
-    size_t nb = set_linebreaks_utf8_per_code_point((const utf8_t *)text, total, params->lang, brks);
+    size_t nb = set_linebreaks_utf8_per_code_point((const utf8_t *)text, pos, params->lang, brks);
     for (size_t i = 0; i < n; i++) {
         items[i].brk = i < nb ? brks[i] : LINEBREAK_ALLOWBREAK;
     }

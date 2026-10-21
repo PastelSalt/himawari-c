@@ -182,6 +182,51 @@ describe("Himawari Studio", () => {
     expect(problems).toEqual([]);
   }, 60000);
 
+  // BREAK_IT.md S-20: the renderer is untrusted. Every safe IPC method gets garbage; Studio refuses it, keeps
+  // running, and the project is untouched. Skipped: native dialogs, PATH changes, opening or creating projects,
+  // export and playtest (slow), and anything that spends money.
+  test("IPC garbage: every method refuses bad arguments without harm (BREAK_IT.md S-20)", async () => {
+    const before = await state();
+    const results = await page.evaluate(async () => {
+      const api = (globalThis as unknown as { himawari: Record<string, Record<string, unknown>> }).himawari;
+      const skip = new Set([
+        "dialog.pickFolder", "dialog.pickFile", "dialog.saveFile", "app.addToolsToPath", "project.open", "project.openBundled",
+        "project.create", "project.close", "project.exportGame", "project.playtest", "preview.start", "preview.stop",
+        "assistant.setKey", "assistant.reset", "mcp.writeClaudeCodeConfig", "settings.set",
+      ]);
+      const junk: unknown[] = [undefined, null, 0, -1, Number.NaN, "", "assets/..", "assets/", "../../evil", "C:/Windows/win.ini", {}, [], { cmd: "warp", to: 5 }, "x".repeat(2_000_000), new Uint8Array(3)];
+      const out: { method: string; ok: number; refused: number }[] = [];
+      for (const [group, methods] of Object.entries(api)) {
+        for (const [name, fn] of Object.entries(methods)) {
+          const method = `${group}.${name}`;
+          if (typeof fn !== "function" || name.startsWith("on") || skip.has(method)) continue;
+          let ok = 0;
+          let refused = 0;
+          for (const a of junk) {
+            for (const b of [undefined, a]) {
+              try {
+                await (fn as (...args: unknown[]) => Promise<unknown>)(a, b, a);
+                ok++;
+              } catch {
+                refused++;
+              }
+            }
+          }
+          out.push({ method, ok, refused });
+        }
+      }
+      return out;
+    });
+    expect(results.length).toBeGreaterThan(20);
+    // Studio is still alive and answering, and nothing in the project changed.
+    const after = await state();
+    expect(after.root).toBe(before.root);
+    expect(Object.keys(after.files).sort()).toEqual(Object.keys(before.files).sort());
+    expect(existsSync(join(projects, "Hallway Test", "himawari.json"))).toBe(true);
+    expect(existsSync(join(projects, "Hallway Test", "assets"))).toBe(true);
+    expect(await page.evaluate(async () => !!(await (globalThis as unknown as { himawari: { app: { info(): Promise<unknown> } } }).himawari.app.info()))).toBe(true);
+  }, 120000);
+
   test("the UI switches to Japanese", async () => {
     await page.getByRole("button", { name: "Settings", exact: true }).click();
     await page.getByRole("combobox").first().selectOption("ja");

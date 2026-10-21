@@ -61,7 +61,7 @@ typedef struct {
     size_t count;
     size_t capacity;
     uint32_t lines;
-    uint32_t reveal_count; /* number of base characters */
+    uint32_t reveal_count; /* reveal steps: base characters plus line breaks (a break takes a step but draws nothing) */
     float height;          /* lines * line_pitch */
 } HwLayout;
 

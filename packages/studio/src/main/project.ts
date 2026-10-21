@@ -5,7 +5,7 @@
  * outside Studio (another editor, git) are picked up by a watcher.
  */
 import { createHash } from "node:crypto";
-import { type FSWatcher, cpSync, existsSync, mkdirSync, watch } from "node:fs";
+import { type FSWatcher, cpSync, existsSync, mkdirSync, statSync, watch } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { LocalHistory } from "./local-history.js";
 import { ProjectFs, compileProject, imageSizes, initProject, packageGame, safeName } from "@himawari/tools";
@@ -135,6 +135,8 @@ export class Project {
   /** Deletes a file: its text is kept in the local history, and the file goes to the Recycle Bin (S-3). */
   async remove(file: string): Promise<void> {
     if (!isWritableText(file) && !file.startsWith("assets/")) throw new Error(`Studio doesn't delete "${file}".`);
+    // Files only: "assets/" itself would take every asset with it (finding B-4).
+    if (file.endsWith("/") || (this.fs.exists(file) && statSync(this.fs.path(file)).isDirectory())) throw new Error(`Studio doesn't delete folders here ("${file}").`);
     if (this.fs.exists(file) && isWritableText(file)) this.history?.save(file, this.fs.read(file), "delete");
     let trashed = false;
     if (this.options.trash && this.fs.exists(file)) {

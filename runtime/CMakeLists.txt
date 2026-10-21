@@ -116,9 +116,31 @@ if(HW_FUZZ)
   target_link_libraries(fuzz_json PRIVATE hw_warnings "${hw_clang_rt_dir}/libclang_rt.fuzzer-x86_64.a")
   set_target_properties(fuzz_json PROPERTIES LINKER_LANGUAGE CXX)
 
+  # The SDL-free libraries: line breaking and the JPEG and WebP decoders (BREAK_IT.md E-1, E-3, E-6).
+  # They get the same instrumentation, so the fuzzer sees inside them too.
+  include(cmake/HimawariCodecs.cmake)
+  target_compile_options(unibreak PRIVATE ${hw_fuzz_flags})
+  target_compile_options(webpdecoder PRIVATE ${hw_fuzz_flags})
+
+  add_executable(fuzz_image fuzz/fuzz_image.c src/app/hw_decode.c)
+  target_include_directories(fuzz_image PRIVATE src/app)
+  target_compile_options(fuzz_image PRIVATE ${hw_fuzz_flags})
+  target_link_options(fuzz_image PRIVATE -fsanitize=address)
+  target_link_libraries(fuzz_image PRIVATE hw_warnings hw_stb hw_webp "${hw_clang_rt_dir}/libclang_rt.fuzzer-x86_64.a")
+  set_target_properties(fuzz_image PROPERTIES LINKER_LANGUAGE CXX)
+
+  add_executable(fuzz_layout fuzz/fuzz_layout.c src/text/hw_layout.c src/core/hw_utf8.c)
+  target_include_directories(fuzz_layout PRIVATE src/text src/core)
+  target_compile_options(fuzz_layout PRIVATE ${hw_fuzz_flags})
+  target_link_options(fuzz_layout PRIVATE -fsanitize=address)
+  target_link_libraries(fuzz_layout PRIVATE hw_warnings unibreak "${hw_clang_rt_dir}/libclang_rt.fuzzer-x86_64.a")
+  set_target_properties(fuzz_layout PROPERTIES LINKER_LANGUAGE CXX)
+
   # Inputs that once crashed a target are replayed on every fuzz build.
   file(GLOB hw_hwb_regressions "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/regressions/hwb/*")
   add_test(NAME fuzz_hwb_regressions COMMAND fuzz_hwb ${hw_hwb_regressions})
+  file(GLOB hw_layout_regressions "${CMAKE_CURRENT_SOURCE_DIR}/fuzz/regressions/layout/*")
+  add_test(NAME fuzz_layout_regressions COMMAND fuzz_layout ${hw_layout_regressions})
 endif()
 
 if(HW_WITH_SDL)
@@ -175,6 +197,7 @@ ${hw_ext_calls}}
     src/app/hw_theme.c
     src/app/hw_vfs.c
     src/app/hw_image.c
+    src/app/hw_decode.c
     src/app/hw_crash.c
     ${HW_EXTENSIONS}
     ${CMAKE_CURRENT_BINARY_DIR}/hw_ext_list.c

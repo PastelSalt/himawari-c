@@ -1013,6 +1013,77 @@ Verified: `corepack pnpm check` (485 tests), ctest (debug, 10 of 10), the golden
 
 **Found, not changed:** Studio's packaged exe still shows Electron's own file properties, because `electron-builder.yml` has `signAndEditExecutable: false`. Its name, company, and icon come with code signing (plan §14.5).
 
+## Session 21: 2026-10-21 · Cleanup, and the break-it plan
+**You asked:** remove and clean up the old worktrees, then plan how to break Studio and the engine on purpose to find bugs and room for improvement.
+
+**Cleanup:**
+- Both Claude worktrees were removed (`adoring-euler-1f2243`, `zen-liskov-d64142`; both clean and fully merged). Their branches were deleted locally; they were never pushed.
+- The folders needed Windows' long-path prefix to delete: `node_modules` paths are too long for `git worktree remove`.
+
+**The plan** ([BREAK_IT.md](BREAK_IT.md), v0.1):
+- **Oracles first:**
+  - no crash and no lost work;
+  - same input, same output;
+  - round trips (save → load → continue, parse → print);
+  - plain-word failures, the sandbox, and budgets.
+- **Engine:**
+  - new fuzz targets for images, fonts, text layout, audio, the debug protocol, and decompression bombs;
+  - fast-check property tests on Core (never throws, lossless, format idempotent, minimal form edits, deterministic builds);
+  - a story generator that plays random valid games headless and checks save, rollback, old saves, and patches;
+  - a runtime input monkey, an 8-hour soak, and weak machines.
+- **Studio:**
+  - a seeded Playwright chaos runner (random UI, edit and undo storms, outside edits, an 8-hour soak);
+  - `HW_FAULTS` fault injection in the file layer;
+  - a nasty-project generator (Unicode, scale, broken JSON, odd paths, symlink and zip escapes, folders changing underneath);
+  - preview, export, and installer abuse;
+  - an Electron and IPC security audit;
+  - hostile MCP arguments and prompt injection.
+- **People:** two 2-hour break-it sessions with charters ("make Studio lose your work").
+- **Every finding:** a severity, a minimal repro, and a failing test before the fix.
+- **Order:** about 3 weeks; the cheapest, highest-yield attacks (property tests, the security audit, the new fuzz targets) come first.
+
+**Already noticed while surveying:**
+- Nothing fuzzes the image, font, audio, or layout code, or the Studio–runtime protocol.
+- Core has no randomized tests. FINALIZATION.md C-1 says "property-tested", but no property-test library is in the repo, so that claim needs either the tests or a correction.
+- CI fuzzes 60 s per target.
+- The `win64-asan` and `win64-fuzz` build folders still hold the old `Documents\Moesoft` path. Reconfigure them like the debug and release ones (delete `_deps/*-subbuild` and the cache) before the first fuzz run.
+
+Four questions are open in BREAK_IT.md §9: where findings live, the AI cost of the prompt-injection evals, overnight runs on this PC, and whether you join the break-it sessions. Nothing in the code changed this session.
+
+## Session 22: 2026-10-21 · Break-it, week 1
+**Your answers to BREAK_IT.md §9** went in as decisions:
+- findings stay in the file until v1.0;
+- a few paid prompt-injection runs are OK;
+- overnight runs are OK on this PC;
+- you join the break-it sessions.
+
+**Built:**
+- **Property tests (fast-check):** Core never throws on any text, parsing is lossless, format is idempotent and never changes the compiled bytes, and builds are deterministic in any file order. All passed at 1 000 runs. In Studio, the Screenplay's form edits touch only their own line, and whatever is typed into a line comes back.
+- **New runtime fuzz targets:**
+  - `fuzz_image`, for JPEG and WebP. Their decoding moved to an SDL-free `hw_decode.c`, so the game and the fuzzer run the same code.
+  - `fuzz_layout`, for line breaking, kinsoku, and ruby, with named invariants.
+  - The SDL-free libraries moved to `cmake/HimawariCodecs.cmake`, so the fuzz build has them.
+  - Seeds live in `runtime/fuzz/seeds/`. CI runs both targets for 60 s.
+- **An e2e test** that sends every safe IPC method garbage, plus the security audit (S-19 to S-22).
+- **`scripts/break/overnight.mjs`:** every fuzz target in turn with kept corpora, then the property tests at 20 000 runs, and a morning report in `runtime/build/break/`.
+
+**Found and fixed** (BREAK_IT.md §8):
+- **B-1, B-2:** typing an unclosed `{` or a final `\` into a Screenplay line broke the file. Both now round-trip while typing.
+- **B-3 (S1):** a junction inside a project let the shared file layer (Studio, `hwc`, export, MCP) read and write outside it. Paths are now checked by where they really lead.
+- **B-4:** "starts with `assets/`" checks accepted `assets/..`, so a compromised renderer could trash the whole project or plant a git hook. The sandbox now refuses `.` and `..` parts.
+- **B-6 (S1):** libunibreak 8.0 wrote before its buffer on some Brahmic-script text (three Cham letters) and on invalid UTF-8. It's patched at download, and the layout now feeds it re-encoded UTF-8. Regression inputs are in `runtime/fuzz/regressions/layout/` and `test_layout.c`.
+- **B-7:** a wrong comment about `reveal_count`.
+
+**Open:**
+- **B-5:** a 16 384 × 16 384 image needs about 2 GB while loading. Decoding at display size (RA-5) is the real fix.
+- The libunibreak bug should be reported upstream. That's a public issue, so it waits for your OK.
+
+**Verified:**
+- `corepack pnpm check`: 499 tests.
+- ctest: debug 10 of 10, ASan 10 of 10, fuzz 9 of 9 (with both regression sets).
+- Golden images: 22. Studio e2e: 8 of 8.
+- The first 8-hour overnight run started at the end of the session.
+
 ---
 
 ## Decision Register

@@ -354,6 +354,8 @@ Rough estimates, one developer with AI help, as so far.
 
 ## 11. How we test it (RESEARCH §17)
 
+> Breaking the app on purpose (fuzzing, generated stories, a Studio monkey, fault injection, hostile projects) has its own plan: [BREAK_IT.md](BREAK_IT.md).
+
 ### 11.1 Expert review first
 1. **Heuristic evaluation** of every Studio and game screen against Nielsen's ten heuristics, weighting *user control and freedom* and *error prevention*. Each finding gets a severity (0–4) and an owner.
 2. **Cognitive walkthrough** of the core tasks (§11.2), asking at each step:

@@ -2,21 +2,7 @@
 
 #include <string.h>
 
-#include <webp/decode.h>
-
-/* stb_image: JPEG only, from memory, with a size limit so a damaged file can't ask for gigabytes. */
-#define STB_IMAGE_IMPLEMENTATION
-#define STBI_ONLY_JPEG
-#define STBI_NO_STDIO
-#define STBI_NO_LINEAR
-#define STBI_NO_HDR
-#define STBI_MAX_DIMENSIONS 16384
-#define STBI_MALLOC SDL_malloc
-#define STBI_REALLOC SDL_realloc
-#define STBI_FREE SDL_free
-#include <stb_image.h>
-
-#define MAX_SIDE 16384
+#include "hw_decode.h"
 
 const char *const HW_IMAGE_EXTS[] = { ".png", ".webp", ".jpg", ".jpeg", ".bmp", NULL };
 
@@ -36,24 +22,14 @@ SDL_Surface *hw_image_load(SDL_IOStream *io, const char *ext)
     size_t size = 0;
     uint8_t *data = SDL_LoadFile_IO(io, &size, true);
     if (!data) return NULL;
-    SDL_Surface *s = NULL;
-    if (SDL_strcasecmp(ext, ".webp") == 0) {
-        int w = 0, h = 0;
-        if (!WebPGetInfo(data, size, &w, &h) || w <= 0 || h <= 0 || w > MAX_SIDE || h > MAX_SIDE) {
-            SDL_SetError("not a WebP image, or larger than %d pixels", MAX_SIDE);
-        } else {
-            uint8_t *rgba = WebPDecodeRGBA(data, size, &w, &h);
-            if (rgba) s = surface_from(rgba, w, h);
-            else SDL_SetError("the WebP image is damaged");
-            WebPFree(rgba);
-        }
-    } else if (size <= 0x7fffffff) {
-        int w = 0, h = 0, n = 0;
-        uint8_t *rgba = stbi_load_from_memory(data, (int)size, &w, &h, &n, 4);
-        if (rgba) s = surface_from(rgba, w, h);
-        else SDL_SetError("the JPEG image can't be read (%s)", stbi_failure_reason());
-        stbi_image_free(rgba);
-    }
+    /* JPEG and WebP decode in hw_decode.c (no SDL, so the fuzz build tests the same code). */
+    HwDecodeKind kind = SDL_strcasecmp(ext, ".webp") == 0 ? HW_DECODE_WEBP : HW_DECODE_JPEG;
+    int w = 0, h = 0;
+    const char *why = NULL;
+    uint8_t *rgba = hw_decode_rgba(data, size, kind, &w, &h, &why);
+    SDL_Surface *s = rgba ? surface_from(rgba, w, h) : NULL;
+    if (!rgba) SDL_SetError("the %s image can't be read (%s)", kind == HW_DECODE_WEBP ? "WebP" : "JPEG", why ? why : "unknown");
+    hw_decode_free(kind, rgba);
     SDL_free(data);
     return s;
 }

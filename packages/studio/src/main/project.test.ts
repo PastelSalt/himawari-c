@@ -75,4 +75,23 @@ describe("never losing work", () => {
       rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  // BREAK_IT.md finding B-4: the renderer is untrusted, and "assets/…" prefix checks met ".." paths.
+  test("B-4: delete and asset writes refuse the project, a folder, or a path that climbs out of assets/", async () => {
+    const { rmSync } = await import("node:fs");
+    const { root, base, dir } = await copy();
+    try {
+      const trashed: string[] = [];
+      const p = new Project(root, { changed: () => {}, built: () => {} }, { historyBase: base, trash: async (full) => void trashed.push(full) });
+      for (const bad of ["assets/..", "assets/", "assets/bg", "assets/../himawari.json"]) {
+        await expect(p.remove(bad), bad).rejects.toThrow();
+      }
+      expect(() => p.writeAsset("assets/../.git/hooks/pre-commit", new Uint8Array([1]))).toThrow();
+      expect(trashed).toEqual([]);
+      expect(p.fs.exists("himawari.json")).toBe(true);
+      p.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
 });

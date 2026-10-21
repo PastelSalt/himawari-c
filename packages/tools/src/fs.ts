@@ -3,7 +3,7 @@
  * to the project root and may not leave it. Writes go to a temporary file and
  * are renamed into place, so a crash never leaves half a file.
  */
-import { closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, renameSync, rmSync, statSync, writeSync } from "node:fs";
+import { closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readSync, readdirSync, realpathSync, renameSync, rmSync, statSync, writeSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 
 export class SandboxError extends Error {}
@@ -25,18 +25,50 @@ function retrying<T>(op: () => T): T {
   }
 }
 
+/** Whether `full` is `root` or inside it (Windows paths compare without case). */
+function within(root: string, full: string): boolean {
+  const r = root.toLowerCase();
+  const f = full.toLowerCase();
+  return f === r || f.startsWith(r.endsWith(sep) ? r : r + sep);
+}
+
 export class ProjectFs {
   readonly root: string;
+  private realRootCache: string | null = null;
 
   constructor(root: string) {
     this.root = resolve(root);
   }
 
-  /** The absolute path of a project-relative path, refusing anything outside the project. */
+  /** The project folder with every link resolved (it may not exist yet, for a new project). */
+  private realRoot(): string {
+    if (this.realRootCache) return this.realRootCache;
+    if (!existsSync(this.root)) return this.root;
+    this.realRootCache = realpathSync.native(this.root);
+    return this.realRootCache;
+  }
+
+  /**
+   * The absolute path of a project-relative path, refusing anything outside the project: by its
+   * name (`..`, a drive), and by where it really leads. A symbolic link or junction inside the
+   * project that points elsewhere is refused too, so a shared project can't make Studio, `hwc`,
+   * an export, or an AI tool read or write the user's other files (BREAK_IT.md, finding B-3).
+   */
   path(rel: string): string {
     if (rel.includes("\0") || isAbsolute(rel) || /^[a-zA-Z]:/.test(rel)) throw new SandboxError(`"${rel}" must be a path inside the project`);
+    // No `.` or `..` parts: callers check prefixes like "assets/", and "assets/.." would pass them (finding B-4).
+    if (rel.split(/[\\/]/).some((part) => part === ".." || part === ".")) throw new SandboxError(`"${rel}" must be a plain path inside the project (no "." or "..")`);
     const full = resolve(this.root, rel);
-    if (full !== this.root && !full.startsWith(this.root + sep)) throw new SandboxError(`"${rel}" is outside the project`);
+    if (!within(this.root, full)) throw new SandboxError(`"${rel}" is outside the project`);
+    // Where it really leads: the deepest part that exists, with links resolved.
+    let existing = full;
+    while (!existsSync(existing)) {
+      const up = dirname(existing);
+      // A project that doesn't exist yet (being created) has no links in it.
+      if (up === existing || !within(this.root, up)) return full;
+      existing = up;
+    }
+    if (!within(this.realRoot(), realpathSync.native(existing))) throw new SandboxError(`"${rel}" leads outside the project through a link`);
     return full;
   }
 
@@ -109,10 +141,13 @@ export class ProjectFs {
     const start = this.path(dir);
     if (!existsSync(start)) return [];
     const out: string[] = [];
+    const root = this.realRoot();
     const visit = (p: string) => {
       for (const name of readdirSync(p)) {
         if (name.startsWith(".") || name === "node_modules") continue;
         const full = join(p, name);
+        // Links that lead outside the project are left out, as if they weren't there (B-3).
+        if (lstatSync(full).isSymbolicLink() && !within(root, realpathSync.native(full))) continue;
         if (statSync(full).isDirectory()) visit(full);
         else if (keep(name)) out.push(this.rel(full));
       }

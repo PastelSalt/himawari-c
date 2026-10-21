@@ -207,6 +207,22 @@ int main(void)
         hw_layout_free(&l);
     }
 
+    /* BREAK_IT.md B-6 and its first cousin: text that once made libunibreak write before its
+     * buffer. Three CHAM LETTER characters (valid UTF-8, LB28a), and invalid bytes. Under the
+     * win64-asan preset, ASan catches a regression here; elsewhere, the layout must still succeed. */
+    {
+        static const char *const texts[] = { "\xEA\xA8\xA8\xEA\xA8\xA8\xEA\xA8\xA8", "\x81\xBB\xBB\xE3\x81\x9F\xE3\x81\xB6\x80\x8D" };
+        for (size_t t = 0; t < sizeof texts / sizeof texts[0]; t++) {
+            HwRun run = { texts[t], NULL };
+            HwLayoutParams p = params(7.5f, true, false);
+            p.lang = "en";
+            HwLayout l = { 0 };
+            CHECK(hw_layout_paragraph(&run, 1, &p, fixed_advance, NULL, &l));
+            CHECK(l.reveal_count == 3 || t == 1);
+            hw_layout_free(&l);
+        }
+    }
+
     if (failures == 0) {
         printf("test_layout: all checks passed\n");
         return 0;

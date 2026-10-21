@@ -40,7 +40,27 @@ export function quotedOn(line: string): { from: number; to: number; raw: string 
   return { from: t.start, to: t.start + t.text.length, raw: t.text.slice(1, -1) };
 }
 
-/** What a writer sees: \" shown as " (outside {…} tags). Other escapes stay visible: they are markup. */
+/** Whether the `{` just before `from` has a matching `}` later (escaped pairs like `\}` don't count). */
+function braceCloses(s: string, from: number): boolean {
+  let depth = 1;
+  for (let i = from; i < s.length; i++) {
+    const ch = s[i]!;
+    if (ch === "\\") {
+      i++;
+      continue;
+    }
+    if (ch === "{") depth++;
+    else if (ch === "}" && --depth === 0) return true;
+  }
+  return false;
+}
+
+/**
+ * What a writer sees: \" shown as " (outside {…} tags). Other escapes stay visible: they are markup.
+ * Two escapes the text box adds by itself are shown as typed: `\{` whose brace never closes (shown
+ * as `{`), and a final `\\` (shown as `\`). Both views must round-trip while someone types, since
+ * the text box re-reads the file on every keystroke (BREAK_IT.md, finding B-1).
+ */
 export function rawToDisplay(raw: string): string {
   let out = "";
   let depth = 0;
@@ -48,29 +68,46 @@ export function rawToDisplay(raw: string): string {
     const ch = raw[i]!;
     if (ch === "\\" && i + 1 < raw.length) {
       const next = raw[i + 1]!;
-      out += next === '"' && depth === 0 ? '"' : ch + next;
+      if (next === '"' && depth === 0) out += '"';
+      else if (next === "{" && !braceCloses(raw, i + 2)) out += "{";
+      else if (next === "\\" && i + 2 === raw.length) out += "\\";
+      else out += ch + next;
       i++;
       continue;
     }
-    if (ch === "{") depth++;
+    if (ch === "{" && braceCloses(raw, i + 1)) depth++;
     if (ch === "}" && depth > 0) depth--;
     out += ch;
   }
   return out;
 }
 
-/** Back to .hws: quotes outside {…} tags are escaped. */
+/**
+ * Back to .hws: quotes outside {…} tags are escaped, a `{` that never closes becomes `\{`, and a
+ * final lone `\` becomes `\\`, so whatever is typed can't break the file (an unclosed tag or an
+ * escaped closing quote would).
+ */
 export function displayToRaw(display: string): string {
   let out = "";
   let depth = 0;
   for (let i = 0; i < display.length; i++) {
     const ch = display[i]!;
-    if (ch === "\\" && i + 1 < display.length) {
+    if (ch === "\\") {
+      if (i + 1 === display.length) {
+        out += "\\\\";
+        continue;
+      }
       out += ch + display[i + 1]!;
       i++;
       continue;
     }
-    if (ch === "{") depth++;
+    if (ch === "{") {
+      if (!braceCloses(display, i + 1)) {
+        out += "\\{";
+        continue;
+      }
+      depth++;
+    }
     if (ch === "}" && depth > 0) depth--;
     out += ch === '"' && depth === 0 ? '\\"' : ch === "\n" ? "\\n" : ch;
   }

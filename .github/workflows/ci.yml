@@ -167,6 +167,9 @@ jobs:
           ./build/win64-fuzz/fuzz_save.exe -max_total_time=60 corpus-save
           mkdir -p corpus-pack && cp ../tests/packs/*.hwp corpus-pack/
           ./build/win64-fuzz/fuzz_pack.exe -max_total_time=60 -max_len=8192 corpus-pack
+          mkdir -p corpus-image corpus-layout && cp fuzz/seeds/image/* corpus-image/ && cp fuzz/seeds/layout/* corpus-layout/
+          ./build/win64-fuzz/fuzz_image.exe -max_total_time=60 -max_len=262144 corpus-image
+          ./build/win64-fuzz/fuzz_layout.exe -max_total_time=60 corpus-layout
 
   studio:
     name: Studio (e2e + P1 budgets, Windows installer)

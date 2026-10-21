@@ -4,23 +4,7 @@
 # used as-is. Otherwise the pinned release tarball is downloaded once into the
 # build tree. Everything is built from source and linked statically.
 
-include(FetchContent)
-
-function(hw_dependency name url sha256)
-  set(vendored "${PROJECT_SOURCE_DIR}/third_party/${name}")
-  # SYSTEM: dependency headers don't trip our -Werror warning set.
-  # Extra arguments (e.g. OVERRIDE_FIND_PACKAGE) are passed through.
-  if(EXISTS "${vendored}")
-    FetchContent_Declare(${name} SOURCE_DIR "${vendored}" SYSTEM ${ARGN})
-  else()
-    FetchContent_Declare(${name} URL "${url}" URL_HASH SHA256=${sha256} SYSTEM ${ARGN})
-  endif()
-endfunction()
-
-# Forces a dependency option, so the pinned recipe is the same on every machine.
-macro(hw_force var value)
-  set(${var} ${value} CACHE BOOL "Set by HimawariDeps.cmake" FORCE)
-endmacro()
+include(${CMAKE_CURRENT_LIST_DIR}/HimawariHelpers.cmake)
 
 hw_dependency(sdl3
   https://github.com/libsdl-org/SDL/archive/refs/tags/release-3.4.18.tar.gz
@@ -33,10 +17,6 @@ hw_dependency(freetype
   https://github.com/freetype/freetype/archive/refs/tags/VER-2-14-3.tar.gz
   dc49de6b01a266eef4876a4dd34d9842c475d3e28ff2eff63bd2fb760ab56261
   OVERRIDE_FIND_PACKAGE)
-# Spike C candidates (rfcs/0003).
-hw_dependency(libunibreak
-  https://github.com/adah1972/libunibreak/releases/download/libunibreak_8_0/libunibreak-8.0.tar.gz
-  9c4fad6e517338a098373acc9f35579ae2c325e6446666fb9ac2666ba15ceba4)
 hw_dependency(sdl3_ttf
   https://github.com/libsdl-org/SDL_ttf/archive/refs/tags/release-3.2.2.tar.gz
   ff6b81d3dc39d843cc3ead6dedd68043a79513d266792ea89445547ef4e9b073)
@@ -120,40 +100,5 @@ if(NOT TARGET Freetype::Freetype)
 endif()
 FetchContent_MakeAvailable(sdl3_ttf)
 
-# libunibreak ships no CMake build; compile its library sources directly.
-FetchContent_MakeAvailable(libunibreak)
-set(unibreak_dir "${libunibreak_SOURCE_DIR}/src")
-add_library(unibreak STATIC
-  ${unibreak_dir}/unibreakbase.c
-  ${unibreak_dir}/unibreakdef.c
-  ${unibreak_dir}/linebreak.c
-  ${unibreak_dir}/linebreakdata.c
-  ${unibreak_dir}/linebreakdef.c
-  ${unibreak_dir}/eastasianwidthdef.c
-  ${unibreak_dir}/emojidef.c
-  ${unibreak_dir}/graphemebreak.c
-  ${unibreak_dir}/wordbreak.c)
-target_include_directories(unibreak SYSTEM PUBLIC "${unibreak_dir}")
-set_target_properties(unibreak PROPERTIES C_STANDARD 99 C_EXTENSIONS ON)
-
-# Images (plan §8.2): stb_image for JPEG, libwebp's decoder for WebP. PNG and BMP stay with SDL.
-hw_dependency(stb
-  https://github.com/nothings/stb/archive/2c980bb59875b0d32144a71867fbdebb2f77cd20.tar.gz
-  9a955b1b49a4410088a2e0ee2a9c057c3c907d0c1d75454144cb980aca0ba515)
-FetchContent_MakeAvailable(stb) # header only: no CMake build
-add_library(hw_stb INTERFACE)
-target_include_directories(hw_stb SYSTEM INTERFACE "${stb_SOURCE_DIR}")
-
-hw_dependency(libwebp
-  https://github.com/webmproject/libwebp/archive/refs/tags/v1.6.0.tar.gz
-  93a852c2b3efafee3723efd4636de855b46f9fe1efddd607e1f42f60fc8f2136
-  EXCLUDE_FROM_ALL)
-hw_force(WEBP_LINK_STATIC ON)
-hw_force(WEBP_USE_THREAD OFF)
-foreach(tool ANIM_UTILS CWEBP DWEBP GIF2WEBP IMG2WEBP VWEBP WEBPINFO LIBWEBPMUX WEBPMUX EXTRAS)
-  hw_force(WEBP_BUILD_${tool} OFF)
-endforeach()
-FetchContent_MakeAvailable(libwebp) # only the decoder library (webpdecoder) is linked
-add_library(hw_webp INTERFACE)
-target_link_libraries(hw_webp INTERFACE webpdecoder)
-target_include_directories(hw_webp SYSTEM INTERFACE "${libwebp_SOURCE_DIR}/src")
+# Line breaking and the image decoders (SDL-free, shared with the fuzz build).
+include(${CMAKE_CURRENT_LIST_DIR}/HimawariCodecs.cmake)

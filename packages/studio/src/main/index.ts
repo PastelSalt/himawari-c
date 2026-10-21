@@ -6,7 +6,7 @@
  * sender and arguments. Fuses are set at packaging (electron-builder.yml).
  */
 import { existsSync, mkdirSync, rmSync, statfsSync, writeFileSync as writeFileSyncNow } from "node:fs";
-import { readFile, stat, writeFile } from "node:fs/promises";
+import { readFile, realpath, stat, writeFile } from "node:fs/promises";
 import { execFile, spawn } from "node:child_process";
 import { dirname, extname, join, normalize, sep } from "node:path";
 import { CORE_VERSION } from "@himawari/core";
@@ -77,6 +77,9 @@ async function serveFrom(base: string, urlPath: string, headers: Record<string, 
   const full = normalize(join(base, rel));
   if (full !== base && !full.startsWith(base + sep)) return new Response("forbidden", { status: 403 });
   try {
+    // Where it really leads: a link inside the project must not reach other files (BREAK_IT.md B-3).
+    const [realBase, real] = await Promise.all([realpath(base), realpath(full)]);
+    if (real.toLowerCase() !== realBase.toLowerCase() && !real.toLowerCase().startsWith(realBase.toLowerCase() + sep)) return new Response("forbidden", { status: 403 });
     if (!(await stat(full)).isFile()) return new Response("not found", { status: 404 });
     const body = await readFile(full);
     return new Response(body, { headers: { "content-type": MIME[extname(full).toLowerCase()] ?? "application/octet-stream", ...headers } });
