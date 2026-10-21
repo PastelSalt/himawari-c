@@ -100,7 +100,7 @@ int main(void)
     CHECK(open_pack(&base, bytes, size, err, sizeof err));
     CHECK(open_pack(&up, patch, psize, err, sizeof err));
     CHECK(base.h.priority == 0 && up.h.priority == 1 && (base.h.flags & HW_PACK_OBFUSCATED));
-    const char *gid = "dev.moesoft.conformance.extend";
+    const char *gid = "dev.moekoworks.conformance.extend";
     CHECK(base.h.game == hw_xxh64(gid, strlen(gid), 0) && up.h.game == base.h.game);
 
     uint8_t *got = entry_data(&base, bytes, "game.hwb", &n);

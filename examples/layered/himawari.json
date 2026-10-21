@@ -1,6 +1,6 @@
 {
   "name": "Layered Sprites",
-  "id": "dev.moesoft.example.layered",
+  "id": "dev.moekoworks.example.layered",
   "version": "0.1.0",
   "engine": "^1.0.0",
   "entry": "start",

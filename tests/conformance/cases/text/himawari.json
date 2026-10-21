@@ -1,6 +1,6 @@
 {
   "name": "Conformance: text",
-  "id": "dev.moesoft.conformance.text",
+  "id": "dev.moekoworks.conformance.text",
   "version": "0.1.0",
   "engine": "^1.0.0",
   "entry": "start",

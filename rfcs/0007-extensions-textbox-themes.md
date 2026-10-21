@@ -1,7 +1,7 @@
 # RFC 0007: Extension statements, textbox modes, and themes (bytecode 1.1)
 
 - **Status:** **Accepted** 2026-10-18 (Phase 5, under the owner's go-ahead)
-- **Author:** Claude (Opus 5.5) for Moesoft
+- **Author:** Claude (Opus 5.5) for Moeko Works
 - **Created:** 2026-10-18
 - **Affects:** `spec/language.md` 0.2.0-draft → 0.3.0-draft (§2.7–§2.9, §3) · `spec/grammar.ebnf` · `spec/bytecode.md` 1.0 → 1.1 · `spec/ast.schema.json` 1.0 → 1.1 · new `spec/extension.schema.json`, `spec/theme.schema.json` · `@himawari/core` · runtime (`ext/`, NVL, theme)
 - **Plan references:** §5.4, §5.6, §8.10, §12 (Tier B), §13, §18 Phase 5

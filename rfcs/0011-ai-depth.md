@@ -1,7 +1,7 @@
 # RFC 0011: Review notes, the glossary, and AI depth (Phase 7)
 
 - **Status:** **Accepted** 2026-10-19 (Phase 7, under the owner's go-ahead)
-- **Author:** Claude (Opus 5.5) for Moesoft
+- **Author:** Claude (Opus 5.5) for Moeko Works
 - **Created:** 2026-10-19
 - **Affects:** project files (`.himawari/notes.json`, `glossary.json`; no spec version changes) · `@himawari/core` (continuity checks HW0340–HW0342, `routeBalance`, the glossary and HW0407) · `@himawari/tools` (25 tools: `add_note`, `list_notes`, `resolve_note`; recipes) · `himawari-mcp` (the glossary resource, prompts from the recipes, MCP Apps views) · Studio (Notes panel, graph coverage and editing, route balance, "Translate with AI", the glossary editor, slash commands) · `packages/evals`
 - **Plan references:** §7, §10.3, §10.4, §10.9, §11.3, §16.1, §18 Phase 7

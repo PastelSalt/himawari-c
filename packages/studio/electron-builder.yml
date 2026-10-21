@@ -1,8 +1,8 @@
 # Himawari Studio for Windows (plan §14.5): an NSIS installer and a portable build.
 # Run `corepack pnpm --filter @himawari/studio package` (it builds, stages resources, and packs).
-appId: dev.moesoft.himawari.studio
+appId: dev.moekoworks.himawari.studio
 productName: Himawari Studio
-copyright: Copyright © 2026 Moesoft
+copyright: Copyright © 2026 Moeko Works
 directories:
   output: release
   buildResources: build-resources

@@ -125,7 +125,7 @@ write(
   JSON.stringify(
     {
       name: "Stress Test",
-      id: "dev.moesoft.stress",
+      id: "dev.moekoworks.stress",
       version: "0.1.0",
       engine: "^1.1.0",
       resolution: [1920, 1080],

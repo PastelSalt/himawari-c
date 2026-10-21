@@ -37,10 +37,10 @@ function check(name: string, bytes: Uint8Array) {
 }
 
 test("pack fixtures", () => {
-  const data = writePack(base, { gameId: "dev.moesoft.conformance.extend", obfuscate: true });
+  const data = writePack(base, { gameId: "dev.moekoworks.conformance.extend", obfuscate: true });
   check("data.hwp", data);
   const shipped = new Map(readPack(data).entries.map((e) => [e.path, e]));
   const { changed, removed } = diffForPatch(shipped, later);
   expect(removed).toEqual(["assets/bg/park.png"]);
-  check("patch1.hwp", writePack(changed, { gameId: "dev.moesoft.conformance.extend", priority: 1, removed }));
+  check("patch1.hwp", writePack(changed, { gameId: "dev.moekoworks.conformance.extend", priority: 1, removed }));
 });

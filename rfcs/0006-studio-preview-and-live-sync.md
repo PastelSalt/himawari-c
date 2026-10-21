@@ -1,7 +1,7 @@
 # RFC 0006: Studio's docked preview, the debug protocol, and AI live sync
 
 - **Status:** **Accepted** 2026-10-18 (Phase 4, under the owner's go-ahead)
-- **Author:** Claude (Opus 5.5) for Moesoft
+- **Author:** Claude (Opus 5.5) for Moeko Works
 - **Created:** 2026-10-18
 - **Affects:** `spec/debug-protocol.md` (new, version 1) · `spec/agent-guide.md` 1.0 → 1.1 · runtime (`--link`, `--parent-window`) · `@himawari/tools` (`ToolContext.propose`, `rationale`) · himawari-mcp (`/http`, `/studio-link`) · studio
 - **Plan references:** §2 P1–P4, P12 · §4.1 · §4.2 · §10.7–§10.9 · §11.3 · §11.4

@@ -1,7 +1,7 @@
 ; Himawari bytecode 1.0
 ; 66 strings, 5 variables, 1 characters, 6 scenes, 16 lines, 137 code words
 ; entry: ch1_intro
-; game: "Conformance: basic" dev.moesoft.conformance.basic 1920x1080, languages en
+; game: "Conformance: basic" dev.moekoworks.conformance.basic 1920x1080, languages en
 ; positions: center(0.5, 1) left(0.25, 1) right(0.75, 1)
 
 var 0: courage int = 0 (save)

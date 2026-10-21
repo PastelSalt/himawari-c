@@ -1,6 +1,6 @@
 {
   "name": "Conformance: extend",
-  "id": "dev.moesoft.conformance.extend",
+  "id": "dev.moekoworks.conformance.extend",
   "version": "0.1.0",
   "engine": "^1.1.0",
   "entry": "start",

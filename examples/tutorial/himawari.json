@@ -1,7 +1,7 @@
 {
   "$schema": "https://pastelsalt.github.io/himawari-c/spec/manifest/1.0.json",
   "name": "Himawari Tutorial",
-  "id": "dev.moesoft.himawari.tutorial",
+  "id": "dev.moekoworks.himawari.tutorial",
   "version": "0.1.0",
   "engine": "^1.0.0",
   "resolution": [1920, 1080],

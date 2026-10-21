@@ -1,7 +1,7 @@
 # RFC 0010: Theme 2.0 and the UI Designer
 
 - **Status:** **Accepted** 2026-10-18 (Phase 6, under the owner's go-ahead)
-- **Author:** Claude (Opus 5.5) for Moesoft
+- **Author:** Claude (Opus 5.5) for Moeko Works
 - **Created:** 2026-10-18
 - **Affects:** `spec/theme.schema.json` 1.0 → 2.0 · `spec/language.md` §2.9 · `spec/bytecode.md` §2.11 (new keys only; bytecode stays 1.1) · `spec/debug-protocol.md` (additions, still version 1) · `@himawari/core` (`project/theme.ts`) · runtime (`hw_theme`, `hw_screens`, `hw_menus`) · Studio (the UI Designer)
 - **Plan references:** §8.10, §11.6, §13, §18 Phase 6

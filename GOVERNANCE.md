@@ -1,9 +1,9 @@
 # Governance
 
-Himawari is made by **Moesoft** (GitHub: [`PastelSalt`](https://github.com/PastelSalt)). This page says, plainly, how decisions are made, so nobody has to guess.
+Himawari is made by **Moeko Works** (GitHub: [`PastelSalt`](https://github.com/PastelSalt)). This page says, plainly, how decisions are made, so nobody has to guess.
 
 ## The model: a benevolent dictator (BDFL)
-For v1, **Moesoft decides**. That means the project lead (the owner of the repository) has the final say on what goes into Himawari, what doesn't, and when it ships. We chose this on purpose: Himawari has a clear core idea, and a single decision-maker keeps it focused.
+For v1, **Moeko Works decides**. That means the project lead (the owner of the repository) has the final say on what goes into Himawari, what doesn't, and when it ships. We chose this on purpose: Himawari has a clear core idea, and a single decision-maker keeps it focused.
 
 The core idea, which every decision is measured against:
 
@@ -48,7 +48,7 @@ These are decisions, not oversights. Please don't send pull requests for them, a
 | **Locking engine features behind payment.** | The engine is never feature-gated. |
 
 ## Maintainers
-- **Project lead:** Moesoft ([`PastelSalt`](https://github.com/PastelSalt)).
+- **Project lead:** Moeko Works ([`PastelSalt`](https://github.com/PastelSalt)).
 - **Maintainers** can review and merge pull requests. They're added by the lead, based on a record of good contributions and good judgment. Maintainers can be removed the same way, or step down whenever they like.
 - **Contributors** are everyone else. Your name stays in the git history, and you keep the credit for what you did.
 

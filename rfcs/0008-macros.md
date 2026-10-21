@@ -1,7 +1,7 @@
 # RFC 0008: Macros (`define statement`)
 
 - **Status:** **Accepted** 2026-10-18 (Phase 5, under the owner's go-ahead)
-- **Author:** Claude (Opus 5.5) for Moesoft
+- **Author:** Claude (Opus 5.5) for Moeko Works
 - **Created:** 2026-10-18
 - **Affects:** `spec/language.md` 0.3.0-draft (§2.6, §5 item 5) · `spec/grammar.ebnf` · `spec/ast.schema.json` 1.1 · `@himawari/core` (parser, `project/invoke.ts`, checker, compiler)
 - **Plan references:** §5.1, §12 (Tier A), §18 Phase 5

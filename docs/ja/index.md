@@ -36,4 +36,4 @@ Himawari は、ビジュアルノベルを作るためのエンジンです。�
 - [プライバシー](../../PRIVACY.md)（英語）：Himawari はどこにも何も送信しません
 - [サードパーティのライセンス](../../THIRD_PARTY_NOTICES.md)（英語）
 
-Himawari は Moesoft が作っているオープンソースです。ランタイムは zlib、ツールは MIT、仕様は CC BY 4.0、テンプレートとサンプルは CC0 です。コードは [github.com/PastelSalt/himawari-c](https://github.com/PastelSalt/himawari-c) にあります。
+Himawari は Moeko Works が作っているオープンソースです。ランタイムは zlib、ツールは MIT、仕様は CC BY 4.0、テンプレートとサンプルは CC0 です。コードは [github.com/PastelSalt/himawari-c](https://github.com/PastelSalt/himawari-c) にあります。

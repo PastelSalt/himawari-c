@@ -22,13 +22,13 @@
 | **Phase 4** | **Built** (session 13): Himawari Studio (Electron), docked preview, Screenplay and Script views, panels, AI proposals, Mode A live sync, Mode B. M2 hallway test pending |
 | **Phase 5** | **Done** (session 14): macros, extension statements, NVL, themes (bytecode 1.1); config, accessibility, gamepad, gallery, music room; `.hwp` packs and patches; JPEG/WebP; crash reports; budgets met; `examples/sunflower-demo` in English, Japanese, and Simplified Chinese; golden images |
 | **Phase 6** | **Built** (session 15): theme 2.0 (layout, shapes, presets, rfcs/0010), a data-driven runtime UI, Studio's **UI Designer**, and Studio's light/dark/system themes. Hallway test pending. Next: Phase 7 AI depth and polish, Phase 8 launch |
-| **Owner** | Moesoft (GitHub: `PastelSalt`) |
+| **Owner** | Moeko Works (GitHub: `PastelSalt`) |
 | **Repo** | **https://github.com/PastelSalt/himawari-c** (public) |
 
 ---
 
 ## Session 1: 2026-10-15 · Initial concept → plan v0.1
-**Machine:** Linux (Ubuntu-based), project folder `~/Desktop/Moesoft/himawari-c` (empty).
+**Machine:** Linux (Ubuntu-based), project folder `~/Desktop/Moesoft/himawari-c` (empty; the brand was later renamed to Moeko Works on 2026-10-21).
 
 **Your starting concept** (quoted verbatim):
 > Himawari-C is an advanced, AI-first visual novel ecosystem designed for high-performance execution and seamless developer tooling, featuring a decoupled architecture split into an Electron and TypeScript-powered Authoring Suite, a Model Context Protocol (MCP) server layer for programmatic AI agent orchestration, and Himawari-C—an ultra-lightweight C99 runtime engine built with SDL2 and FreeType. Targeted for Windows deployment while engineered entirely on Linux via MinGW-w64 cross-compilation, the project bridges human creative authoring and autonomous AI assistance through a clean script data contract, allowing external LLMs to natively query, write, and validate story nodes while preserving maximum execution efficiency.
@@ -116,7 +116,7 @@ You noted that nothing was final and asked for improvements.
 - **You're moving development to Windows.** This was the last session on the Linux machine. The `.md` files will be copied to the Windows PC.
 
 **GitHub check** (read-only, with `gh`):
-- `gh` 2.46.0, logged in as **`PastelSalt`** ("Moesoft: Moeko Software and Technologies"). Token scopes: `repo`, `workflow`, `gist`, `read:org`.
+- `gh` 2.46.0, logged in as **`PastelSalt`** ("Moesoft: Moeko Software and Technologies" then; renamed to Moeko Works on 2026-10-21). Token scopes: `repo`, `workflow`, `gist`, `read:org`.
 - `PastelSalt/himawari` and `PastelSalt/himawari-c` **do not exist yet**, so both names are free.
 - `PastelSalt.github.io` does not exist. A project Pages site works without it: `https://pastelsalt.github.io/himawari/`.
 - **Nothing was created on GitHub.**
@@ -141,7 +141,7 @@ You noted that nothing was final and asked for improvements.
 ---
 
 ## Session 5: 2026-10-17 · First Windows session → Phase 0 scaffold + Spike A
-**Machine:** Windows 11 Pro, project folder `C:\Users\Myaako\Documents\Moesoft\himawari-c` (kept instead of `C:\dev\himawari`).
+**Machine:** Windows 11 Pro, project folder `C:\Users\Myaako\Documents\Moesoft\himawari-c` (kept instead of `C:\dev\himawari`; now `C:\Users\Myaako\Documents\MoekoWorks\himawari-c` after the rename to Moeko Works on 2026-10-21).
 
 **You asked:** read, analyze, and execute the plan. You approved installing the §14.2 toolchain.
 
@@ -992,6 +992,27 @@ Verified on the merged tree:
 
 Not run: the ASan build. The installer wasn't re-packaged. Session 19's own changes are not committed.
 
+## Session 20: 2026-10-21 · Renamed to Moeko Works
+**Why:** the brand "Moesoft" (also "Moeko Software and Technologies") belongs to an established company, so it's now **Moeko Works** (https://moekoworks.vercel.app), done the same way as the Kotoha, Hanon, and Aqua Iro Archive sites. The repo folder moved to `C:\Users\Myaako\Documents\MoekoWorks\himawari-c`.
+
+**What changed:**
+- **Names:** the copyright holder in `LICENSE-MIT`, `LICENSE-zlib`, and `spec/LICENSE.md` (and its attribution line); GOVERNANCE.md; the docs' home pages (EN/JA); CLAUDE.md; the plan; the RFC author lines; Studio's `package.json` author and installer copyright; the runtime exe's `CompanyName`; its Windows manifest (`MoekoWorks.Himawari.Runtime`).
+- **IDs:** `dev.moesoft.*` became `dev.moekoworks.*`, with no migration or alias, because nothing was ever released or published (no npm packages, no GitHub releases, no update channel). That covers:
+  - Studio's `appId`: a new install sits beside an old local test install rather than upgrading it. Studio's settings are keyed by its product name, so they're unaffected.
+  - The example games' IDs: their save folders under `%APPDATA%\Himawari\` change.
+  - The test fixtures: the conformance `expected.hwb` and `.disasm` (only the ID line changed; each file grew 4 bytes), the pack fixtures, and the C pack test.
+- **Worktrees:** the two Claude worktrees' links were repaired with `git worktree repair` after the folder move.
+- **Runtime build folders:** the old path in the stale FetchContent sub-build caches was cleared, and both presets were reconfigured.
+
+**Kept on purpose:**
+- Three history notes in this log (the old folders and the old `gh` display name), each now saying when the name changed.
+- The authors of past commits.
+- The fuzz regression input `runtime/fuzz/regressions/hwb/top-level-return-ending.bin`, a recorded crash input whose bytes must stay as found.
+
+Verified: `corepack pnpm check` (485 tests), ctest (debug, 10 of 10), the golden images (22), Studio's e2e (7 of 7), and `… package` (installer and portable build).
+
+**Found, not changed:** Studio's packaged exe still shows Electron's own file properties, because `electron-builder.yml` has `signAndEditExecutable: false`. Its name, company, and icon come with code signing (plan §14.5).
+
 ---
 
 ## Decision Register
@@ -1062,6 +1083,7 @@ Not run: the ASan build. The installer wasn't re-packaged. Session 19's own chan
 | D64 | Local history lives outside the project, in Studio's user data: edits merged over 10 s, 50 versions per file, restore points before changes to three or more files; deletes go to the Recycle Bin with Undo instead of a confirmation | session 19 | ✅ Active |
 | D65 | Studio's e2e suite gates releases on a no-code test (every kind of step from menus and forms) and on axe (no serious or critical WCAG 2 A/AA problems on the main screens) | session 19 | ✅ Active |
 | D66 | The gallery and music room follow the story (`cg` and `music` lines unlock them); Studio lists what will unlock instead of adding switches | session 19 | ✅ Active |
+| D67 | The maker is **Moeko Works** (renamed from Moesoft on 2026-10-21); IDs use `dev.moekoworks.*`, with no alias for the old ones (nothing was released) | session 20 | ✅ Active |
 | D58 | **One click** (P15): ~~a one-click per-user Studio installer~~ (the installer is D61) with everything inside (`hwc` and `himawari-mcp` run through Studio's executable, no Node); export is one button; an optional single-file game | session 18 | ✅ Active |
 | D52 | AI quality is measured by `packages/evals`: deterministic scores, JSON results by date, `TREND.md`; real runs are started by hand with a key (never by default in CI) | session 17 | ✅ Active |
 

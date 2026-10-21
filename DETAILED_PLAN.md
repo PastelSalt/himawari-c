@@ -459,7 +459,7 @@ my-novel/
 // himawari.json
 {
   "$schema": "https://pastelsalt.github.io/himawari-c/spec/manifest/1.0.json",
-  "name": "Sunflower Days", "id": "dev.moesoft.sunflowerdays", "version": "0.1.0",
+  "name": "Sunflower Days", "id": "dev.moekoworks.sunflowerdays", "version": "0.1.0",
   "engine": "^1.0.0",
   "resolution": [1920, 1080],
   "sourceLanguage": "en", "languages": ["en", "ja", "zh-Hans"],
@@ -1107,7 +1107,7 @@ build/windows/SunflowerDays/
 | Core / CLI / MCP / Studio (TypeScript, Electron) | Node LTS + pnpm |
 | Studio (installer, file dialogs, Japanese paths) | Windows |
 
-**Repo location:** any folder on the Windows drive (this PC: `C:\Users\Myaako\Documents\Moesoft\himawari-c`).
+**Repo location:** any folder on the Windows drive (this PC: `C:\Users\Myaako\Documents\MoekoWorks\himawari-c`).
 
 **What changed from v0.4:** no WSL2, no second clone, no Linux CI. The cost is that memory-safety tooling must work natively on Windows; §14.3 has the plan and the fallbacks.
 

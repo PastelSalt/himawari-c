@@ -10,7 +10,7 @@ import { HwbError, readHwb } from "./reader.js";
 import { writeHwb } from "./writer.js";
 
 const MANIFEST = JSON.stringify({
-  name: "T", id: "dev.moesoft.t", version: "0.1.0", engine: "^1.0.0", entry: "start",
+  name: "T", id: "dev.moekoworks.t", version: "0.1.0", engine: "^1.0.0", entry: "start",
   sourceLanguage: "en", languages: ["en"],
   variables: {
     score: { type: "int", default: 0, scope: "save" },

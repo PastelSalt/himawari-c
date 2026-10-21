@@ -6,7 +6,7 @@ import { readManifest } from "./manifest.js";
 
 const MANIFEST = JSON.stringify({
   name: "Test",
-  id: "dev.moesoft.test",
+  id: "dev.moekoworks.test",
   version: "0.1.0",
   engine: "^1.0.0",
   entry: "start",

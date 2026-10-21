@@ -1,7 +1,7 @@
 # RFC 0009: Asset packs (`.hwp`) and patches
 
 - **Status:** **Accepted** 2026-10-18 (Phase 5, under the owner's go-ahead)
-- **Author:** Claude (Opus 5.5) for Moesoft
+- **Author:** Claude (Opus 5.5) for Moeko Works
 - **Created:** 2026-10-18
 - **Affects:** new `spec/pack.md` (version 1.0) · `@himawari/core` (`pack/`) · `@himawari/tools` (`packageGame`) · `hwc build --release [--patch]`, `hwc disasm` · Studio export · runtime (`core/hw_pack.c`, `app/hw_vfs.c`, `app/hw_image.c`)
 - **Plan references:** §8.1, §8.2, §8.8, §14.4

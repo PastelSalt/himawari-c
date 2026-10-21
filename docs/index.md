@@ -36,4 +36,4 @@ Start here if you're new.
 - [Security policy](../SECURITY.md)
 - [Third-party notices](../THIRD_PARTY_NOTICES.md): every library we use, and its license
 
-Himawari is made by Moesoft and is open source: the runtime is zlib, the tools are MIT, the specs are CC BY 4.0, and the templates and examples are CC0. The code is at [github.com/PastelSalt/himawari-c](https://github.com/PastelSalt/himawari-c).
+Himawari is made by Moeko Works and is open source: the runtime is zlib, the tools are MIT, the specs are CC BY 4.0, and the templates and examples are CC0. The code is at [github.com/PastelSalt/himawari-c](https://github.com/PastelSalt/himawari-c).

@@ -1,7 +1,7 @@
 ; Himawari bytecode 1.0
 ; 40 strings, 9 variables, 0 characters, 3 scenes, 14 lines, 131 code words
 ; entry: start
-; game: "Conformance: flow" dev.moesoft.conformance.flow 1920x1080, languages en
+; game: "Conformance: flow" dev.moekoworks.conformance.flow 1920x1080, languages en
 ; positions: center(0.5, 1) left(0.25, 1) right(0.75, 1)
 
 var 0: endings int = 0 (global)

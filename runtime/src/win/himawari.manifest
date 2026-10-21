@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <!-- Himawari-C runtime manifest (plan §8.13): per-monitor-v2 DPI, the UTF-8 code page, long paths, Windows 10 and 11. -->
 <assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
-  <assemblyIdentity type="win32" name="Moesoft.Himawari.Runtime" version="0.5.0.0" processorArchitecture="amd64"/>
+  <assemblyIdentity type="win32" name="MoekoWorks.Himawari.Runtime" version="0.5.0.0" processorArchitecture="amd64"/>
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
       <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true/pm</dpiAware>

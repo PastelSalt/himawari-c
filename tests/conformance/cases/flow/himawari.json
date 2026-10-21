@@ -1,6 +1,6 @@
 {
   "name": "Conformance: flow",
-  "id": "dev.moesoft.conformance.flow",
+  "id": "dev.moekoworks.conformance.flow",
   "version": "0.1.0",
   "engine": "^1.0.0",
   "entry": "start",

@@ -1,6 +1,6 @@
 {
   "name": "Conformance: basic",
-  "id": "dev.moesoft.conformance.basic",
+  "id": "dev.moekoworks.conformance.basic",
   "version": "0.1.0",
   "engine": "^1.0.0",
   "entry": "ch1_intro",

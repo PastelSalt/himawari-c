@@ -1,7 +1,7 @@
 ; Himawari bytecode 1.1
 ; 47 strings, 1 variables, 1 characters, 1 scenes, 4 lines, 65 code words
 ; entry: start
-; game: "Conformance: extend" dev.moesoft.conformance.extend 1920x1080, languages en ja
+; game: "Conformance: extend" dev.moekoworks.conformance.extend 1920x1080, languages en ja
 ; positions: center(0.5, 1) left(0.25, 1) right(0.75, 1)
 
 var 0: calls int = 0 (save)
