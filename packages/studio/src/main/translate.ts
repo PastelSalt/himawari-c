@@ -56,13 +56,15 @@ export class TranslateHost {
 
   estimate(raw: unknown): TranslateEstimate {
     const j = this.prepare(raw);
-    return { lines: j.lines.length, model: j.model, cost: estimateCost(j.model, j.lines, j.instructions), hasKey: this.assistant.keyStatus().hasKey };
+    return { lines: j.lines.length, model: j.model, cost: estimateCost(j.model, j.lines, j.instructions), hasKey: this.assistant.hasKey() };
   }
 
-  start(raw: unknown): string {
+  async start(raw: unknown): Promise<string> {
     if (this.abort) throw new Error("A translation is already running.");
     const j = this.prepare(raw);
-    const client = this.assistant.apiClient();
+    const client = await this.assistant.apiClient();
+    // Checked again: another translation may have started while the key was decrypted.
+    if (this.abort) throw new Error("A translation is already running.");
     const project = this.project()!;
     const job = `x${++this.jobs}`;
     const abort = new AbortController();

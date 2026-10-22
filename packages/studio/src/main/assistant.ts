@@ -34,25 +34,34 @@ export class AssistantHost {
     private runtime: () => string | null = () => null,
   ) {}
 
-  keyStatus(): AssistantKeyStatus {
-    return { hasKey: existsSync(keyFile()), canStore: safeStorage.isEncryptionAvailable() };
+  /** Whether a key is saved (no decryption needed). */
+  hasKey(): boolean {
+    return existsSync(keyFile());
   }
 
-  setKey(key: string | null): AssistantKeyStatus {
+  // safeStorage's asynchronous methods: the synchronous ones go away in Electron 46, and the async
+  // ones read keys the synchronous ones saved.
+  async keyStatus(): Promise<AssistantKeyStatus> {
+    return { hasKey: this.hasKey(), canStore: await safeStorage.isAsyncEncryptionAvailable() };
+  }
+
+  async setKey(key: string | null): Promise<AssistantKeyStatus> {
     if (key === null) {
       rmSync(keyFile(), { force: true });
     } else {
-      if (!safeStorage.isEncryptionAvailable()) throw new Error("Windows can't encrypt the key on this machine.");
+      if (!(await safeStorage.isAsyncEncryptionAvailable())) throw new Error("Windows can't encrypt the key on this machine.");
       if (!/^sk-ant-[\w-]{20,}$/.test(key.trim())) throw new Error("That doesn't look like an Anthropic API key (sk-ant-…).");
-      writeFileSync(keyFile(), safeStorage.encryptString(key.trim()));
+      writeFileSync(keyFile(), await safeStorage.encryptStringAsync(key.trim()));
     }
     return this.keyStatus();
   }
 
   /** A client with the stored key (the assistant and "Translate with AI"). */
-  apiClient(): Anthropic {
-    if (!existsSync(keyFile())) throw new Error("Add your Anthropic API key in Settings first.");
-    return new Anthropic({ apiKey: safeStorage.decryptString(readFileSync(keyFile())) });
+  async apiClient(): Promise<Anthropic> {
+    if (!this.hasKey()) throw new Error("Add your Anthropic API key in Settings first.");
+    const { result: apiKey, shouldReEncrypt } = await safeStorage.decryptStringAsync(readFileSync(keyFile()));
+    if (shouldReEncrypt) writeFileSync(keyFile(), await safeStorage.encryptStringAsync(apiKey));
+    return new Anthropic({ apiKey });
   }
 
   /** @scene:name, @character:id, @line:id → their text, read from the project. */
@@ -86,14 +95,16 @@ export class AssistantHost {
     return out;
   }
 
-  send(request: unknown): string {
+  async send(request: unknown): Promise<string> {
     const r = request as AssistantRequest;
     if (!r || typeof r.text !== "string" || !r.text.trim()) throw new Error("Type a message first.");
     const project = this.project();
     if (!project) throw new Error("No project is open.");
     if (!aiHelpAllowed(project.fs.exists("himawari.json") ? project.fs.read("himawari.json") : null)) throw new Error("AI help is turned off for this project.");
     if (this.abort) throw new Error("The assistant is still answering.");
-    const client = this.apiClient();
+    const client = await this.apiClient();
+    // Checked again: another message may have started while the key was decrypted.
+    if (this.abort) throw new Error("The assistant is still answering.");
     const settings = this.settings();
     const turn = `t${++this.turns}`;
     if (!this.system) {

@@ -1231,6 +1231,41 @@ Graphify processes notes after about 15 quiet minutes, and each one needs your *
 
 ---
 
+## Session 28: 2026-10-22 · Acting on DebtDraft's first scan
+**You asked:** to lessen the problems in DebtDraft's first scan of `d69b22c`, which scored 72 (C-). The weakest signal was vulnerabilities (50); the others were complexity 78, outdated dependencies 90, and duplication 99.
+
+**The vulnerability:**
+- DebtDraft flagged `sprintf-js` 1.1.3 (GHSA-hp3w-g68c-fv3c, a moderate denial of service). The advisory has no fixed release.
+- It only reached us at build time, through electron-builder → `@electron/get` → `global-agent` → `roarr`. Nothing that ships contained it.
+- `global-agent` is an *optional* dependency of `@electron/get`, loaded in a try/catch and only for proxy downloads (`ELECTRON_GET_USE_PROXY`). `pnpm-workspace.yaml` now removes it (`overrides: global-agent: "-"`), which takes 16 packages out of the tree.
+- `pnpm audit`: no known vulnerabilities.
+- The cost: packaging behind a proxy no longer gets `@electron/get`'s proxy support.
+
+**Dependencies:**
+- **resedit 1.7.2 → 3.1.0** (with pe-library 2.0.1). Both are native ES modules now, so Studio's `esm-aliases.mjs` workaround is gone, from both electron-vite and `stage-resources.mjs`. Checked with a release export through the bundled `himawari-tools.exe`: the game's `.exe` still gets its name, company, and version. The bundled `himawari-mcp.mjs` also still starts.
+- **Electron 44.8.0 → 45.0.0.**
+  - Studio's preload uses nothing that 45 takes away from sandboxed preloads (`Buffer`, `events`, `timers`, `url`).
+  - The API key now uses `safeStorage`'s **async** methods, because the sync ones are deprecated in 45 and removed in 46. Electron says keys saved with the sync methods decrypt with the async ones, so saved keys keep working. A key Windows asks to re-encrypt is rewritten.
+  - `send` and `translate.start` check again after the await, so two quick clicks can't start two runs.
+- **`@anthropic-ai/sdk` 0.135.0 → 1.1.0** (API version 2026-10-21; [migration guide](https://platform.claude.com/docs/en/api/migration-2026-10-21)).
+  - Studio and the evals use none of the removed pieces: sampling parameters, `compactionControl`, Text Completions, and `betas` on `models`.
+  - The key now goes out as `Authorization: Bearer`, which the API accepts.
+  - The SDK is **Apache-2.0** from 1.0, and THIRD_PARTY_NOTICES now says so. It also gained resedit and pe-library, which ship inside `hwc` and `himawari-mcp` and were missing.
+- **TypeScript stays at 6.0.3.** typescript-eslint (8.72.0, the newest) supports TypeScript below 6.1 only, and TypeScript 7 doesn't ship the compiler API that type-aware linting needs. Upgrade when typescript-eslint supports 7.
+
+**Complexity:** the three biggest project and bytecode readers were split into small functions. The ESLint `complexity` counts:
+- `readHwb` (85) is now a class with one method per section. The largest pieces are `checkOperands` (22) and `readTextProgram` (13).
+- `readManifest` (53): the largest piece is now `readVariable` (23).
+- `readCharacter` (56): the largest piece is now `collectWords` (23).
+
+These are the engine's reference loaders, so behaviour had to stay exactly the same. The old build was kept and compared against the new one:
+- `readHwb`: 200 000 `.hwb` files mutated with their checksum repaired. 124 793 still read as valid; the rest reached 55 distinct errors. Old and new gave the same result on every one.
+- `readManifest` and `readCharacter`: 50 000 structurally mutated files each. Results and diagnostics were identical.
+
+**Duplication** (99): the known duplicate, the `png()` helper in the examples' `make-art.mjs`, stays on purpose. Each example is self-contained and CC0.
+
+---
+
 ## Decision Register
 
 | ID | Decision | Since | Status |
@@ -1319,7 +1354,7 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 27)
+## Next Steps (after session 28)
 
 0. **Graphify:** accept the 20 seeded memory notes in Graphify's Memory → Needs review, and check whether it re-indexes on push.
 1. **Usability rounds 1–3** ([FINALIZATION.md](FINALIZATION.md) §11.2) with five or six writers each; the M2 and Phase 6 hallway tests can be round 1.
@@ -1344,3 +1379,7 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 6. The first real eval runs (`node packages/evals/dist/main.js run --model claude-haiku-5-5`, then Sonnet and Opus; a few cents to a dollar each), then `trend --write`.
 7. Human review of the Japanese UI (1 014 messages) and of AI-written Japanese in the examples.
 8. Before v1.0: code signing (Azure Artifact Signing or an OV certificate); betas ship unsigned with a SmartScreen explanation.
+9. **DebtDraft follow-ups** (session 28):
+   - the rest of the complexity list, using the same compare-old-and-new method: `disassemble`, `checkProject`, `checkRefs`, the lexer, `Parser.parseStatement`, `readTheme`, and Studio's `StoryGraph` and `Workspace`;
+   - TypeScript 7 once typescript-eslint supports it;
+   - coverage, which DebtDraft doesn't measure yet (vitest's coverage report could feed it).

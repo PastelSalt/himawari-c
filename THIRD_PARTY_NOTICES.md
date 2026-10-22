@@ -39,7 +39,7 @@ Studio is an Electron app. Everything it needs is bundled into one package (no `
 ### Electron and Chromium
 | Component | Version | License |
 |---|---|---|
-| [Electron](https://www.electronjs.org) | 44.8.0 | MIT |
+| [Electron](https://www.electronjs.org) | 45.0.0 | MIT |
 | Chromium, Node.js, V8, and the other pieces inside Electron | as bundled by Electron | Many permissive licenses. Electron ships their full notices in `LICENSES.chromium.html` next to the app. **Keep that file in the installer.** |
 
 Build tools (electron-builder, electron-vite, Vite, TypeScript, Vitest, Playwright, ESLint) are used to *build* Himawari and are **not shipped**.
@@ -53,14 +53,14 @@ Build tools (electron-builder, electron-vite, Vite, TypeScript, Vitest, Playwrig
 The OFL lets us bundle the fonts freely, but its license text must travel with them and the fonts can't be sold on their own. They are not copied into games.
 
 ### JavaScript packages bundled into Studio, `hwc`, and `himawari-mcp`
-78 packages (versions counted separately), found by walking `pnpm-lock.yaml` from Studio's, `himawari-mcp`'s, `@himawari/tools`', and `@himawari/core`'s dependencies. All are permissive **except `elkjs`**, which is a dual license (see flagged item 1).
+80 packages (versions counted separately), found by walking `pnpm-lock.yaml` from Studio's, `himawari-mcp`'s, `@himawari/tools`', and `@himawari/core`'s dependencies. All are permissive **except `elkjs`**, which is a dual license (see flagged item 1).
 
 | License | Packages |
 |---|---|
-| **MIT** (55) | `@anthropic-ai/sdk` 0.135.0, `@babel/runtime`, `@codemirror/*` (autocomplete, commands, language, lint, search, state, streamparser, view), `@formatjs/*` (fast-memoize, icu-messageformat-parser, icu-skeleton-parser, intl), `@lezer/*` (common, highlight, lr), `@marijn/find-cluster-break`, `@stablelib/base64`, `@types/*` (type definitions only), `@xyflow/react` 12.12.0, `@xyflow/system`, `ag-psd` 31.0.3, `base64-js`, `classcat`, `crelt`, `cross-spawn`, `csstype`, `eventsource`, `eventsource-parser`, `fflate`, `jose`, `json-schema-to-ts`, `path-key`, `pkce-challenge`, `react` 19.3.1, `react-dom`, `scheduler`, `shebang-command`, `shebang-regex`, `standardwebhooks`, `style-mod`, `ts-algebra`, `use-sync-external-store`, `w3c-keyname`, `zod` 4.6.7, `zustand` 5.0.15 and 4.5.7 |
+| **MIT** (56) | `@babel/runtime`, `@codemirror/*` (autocomplete, commands, language, lint, search, state, streamparser, view), `@formatjs/*` (fast-memoize, icu-messageformat-parser, icu-skeleton-parser, intl), `@lezer/*` (common, highlight, lr), `@marijn/find-cluster-break`, `@stablelib/base64`, `@types/*` (type definitions only), `@xyflow/react` 12.12.0, `@xyflow/system`, `ag-psd` 31.0.3, `base64-js`, `classcat`, `crelt`, `cross-spawn`, `csstype`, `eventsource`, `eventsource-parser`, `fflate`, `jose`, `json-schema-to-ts`, `path-key`, `pe-library` 2.0.1, `pkce-challenge`, `react` 19.3.1, `react-dom`, `resedit` 3.1.0 (the exported game's `.exe` name and icon), `scheduler`, `shebang-command`, `shebang-regex`, `standardwebhooks`, `style-mod`, `ts-algebra`, `use-sync-external-store`, `w3c-keyname`, `zod` 4.6.7, `zustand` 5.0.15 and 4.5.7 |
 | **ISC** (11) | `d3-color`, `d3-dispatch`, `d3-drag`, `d3-interpolate`, `d3-selection`, `d3-timer`, `d3-transition`, `d3-zoom`, `isexe`, `which`, `yaml` |
 | **BSD-3-Clause** (3) | `d3-ease`, `intl-messageformat`, `react-intl` 12.1.4 |
-| **Apache-2.0** (4) | `@modelcontextprotocol/client`, `@modelcontextprotocol/core`, `@modelcontextprotocol/server` (the MCP SDK, 2.3.1), `@opentelemetry/api` |
+| **Apache-2.0** (5) | `@anthropic-ai/sdk` 1.1.0 (Apache-2.0 since 1.0; MIT before), `@modelcontextprotocol/client`, `@modelcontextprotocol/core`, `@modelcontextprotocol/server` (the MCP SDK, 2.3.1), `@opentelemetry/api` |
 | **OFL-1.1** (2) | `@fontsource/noto-sans`, `@fontsource/noto-sans-jp` (the fonts above) |
 | **EPL-2.0 OR GPL-3.0-or-later** (1) | `elkjs` 0.12.0 |
 | **Unlicense** (1) | `fast-sha256` |
@@ -77,7 +77,7 @@ Nothing here blocks a release, but each should be settled before v1.0.
 | # | Item | Why it matters | Suggested fix |
 |---|---|---|---|
 | 1 | **`elkjs` 0.12.0 is `EPL-2.0 OR GPL-3.0-or-later`** (Studio's story-graph layout). | EPL-2.0 is a *weak* copyleft that covers only elkjs's own files. Used unmodified under the **EPL-2.0** option, it leaves Studio's own code MIT. We must keep its notice and make its source available. | We use the EPL-2.0 option (stated here). Include the EPL-2.0 text in Studio's licenses and link elkjs's source. Don't modify elkjs. |
-| 2 | **The MCP SDK (`@modelcontextprotocol/*` 2.3.1) is Apache-2.0**, not MIT. `@opentelemetry/api` (pulled in by the Anthropic SDK) is Apache-2.0 too. | Apache-2.0 asks that its license text (and any NOTICE) ship with the software. | Include the Apache-2.0 text in Studio's and `himawari-mcp`'s licenses. |
+| 2 | **The MCP SDK (`@modelcontextprotocol/*` 2.3.1) and the Anthropic SDK (`@anthropic-ai/sdk` 1.x) are Apache-2.0**, not MIT. `@opentelemetry/api` (pulled in by the Anthropic SDK) is Apache-2.0 too. Neither SDK ships a NOTICE file. | Apache-2.0 asks that its license text (and any NOTICE) ship with the software. | Include the Apache-2.0 text in Studio's and `himawari-mcp`'s licenses. |
 | 3 | **Exported games' `CREDITS.txt` is incomplete.** It names SDL, FreeType, libunibreak, and libwebp, but leaves out stb_image, stb_vorbis, and dr_mp3, and doesn't include libwebp's full BSD conditions. | libwebp's BSD license asks binary distributions to reproduce its notice and disclaimer. (FreeType's required credit line *is* already there.) | Have the exporter write the full texts to a `licenses/` folder (the plan already calls for this) and list every library in section 1. The text lives in `packages/tools/src/package.ts`. |
 | 4 | **`spec/LICENSE.md` still has a TODO** for the full CC BY 4.0 legal text. | The summary and link are there, but the legal code should be in the folder. | Add the legal text before the first release. |
 | 5 | **Studio has no place to show license texts.** MIT and BSD ask that copyright notices travel with the software, and OFL and EPL need their texts too. | Today there's no "About → Third-party licenses" screen. | Generate the texts from the packages at build time and show them in About (already planned in FINALIZATION.md). Keep Electron's `LICENSES.chromium.html`. |
@@ -88,7 +88,7 @@ Nothing here blocks a release, but each should be settled before v1.0.
 - **No GPL, LGPL, or AGPL code ships.** FreeType's GPL option and elkjs's GPL option are *not* the ones we use.
 - **Build-only packages that look scarier are not shipped:** `lightningcss` (MPL-2.0), `caniuse-lite` (CC BY 4.0), `argparse` (Python-2.0), and the WTFPL-licensed helpers belong to the build tools, not to the app.
 - **The runtime links no network or TLS library**, so a game has no way to reach the internet. See [PRIVACY.md](PRIVACY.md).
-- The **Anthropic SDK** (MIT) is used only by Studio's optional assistant. Games contain no AI.
+- The **Anthropic SDK** (Apache-2.0) is used only by Studio's optional assistant and "Translate with AI". Games contain no AI.
 
 ## Keeping this page right
 - Adding a dependency? Add it here in the same pull request ([CONTRIBUTING.md](CONTRIBUTING.md)). Anything copyleft needs a conversation first.

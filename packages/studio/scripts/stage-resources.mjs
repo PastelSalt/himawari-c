@@ -9,7 +9,6 @@ import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } fr
 import { basename, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "vite";
-import { esmAliases } from "./esm-aliases.mjs";
 
 const studio = fileURLToPath(new URL("..", import.meta.url));
 const repo = join(studio, "..", "..");
@@ -38,7 +37,6 @@ await build({
   configFile: false,
   logLevel: "warn",
   ssr: { noExternal: true, target: "node" },
-  resolve: { alias: esmAliases() },
   build: {
     ssr: join(repo, "packages", "mcp", "dist", "main.js"),
     outDir: join(out, "mcp"),
@@ -56,7 +54,6 @@ await build({
   configFile: false,
   logLevel: "warn",
   ssr: { noExternal: true, target: "node" },
-  resolve: { alias: esmAliases() },
   build: {
     ssr: join(studio, "scripts", "tools", "entry.mjs"),
     outDir: seaDir,
