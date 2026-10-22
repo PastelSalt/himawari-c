@@ -1,0 +1,467 @@
+<!doctype html>
+<html lang="en" data-motion="on">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Himawari Studio · mockup</title>
+<!--
+  Website mockup (planning/WEBSITE.md, the "middle path"): nanahira.jp's calm layout, sunflower colors,
+  thick outlines only on things you click, and one moving thing per screen.
+  Mockup only: fonts, icons, and confetti come from public CDNs here; the real site bundles them (WEBSITE.md §9).
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Zen+Maru+Gothic:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/duotone/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<style>
+:root {
+  --sun: #f5d57c;
+  --sun-deep: #f1cb60;
+  --sun-wash: #fdf3d4;
+  --paper: #fffcf2;
+  --white: #ffffff;
+  --ink: #2e2a33;
+  --text: #45404d;
+  --gray-600: #5d5869;
+  --gray-500: #77727f;
+  --line: #ddd6c8;
+  --line-strong: #4a4550;
+  --black: #1e1a24;
+  --font: "Fredoka", "Zen Maru Gothic", system-ui, sans-serif;
+  --column: 1000px;
+  --dur: 1;
+}
+html[data-motion="off"] { --dur: 0; }
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 17px;
+  line-height: 1.7;
+  letter-spacing: 0.02em;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: clip; /* drifting flowers may hang past the edge; clip keeps the sticky nav working */
+}
+a { color: var(--ink); text-decoration: none; background: linear-gradient(var(--sun), var(--sun)) 0 92% / 100% 0.35em no-repeat; transition: background-size calc(200ms * var(--dur)); }
+a:hover { background-size: 100% 92%; }
+.wrap { width: min(var(--column), calc(100% - 32px)); margin-inline: auto; }
+.ph-duotone { --ph-duotone-color: var(--sun); --ph-duotone-opacity: 1; color: var(--black); }
+/* Phosphor's duotone fill layer is ::before (0.2 opacity by default); ours is solid sunflower. */
+.ph-duotone.ph-duotone::before { opacity: 1 !important; color: var(--sun) !important; }
+
+/* ---------- header ---------- */
+.top { padding-top: 22px; }
+.top__row { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.top__logo img { height: 64px; display: block; }
+.top__tools { display: flex; align-items: center; gap: 8px; }
+.icon-btn {
+  display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 999px;
+  color: var(--ink); background: none; border: 1.5px solid transparent; font-size: 20px; cursor: pointer;
+}
+.icon-btn:hover { border-color: var(--line-strong); }
+.lang { font: 500 13px var(--font); letter-spacing: 0.12em; color: var(--gray-600); padding: 0 8px; }
+.lang b { color: var(--ink); }
+.motion {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 999px;
+  border: 1.5px solid var(--line-strong); background: var(--white); font: 500 12px var(--font); letter-spacing: 0.14em;
+  color: var(--ink); cursor: pointer;
+}
+.motion i { font-size: 16px; }
+nav.nav {
+  position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--paper) 92%, transparent);
+  backdrop-filter: blur(6px); margin-top: 14px;
+}
+.nav__row { display: flex; align-items: center; gap: 28px; height: 58px; }
+.nav__name { font-weight: 600; letter-spacing: 0.16em; font-size: 13px; color: var(--ink); white-space: nowrap; }
+.nav__rule { flex: 1; height: 1px; background: var(--line-strong); max-width: 140px; }
+.nav__links { display: flex; gap: 26px; margin-left: auto; }
+.nav__links a { background: none; font-size: 13px; letter-spacing: 0.18em; font-weight: 500; color: var(--gray-600); position: relative; }
+.nav__links a::after { content: ""; position: absolute; left: 0; right: 0; bottom: -6px; height: 3px; border-radius: 3px; background: var(--sun); transform: scaleX(0); transition: transform calc(220ms * var(--dur)); }
+.nav__links a:hover { color: var(--ink); }
+.nav__links a:hover::after { transform: scaleX(1); }
+
+/* ---------- news bar (nanahira's hot topic) ---------- */
+.news { position: relative; margin-top: 18px; }
+.news__bar {
+  display: flex; align-items: center; gap: 18px; padding: 14px 24px; border-radius: 22px; background: var(--sun);
+  color: var(--black); font-size: 15px;
+}
+.news__label { font-size: 12px; font-weight: 600; letter-spacing: 0.2em; padding-right: 18px; border-right: 1.5px solid rgb(30 26 36 / 0.35); white-space: nowrap; }
+.news__bar a { background: none; text-decoration: underline; text-underline-offset: 4px; font-weight: 500; }
+.news__flower { margin-left: auto; width: 34px; animation: bob calc(2.4s * var(--dur, 1)) ease-in-out infinite; }
+.news::after {
+  content: ""; position: absolute; right: 90px; bottom: -16px; width: 34px; height: 22px; background: var(--sun);
+  clip-path: polygon(0 0, 100% 0, 70% 100%);
+}
+
+/* ---------- section titles (thin double-line pill on a rule) ---------- */
+.sec { padding: 92px 0 20px; }
+.sec-title { position: relative; display: grid; place-items: center; margin: 0 0 54px; }
+.sec-title::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--line-strong); }
+.sec-title span {
+  position: relative; background: var(--paper); padding: 6px 34px; border-radius: 999px;
+  border: 1.5px solid var(--line-strong); box-shadow: 0 0 0 5px var(--paper), 0 0 0 6.5px var(--line-strong);
+  font-size: 26px; font-weight: 500; letter-spacing: 0.16em; color: var(--ink);
+}
+.sec-title span em { font-style: normal; display: inline-block; }
+html[data-motion="on"] .sec-title.pop span em { animation: pop 520ms cubic-bezier(.3,1.6,.5,1) both; animation-delay: calc(var(--i) * 45ms); }
+.ornament { display: grid; place-items: center; margin: 56px 0 0; }
+.ornament svg { width: 40px; animation: bob 2.8s ease-in-out infinite; }
+
+/* ---------- buttons (thick outlines: only on things you click) ---------- */
+.btn {
+  display: inline-flex; align-items: center; gap: 10px; height: 54px; padding: 0 26px; border-radius: 16px;
+  font: 600 17px var(--font); letter-spacing: 0.04em; color: var(--black); background: var(--sun);
+  border: 2.5px solid var(--black); box-shadow: 4px 5px 0 var(--black); cursor: pointer;
+  transition: transform calc(120ms * var(--dur)), box-shadow calc(120ms * var(--dur));
+}
+.btn:hover { background: var(--sun-deep); }
+.btn:active { transform: translate(3px, 4px); box-shadow: 1px 1px 0 var(--black); }
+.btn--ghost { background: var(--white); box-shadow: 4px 5px 0 var(--sun); }
+.btn--ghost:hover { background: var(--sun-wash); }
+.btn i { font-size: 22px; }
+
+/* ---------- hero ---------- */
+.hero { display: grid; grid-template-columns: 1fr 1.05fr; gap: 48px; align-items: center; padding: 64px 0 24px; position: relative; }
+.hero h1 { font-size: clamp(34px, 2.2rem + 1.4vw, 52px); line-height: 1.15; letter-spacing: 0.01em; color: var(--ink); margin: 0 0 18px; font-weight: 600; }
+.hero h1 mark { background: linear-gradient(var(--sun), var(--sun)) 0 85% / 100% 0.38em no-repeat; color: inherit; }
+.hero p.lead { font-size: 19px; color: var(--gray-600); margin: 0 0 30px; max-width: 30ch; }
+.hero__actions { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.hero__dl { display: grid; gap: 8px; justify-items: start; }
+.hero__meta { font-size: 13px; color: var(--gray-500); letter-spacing: 0.06em; padding-left: 4px; }
+.drift { position: absolute; width: 74px; opacity: 0.95; pointer-events: none; z-index: 0; }
+.drift--a { right: -40px; top: 18px; animation: float 7s ease-in-out infinite; }
+.drift--b { left: 43%; bottom: -18px; width: 54px; animation: float 8s ease-in-out infinite reverse; }
+
+/* window frame (a thing you look at closely: thick outline, sun shadow) */
+.win { position: relative; z-index: 1; background: var(--white); border: 2.5px solid var(--black); border-radius: 18px; box-shadow: 8px 10px 0 var(--sun); overflow: hidden; }
+.win__bar { display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 14px; border-bottom: 2px solid var(--black); background: var(--sun-wash); font-size: 12px; letter-spacing: 0.08em; color: var(--gray-600); }
+.win__dots { display: flex; gap: 6px; }
+.win__dots span { width: 10px; height: 10px; border-radius: 50%; border: 1.5px solid var(--black); background: var(--white); }
+.win__dots span:first-child { background: var(--sun); }
+.studio { display: grid; grid-template-columns: 1fr 1fr; min-height: 300px; }
+.sp { padding: 16px 14px; border-right: 1.5px solid var(--line); display: grid; align-content: start; gap: 10px; font-size: 13px; }
+.sp__row { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; }
+.sp__row--active { background: var(--sun-wash); outline: 1.5px solid var(--sun-deep); }
+.sp__who { border: 1.5px solid var(--line-strong); border-radius: 8px; padding: 2px 8px; font-weight: 600; color: var(--ink); font-size: 12px; white-space: nowrap; }
+.sp__chip { border-radius: 999px; background: var(--sun); padding: 1px 9px; font-size: 11px; color: var(--black); transition: background 200ms; white-space: nowrap; }
+.sp__text { color: var(--ink); min-height: 1.4em; }
+.sp__caret { display: inline-block; width: 2px; height: 1em; background: var(--black); vertical-align: -2px; animation: blink 1s steps(1) infinite; }
+.sp__add { display: flex; gap: 8px; padding-left: 10px; }
+.sp__add span { border: 1.5px dashed var(--line); border-radius: 8px; padding: 2px 8px; font-size: 11px; color: var(--gray-500); }
+.game { position: relative; overflow: hidden; background: linear-gradient(#bfe2fb 0 55%, #9ccf7d 55% 100%); }
+.game__sun { position: absolute; right: 22px; top: 18px; width: 38px; height: 38px; border-radius: 50%; background: #fff4c2; box-shadow: 0 0 22px #fff4c2; }
+.game__field { position: absolute; left: 0; right: 0; top: 49%; height: 26px; background: radial-gradient(circle at 14px 12px, var(--sun) 0 7px, #6b4a1f 8px 10px, transparent 11px) 0 0 / 30px 26px repeat-x; }
+.char { position: absolute; left: 50%; bottom: 74px; translate: -50% 0; display: grid; justify-items: center; transition: transform calc(300ms * var(--dur)); }
+.char__head { width: 58px; height: 58px; border-radius: 50%; background: #f7e7d3; border: 2px solid var(--black); position: relative; }
+.char__head::before { content: ""; position: absolute; inset: -6px -4px auto; height: 30px; border-radius: 30px 30px 8px 8px; background: #6b4a1f; border: 2px solid var(--black); border-bottom: none; }
+.char__face { position: absolute; left: 50%; top: 34px; translate: -50% 0; font-size: 14px; color: var(--black); font-weight: 700; letter-spacing: 6px; }
+.char__body { width: 74px; height: 70px; margin-top: -2px; border-radius: 22px 22px 6px 6px; background: var(--white); border: 2px solid var(--black); }
+.char__tag { position: absolute; top: -26px; font-size: 10px; letter-spacing: 0.1em; background: var(--black); color: var(--sun); border-radius: 6px; padding: 1px 6px; white-space: nowrap; }
+.tbox { position: absolute; left: 10px; right: 10px; bottom: 10px; min-height: 66px; border-radius: 12px; background: rgb(30 26 36 / 0.82); color: #fff; padding: 18px 12px 10px; font-size: 12.5px; line-height: 1.5; }
+.tbox__name { position: absolute; top: -11px; left: 12px; background: var(--sun); color: var(--black); font-weight: 600; font-size: 11px; padding: 1px 10px; border-radius: 6px; }
+.hero__note { text-align: center; font-size: 12px; color: var(--gray-500); letter-spacing: 0.08em; margin-top: 18px; }
+
+/* ---------- promises ---------- */
+.cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; }
+.card { background: var(--white); border: 1px solid var(--line); border-radius: 20px; padding: 28px 26px; }
+.card i { font-size: 44px; }
+.card h3 { margin: 12px 0 8px; font-size: 20px; color: var(--ink); font-weight: 600; letter-spacing: 0.02em; }
+.card p { margin: 0; font-size: 15.5px; color: var(--text); }
+
+/* ---------- features ---------- */
+.feature { display: grid; grid-template-columns: 0.9fr 1.1fr; gap: 54px; align-items: center; margin-bottom: 70px; }
+.feature--flip { grid-template-columns: 1.1fr 0.9fr; }
+.feature--flip .feature__text { order: 2; }
+.feature__kicker { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; letter-spacing: 0.2em; color: var(--gray-600); font-weight: 600; }
+.feature__kicker i { font-size: 26px; }
+.feature h3 { font-size: 28px; margin: 10px 0 12px; color: var(--ink); font-weight: 600; line-height: 1.25; }
+.feature ul { padding-left: 1.1em; margin: 14px 0 0; }
+.feature li { margin: 4px 0; }
+.feature li::marker { color: var(--sun-deep); }
+.shot img { display: block; width: 100%; }
+
+/* ---------- coming soon: the one dark moment ---------- */
+.soon { position: relative; overflow: hidden; background: var(--black); color: #f3eedf; margin-top: 70px; padding: 96px 16px 104px; text-align: center; }
+.soon h2 { position: relative; z-index: 1; margin: 18px 0 14px; font-size: clamp(30px, 1.6rem + 1.4vw, 44px); color: var(--sun); font-weight: 600; letter-spacing: 0.02em; }
+.soon p { position: relative; z-index: 1; margin: 0 auto; max-width: 46ch; color: #d9d3c4; }
+.soon__pill { position: relative; z-index: 1; display: inline-block; padding: 5px 22px; border-radius: 999px; border: 1.5px solid var(--sun); box-shadow: 0 0 0 5px var(--black), 0 0 0 6.5px var(--sun); color: var(--sun); font-size: 14px; letter-spacing: 0.3em; }
+.fall { position: absolute; top: -40px; width: 22px; opacity: 0.85; animation: fall linear infinite; }
+
+/* ---------- footer ---------- */
+footer { padding: 54px 0 40px; }
+.foot { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+.foot__flowers { display: flex; align-items: flex-end; gap: 6px; }
+.foot__flowers img { width: 64px; animation: bob 3s ease-in-out infinite; }
+.foot__right { text-align: right; font-size: 12.5px; letter-spacing: 0.12em; color: var(--gray-500); }
+.foot__right .mw { display: inline-block; background: none; }
+.foot__right .mw img { height: 46px; display: block; margin-left: auto; margin-bottom: 10px; }
+.foot__links { display: flex; gap: 18px; justify-content: flex-end; margin-bottom: 6px; }
+.foot__links a { background: none; color: var(--gray-600); }
+
+/* ---------- motion ---------- */
+@keyframes bob { 50% { transform: translateY(-5px); } }
+@keyframes float { 0%, 100% { transform: translateY(0) rotate(-6deg); } 50% { transform: translateY(-14px) rotate(8deg); } }
+@keyframes blink { 50% { opacity: 0; } }
+@keyframes pop { 0% { transform: translateY(14px) scale(0.6); opacity: 0; } 100% { transform: none; opacity: 1; } }
+@keyframes rise { from { transform: translateY(26px); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes fall { to { transform: translateY(560px) rotate(260deg); } }
+html[data-motion="on"] .reveal { opacity: 0; }
+html[data-motion="on"] .reveal.in { animation: rise 700ms cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--d, 0) * 90ms); }
+html[data-motion="off"] *, html[data-motion="off"] *::before, html[data-motion="off"] *::after { animation: none !important; transition: none !important; }
+@media (prefers-reduced-motion: reduce) { html:not([data-motion="on-forced"]) { scroll-behavior: auto; } }
+
+/* ---------- phones ---------- */
+@media (max-width: 760px) {
+  .top__logo img { height: 40px; }
+  .lang, .motion span { display: none; }
+  .nav__links, .nav__rule { display: none; }
+  .nav__row { justify-content: space-between; }
+  .menu { display: inline-grid !important; }
+  .news__bar { font-size: 13.5px; padding: 12px 16px; gap: 12px; }
+  .news__flower { display: none; }
+  .hero, .feature, .feature--flip { grid-template-columns: 1fr; gap: 30px; }
+  .feature--flip .feature__text { order: 0; }
+  .cards { grid-template-columns: 1fr; }
+  .studio { grid-template-columns: 1fr; }
+  .game { order: -1; min-height: 230px; }
+  .sp { border-right: none; border-top: 1.5px solid var(--line); }
+  .sp__row:first-child { display: none; }
+  .sec { padding-top: 70px; }
+  .sec-title span { font-size: 20px; padding: 5px 22px; }
+  .drift--a { right: -14px; top: auto; bottom: 300px; width: 52px; }
+  .drift--b { display: none; }
+  .foot { flex-direction: column; align-items: flex-start; }
+  .foot__right { text-align: left; }
+  .foot__right .mw img { margin-left: 0; }
+  .foot__links { justify-content: flex-start; }
+}
+.menu { display: none; width: 44px; height: 44px; border-radius: 12px; background: var(--sun); border: 2.5px solid var(--black); box-shadow: 3px 4px 0 var(--black); place-items: center; font-size: 22px; }
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="flower" viewBox="0 0 100 100">
+      <g stroke="#1e1a24" stroke-width="5">
+        <circle cx="50" cy="22" r="20" fill="#f5d57c"/><circle cx="77" cy="42" r="20" fill="#f5d57c"/>
+        <circle cx="67" cy="74" r="20" fill="#f5d57c"/><circle cx="33" cy="74" r="20" fill="#f5d57c"/>
+        <circle cx="23" cy="42" r="20" fill="#f5d57c"/>
+      </g>
+      <circle cx="50" cy="50" r="22" fill="#f5d57c"/>
+      <circle cx="50" cy="50" r="13" fill="#5a5a5a" stroke="#1e1a24" stroke-width="5"/>
+    </symbol>
+    <symbol id="flower-white" viewBox="0 0 100 100">
+      <g stroke="#1e1a24" stroke-width="5">
+        <circle cx="50" cy="22" r="20" fill="#fff"/><circle cx="77" cy="42" r="20" fill="#fff"/>
+        <circle cx="67" cy="74" r="20" fill="#fff"/><circle cx="33" cy="74" r="20" fill="#fff"/>
+        <circle cx="23" cy="42" r="20" fill="#fff"/>
+      </g>
+      <circle cx="50" cy="50" r="22" fill="#fff"/>
+      <circle cx="50" cy="50" r="13" fill="#f5d57c" stroke="#1e1a24" stroke-width="5"/>
+    </symbol>
+  </defs>
+</svg>
+
+<header class="top">
+  <div class="wrap top__row">
+    <a class="top__logo" href="#" style="background:none"><img src="../../packages/studio/src/renderer/src/brand/himawari-studio.png" alt="Himawari Studio: Visual Novel Engine and Maker by Moeko Works"></a>
+    <div class="top__tools">
+      <span class="lang"><b>EN</b> / 日本語</span>
+      <button class="motion" id="motion" type="button" aria-pressed="true"><i class="ph ph-sparkle"></i><span>MOTION ON</span></button>
+      <a class="icon-btn" href="#" aria-label="GitHub" style="background:none"><i class="ph ph-github-logo"></i></a>
+      <a class="icon-btn" href="#" aria-label="Contact" style="background:none"><i class="ph ph-envelope-simple"></i></a>
+    </div>
+  </div>
+</header>
+
+<nav class="nav" aria-label="Sections">
+  <div class="wrap nav__row">
+    <span class="nav__name">HIMAWARI</span>
+    <span class="nav__rule"></span>
+    <div class="nav__links">
+      <a href="#features">FEATURES</a><a href="#download">DOWNLOAD</a><a href="#learn">LEARN</a><a href="#news">NEWS</a><a href="#faq">FAQ</a>
+    </div>
+    <button class="menu" type="button" aria-label="Menu"><i class="ph ph-list"></i></button>
+  </div>
+</nav>
+
+<main>
+  <div class="wrap">
+    <div class="news">
+      <div class="news__bar">
+        <span class="news__label">NEWS</span>
+        <span><a href="#">Himawari Studio 0.4.1 is out</a> &nbsp;·&nbsp; each sample now opens its own copy</span>
+        <svg class="news__flower" viewBox="0 0 100 100" aria-hidden="true"><use href="#flower-white"/></svg>
+      </div>
+    </div>
+
+    <section class="hero" aria-labelledby="hero-title">
+      <img class="drift drift--a" src="../../branding/himawari-flowers.png" alt="">
+      <svg class="drift drift--b" viewBox="0 0 100 100" aria-hidden="true"><use href="#flower"/></svg>
+      <div>
+        <h1 id="hero-title">Write your story and <mark>play it as you type.</mark></h1>
+        <p class="lead">A free visual novel maker for Windows. No code needed, and nothing for your players to install.</p>
+        <div class="hero__actions">
+          <div class="hero__dl">
+            <button class="btn" id="dl" type="button"><i class="ph ph-windows-logo"></i>Download for Windows</button>
+            <span class="hero__meta">0.4.1 &nbsp;·&nbsp; 22 October 2026 &nbsp;·&nbsp; 146 MB</span>
+          </div>
+          <a class="btn btn--ghost" href="#learn" style="background-size:0"><i class="ph ph-book-open"></i>Make your first game</a>
+        </div>
+      </div>
+      <div>
+        <div class="win" aria-label="An animation of Himawari Studio: a line typed in the editor appears in the game beside it">
+          <div class="win__bar"><span class="win__dots"><span></span><span></span><span></span></span>Himawari Studio &nbsp;·&nbsp; start.hws</div>
+          <div class="studio">
+            <div class="sp">
+              <div class="sp__row"><span class="sp__who">Narration</span><span class="sp__text">The sunflowers are taller than I am.</span></div>
+              <div class="sp__row sp__row--active"><span class="sp__who">Hana</span><span class="sp__chip" id="chip">happy</span><span class="sp__text"><span id="typed"></span><span class="sp__caret"></span></span></div>
+              <div class="sp__add"><span>+ Line</span><span>+ Choice</span><span>+ Stage</span></div>
+            </div>
+            <div class="game">
+              <div class="game__sun"></div><div class="game__field"></div>
+              <div class="char" id="char"><span class="char__tag" id="tag">Hana · happy</span><div class="char__head"><span class="char__face" id="face">^ ^</span></div><div class="char__body"></div></div>
+              <div class="tbox"><span class="tbox__name">Hana</span><span id="said"></span></div>
+            </div>
+          </div>
+        </div>
+        <p class="hero__note">THE GAME PLAYS BESIDE THE EDITOR, IN UNDER A SECOND</p>
+      </div>
+    </section>
+
+    <div class="ornament"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#flower"/></svg></div>
+
+    <section class="sec" aria-labelledby="t-about">
+      <h2 class="sec-title" id="t-about"><span>ABOUT</span></h2>
+      <div class="cards">
+        <article class="card reveal" style="--d:0"><i class="ph-duotone ph-pencil-simple-line"></i><h3>Easy enough for anyone</h3><p>Write lines, choices, and characters with buttons and forms. Your story plays from the first line, even before any art exists.</p></article>
+        <article class="card reveal" style="--d:1"><i class="ph-duotone ph-code"></i><h3>Open enough for coders</h3><p>The same project is plain text with a command-line tool and git-friendly files. Extend it with your own statements.</p></article>
+        <article class="card reveal" style="--d:2"><i class="ph-duotone ph-lightning"></i><h3>Light enough for any PC</h3><p>A finished game is about 3 MB before your art and music, and it starts with a double-click on Windows 10 or 11.</p></article>
+      </div>
+    </section>
+
+    <div class="ornament"><svg viewBox="0 0 100 100" aria-hidden="true"><use href="#flower-white"/></svg></div>
+
+    <section class="sec" id="features" aria-labelledby="t-features">
+      <h2 class="sec-title" id="t-features"><span>FEATURES</span></h2>
+      <div class="feature">
+        <div class="feature__text reveal">
+          <span class="feature__kicker"><i class="ph-duotone ph-feather"></i>FOR WRITERS</span>
+          <h3>Each line of your story is a row.</h3>
+          <p>Pick who speaks and how they look, then type what they say. Choices, music, and backgrounds come from menus and forms, never code.</p>
+          <ul><li>The game updates as you type</li><li>Play from any line</li><li>Autosave and a history of every change</li></ul>
+        </div>
+        <div class="win shot reveal" style="--d:1"><div class="win__bar"><span class="win__dots"><span></span><span></span><span></span></span>Screenplay</div><img src="../../docs/images/studio.png" alt="Himawari Studio: the story as a screenplay on the left, the game on the right"></div>
+      </div>
+      <div class="feature feature--flip">
+        <div class="feature__text reveal" style="--d:1">
+          <span class="feature__kicker"><i class="ph-duotone ph-palette"></i>FOR ARTISTS</span>
+          <h3>Make the menus look like your game.</h3>
+          <p>Move, resize, and recolor the textbox, choices, and every menu right on the running game. Start from a preset and get a contrast check as you go.</p>
+          <ul><li>Layered sprites with blinking and lip-flap</li><li>Import from Photoshop</li><li>Seven presets and color palettes</li></ul>
+        </div>
+        <div class="win shot reveal"><div class="win__bar"><span class="win__dots"><span></span><span></span><span></span></span>UI Designer</div><img src="../../docs/images/ui-designer.png" alt="The UI Designer with presets, palettes, and a resizable textbox"></div>
+      </div>
+    </section>
+  </div>
+
+  <section class="soon" aria-labelledby="t-soon">
+    <div id="fall"></div>
+    <span class="soon__pill">COMING SOON</span>
+    <h2 id="t-soon">A visual novel made with Himawari is on the way.</h2>
+    <p>Made by Moeko Works, with the engine you can download today. More when it's ready.</p>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <div class="foot__flowers"><img src="../../branding/himawari-flowers.png" alt=""><img src="../../branding/himawari-flowers.png" alt="" style="width:44px;animation-delay:-1.2s"></div>
+    <div class="foot__right">
+      <a class="mw" href="#"><img src="../../branding/moeko-works-logo.png" alt="Moeko Works"></a>
+      <div class="foot__links"><a href="#">PRIVACY</a><a href="#">ABOUT</a><a href="#">GITHUB</a></div>
+      COPYRIGHT © MOEKO WORKS · RUNTIME ZLIB · TOOLS MIT
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+<script>
+(() => {
+  const root = document.documentElement;
+  const motionOn = () => root.dataset.motion === "on";
+  const setMotion = (on) => {
+    root.dataset.motion = on ? "on" : "off";
+    const b = document.getElementById("motion");
+    b.setAttribute("aria-pressed", String(on));
+    b.querySelector("span").textContent = on ? "MOTION ON" : "MOTION OFF";
+  };
+  setMotion(!matchMedia("(prefers-reduced-motion: reduce)").matches && !location.search.includes("still"));
+  document.getElementById("motion").addEventListener("click", () => setMotion(!motionOn()));
+
+  // Section titles: split into letters that pop in when the title arrives.
+  document.querySelectorAll(".sec-title span").forEach((s) => {
+    s.innerHTML = [...s.textContent].map((c, i) => `<em style="--i:${i}">${c === " " ? "&nbsp;" : c}</em>`).join("");
+  });
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      e.target.classList.add(e.target.classList.contains("sec-title") ? "pop" : "in");
+      io.unobserve(e.target);
+    }
+  }, { threshold: 0.2 });
+  document.querySelectorAll(".reveal, .sec-title").forEach((el) => io.observe(el));
+
+  // Hero: a line types itself into the screenplay row, and the game's textbox follows.
+  const LINES = [
+    { text: "The festival is tonight. Will you help me get ready?", mood: "happy", face: "^ ^" },
+    { text: "Wait, you forgot the lanterns?", mood: "surprised", face: "o o" },
+    { text: "Then we'll make them together.", mood: "smile", face: "^ ‿ ^" },
+  ];
+  const typed = document.getElementById("typed"), said = document.getElementById("said");
+  const chip = document.getElementById("chip"), face = document.getElementById("face"), tag = document.getElementById("tag"), ch = document.getElementById("char");
+  const show = (l, n) => { typed.textContent = l.text.slice(0, n); said.textContent = l.text.slice(0, n); };
+  const setMood = (l) => { chip.textContent = l.mood; face.textContent = l.face; tag.textContent = `Hana · ${l.mood}`; ch.style.transform = "translateY(-6px)"; setTimeout(() => (ch.style.transform = ""), 180); };
+  let li = 0;
+  const run = async () => {
+    for (;;) {
+      const l = LINES[li++ % LINES.length];
+      setMood(l);
+      if (!motionOn()) { show(l, l.text.length); await new Promise((r) => setTimeout(r, 400)); if (!motionOn()) return; continue; }
+      for (let n = 0; n <= l.text.length; n++) { show(l, n); await new Promise((r) => setTimeout(r, 42)); }
+      await new Promise((r) => setTimeout(r, 1700));
+    }
+  };
+  if (location.search.includes("still") || location.search.includes("shot")) { setMood(LINES[0]); show(LINES[0], LINES[0].text.length); } else run();
+  if (location.search.includes("shot")) { setTimeout(() => document.querySelectorAll(".reveal, .sec-title").forEach((el) => el.classList.add(el.classList.contains("sec-title") ? "pop" : "in")), 50); }
+
+  // Coming soon: flowers falling slowly behind the black band.
+  const fall = document.getElementById("fall");
+  for (let i = 0; i < 14; i++) {
+    const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    s.setAttribute("viewBox", "0 0 100 100");
+    s.classList.add("fall");
+    s.innerHTML = `<use href="#${i % 3 ? "flower" : "flower-white"}"/>`;
+    s.style.left = `${(i * 7.3 + 3) % 100}%`;
+    s.style.width = `${14 + (i % 4) * 6}px`;
+    s.style.animationDuration = `${9 + (i % 5) * 2.2}s`;
+    s.style.animationDelay = `${-i * 1.3}s`;
+    s.style.opacity = String(0.35 + (i % 3) * 0.2);
+    fall.appendChild(s);
+  }
+
+  // Download: a burst of yellow, white, and black confetti from the button.
+  document.getElementById("dl").addEventListener("click", (e) => {
+    if (!motionOn() || typeof confetti !== "function") return;
+    const r = e.currentTarget.getBoundingClientRect();
+    confetti({ particleCount: 70, spread: 70, startVelocity: 32, scalar: 0.9, colors: ["#f5d57c", "#ffffff", "#1e1a24", "#f1cb60"], origin: { x: (r.left + r.width / 2) / innerWidth, y: (r.top + r.height / 2) / innerHeight } });
+  });
+})();
+</script>
+</body>
+</html>

@@ -1363,6 +1363,78 @@ CI's first two tries failed while downloading pnpm itself (npm registry timeouts
 
 ---
 
+## Session 32: 2026-10-22 · The website plan, rebuilt on how you work
+**You asked:**
+- to build the website the way your previous projects are built;
+- to use sunflower colors (yellow first, then white, gray, and black);
+- to use proper icons from libraries;
+- to expect no art (no budget);
+- to say "coming soon" instead of showing samples, since a proper visual novel is on its way;
+- to make the page alive with motion;
+- to deploy on Vercel with Astro, with the backend done as in your previous projects.
+
+**Read your previous projects** (local copies in `Documents\MoekoWorks`), recorded in [RESEARCH.md](RESEARCH.md) §18.4 (v1.5):
+- **Aqua Iro Archive** is the template:
+  - Astro 7 static-first with Preact islands, plain CSS, Neon and Drizzle, Better Auth with TOTP, and Turnstile, on Vercel `sin1`;
+  - Phosphor duotone icons in a build-time sprite;
+  - motion gated by `html[data-motion]`, with reveal, tilt, odometer, and offscreen scripts;
+  - CSP hashes written into `vercel.json` at build;
+  - contrast and budget scripts, and Playwright with axe in CI.
+- **The portfolio** adds Lenis, cursor sparkles, falling flowers, confetti, letter pops, cookieless visit counting with a daily salt, rate-limited forms, a daily cron, and sticker styling.
+- **The fan sites** show the simplest form: static pages plus Vercel functions.
+
+**[WEBSITE.md](WEBSITE.md) v0.2:**
+- **Colors:** yellow fills and highlights, white and warm paper, gray and black text. Yellow text appears only on black bands (11.96:1), and every text pair meets AA.
+- **Icons and type:** Phosphor duotone icons, black with a yellow fill; Fredoka and Zen Maru Gothic; BudouX for Japanese line breaks.
+- **No art needed:**
+  - the hero is a live HTML and CSS recreation of Studio's play-as-you-write;
+  - ornaments, falling flowers, and sparkles are flower shapes drawn in SVG;
+  - the features use real screenshots, plus a real recording;
+  - social images are generated at build.
+- **"Coming soon"** for your visual novel, in a black band, with no samples on the home page.
+- **Motion:** splash, typing hero, Lenis, cursor sparkles, letter pops, reveals, tilt, counters, marquee, falling flowers, and download confetti, with GSAP ScrollTrigger only where needed. All of it sits behind a Motion switch that honors reduced motion, within a 90 KB JavaScript budget.
+- **Backend:** its own repo (`himawari-site`, `dev` to `main`), Neon via the Vercel Marketplace, Drizzle, cookieless `/api/track`, rate limits, a daily cron, Discord alerts, typed env, the security headers, and CSP hashes. The download button is fed by the latest release, with a deploy hook on each new release.
+- **Four questions left**, each with a recommendation: the address, how visits are counted, the coming-soon details, and the press logo terms.
+- **Nothing is built yet.**
+
+---
+
+## Session 33: 2026-10-22 · The website mockup, approved
+**You asked:**
+- whether the v0.2 plan still looked like nanahira.jp. You liked its simplicity but wanted your own preferences added;
+- then, for a mockup in a new folder, as an image or HTML.
+
+**The answer:** the layout was still nanahira.jp's, but v0.2's dozen effects, thick black outlines everywhere, and several black bands moved it toward the portfolio's busier feel. The proposed middle path:
+- nanahira.jp's thin double-line pills and rules;
+- dark gray text;
+- thick outlines only on things you click and on the window frames;
+- one black band;
+- one moving thing per screen.
+
+**Built:** [website-mockup/](website-mockup/), with:
+- `index.html`, a working one-page mockup;
+- `mockup-desktop.png` (1440 px) and `mockup-phone.png` (390 px), rendered offscreen with the repo's Electron by `render.cjs`;
+- a README.
+
+The page has a header with a Motion switch, the yellow speech-bubble news bar, and a hero where a line types itself into a live Studio window and the game's textbox follows. Then ABOUT (three duotone-icon cards), FEATURES (writers and artists with real screenshots in window frames), the black coming-soon band with falling flowers, and the footer.
+
+Fixed while rendering:
+- the logo (now the trimmed Studio copy);
+- Phosphor's duotone fill (its `::before` layer needed the color set with higher specificity);
+- the hero frozen mid-word in screenshots;
+- the stacked hero panes on phones;
+- sideways overflow from a drifting flower (`overflow-x: clip`, which keeps the sticky navigation working).
+
+**You approved it** ("looks good to me … I love it"). **[WEBSITE.md](WEBSITE.md) v0.3** now follows the mockup:
+- the summary, the home page section by section, and the 6.1 comparison;
+- the mockup's tokens and outline weights, and which components already exist;
+- the calm motion list, with a JavaScript budget of 40 KB;
+- the milestones and done-when list.
+
+The splash, numbers band, marquee, cursor sparkles, Lenis, counters, tilt, and the screen recording were dropped. RESEARCH.md §18's motion decision says so. **Nothing is built or committed yet.**
+
+---
+
 ## Decision Register
 
 | ID | Decision | Since | Status |
@@ -1451,7 +1523,7 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 31)
+## Next Steps (after session 33)
 
 0. **Graphify:** accept the 20 seeded memory notes in Graphify's Memory → Needs review, and check whether it re-indexes on push.
 1. **Usability rounds 1–3** ([FINALIZATION.md](FINALIZATION.md) §11.2) with five or six writers each; the M2 and Phase 6 hallway tests can be round 1.
@@ -1475,7 +1547,7 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 6. The first real eval runs (`node packages/evals/dist/main.js run --model claude-haiku-5-5`, then Sonnet and Opus; a few cents to a dollar each), then `trend --write`.
 7. Human review of the Japanese UI (1 014 messages) and of AI-written Japanese in the examples.
 8. Before v1.0: code signing (Azure Artifact Signing or an OV certificate); betas ship unsigned with a SmartScreen explanation.
-9. **The website** ([WEBSITE.md](WEBSITE.md)): answer its seven questions (address, hosting, hero character, art, dark theme, sample downloads, press terms), then build W1–W4.
+9. **The website** ([WEBSITE.md](WEBSITE.md) v0.3; look approved in [website-mockup/](website-mockup/)): answer its four questions (address, visit counting, coming-soon details, press terms), then W0 (the `himawari-site` repo, Vercel, Neon) and W1–W4.
 10. **DebtDraft follow-ups** (session 28):
    - the rest of the complexity list, using the same compare-old-and-new method: `disassemble`, `checkProject`, `checkRefs`, the lexer, `Parser.parseStatement`, `readTheme`, and Studio's `StoryGraph` and `Workspace`;
    - TypeScript 7 once typescript-eslint supports it;

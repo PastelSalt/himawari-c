@@ -1,6 +1,6 @@
 # Himawari — Foundations Research
 
-> **Status:** v1.4 · 2026-10-22 (§18 added: how visual novel engine sites present themselves, and the nanahira.jp look, for WEBSITE.md). v1.3 · 2026-10-20 (§17 added: testing methods for finalization and the "any Windows PC" facts, see FINALIZATION.md). v1.2 · 2026-10-17 (§4.4 and §15 updated with Phase 0 spike results; plan v0.5 is Windows-only, so Linux-specific findings, e.g. cross-compiling in §4.5, are kept for the future Linux work in plan §18.9 but are not on the v1 path)
+> **Status:** v1.5 · 2026-10-22 (§18.4 added: how the owner's previous projects are built; §18's decisions updated for WEBSITE.md v0.2). v1.4 · 2026-10-22 (§18 added: how visual novel engine sites present themselves, and the nanahira.jp look, for WEBSITE.md). v1.3 · 2026-10-20 (§17 added: testing methods for finalization and the "any Windows PC" facts, see FINALIZATION.md). v1.2 · 2026-10-17 (§4.4 and §15 updated with Phase 0 spike results; plan v0.5 is Windows-only, so Linux-specific findings, e.g. cross-compiling in §4.5, are kept for the future Linux work in plan §18.9 but are not on the v1 path)
 > **Purpose:** Find proven, field-tested patterns before committing to designs, so the plan rests on evidence instead of guesses.
 > **Method:** Web research across official docs, specs, source repositories, and practitioner write-ups (October 2026). Each finding is rated:
 > - ✅ **Primary:** official docs, specs, or source code
@@ -34,7 +34,7 @@
 | 17 | License | MIT/zlib maximize adoption; MPL-2.0 keeps engine changes open | **Runtime: zlib. Tooling: MIT** | ◐ |
 | 18 | AI content compliance | Steam (Jan 2026): disclose pre-generated vs live-generated AI content; dev tools exempt | **Adopt** text-only provenance tracking and an exportable "AI content report". Himawari has no media generation (plan v0.4 §1.5) | ◐ |
 | 19 | Docs | Diátaxis (tutorials / how-to / reference / explanation) | **Adopt** | ◐ |
-| 20 | Website | Engine sites open with one sentence and a versioned download, prove real use with games, and show the editor; nanahira.jp's look (near-white, one accent, pill titles, sticker art) | **Adopt** the structure; **Adapt** the look in Himawari's colors with readable contrast (§18, WEBSITE.md) | ✅ |
+| 20 | Website | Engine sites open with one sentence and a versioned download, prove real use with games, and show the editor; nanahira.jp's look (near-white, one accent, pill titles, sticker art) | **Adopt** the structure and the owner's own stack and motion (§18.4); **Adapt** the look in sunflower colors with readable contrast (§18, WEBSITE.md) | ✅ |
 
 ---
 
@@ -574,19 +574,44 @@ The owner chose the official site of the singer Nanahira as the reference for ho
   - Studio's text color `#2E2A33` gives 13.71:1;
   - dark text on a sunflower button (`#3A2D00` on `#F5D57C`) gives 9.45:1.
 
-### → Himawari decisions (WEBSITE.md)
-- **Adopt** the opening every engine site uses: one sentence, then a download button with the version and date, then "make your first game".
-- **Adopt** showing play-as-you-write *moving*: a short, silent loop of Studio, after ink and Light.vn.
-- **Adopt** proof of real use. Until games made with Himawari exist, show the sample games, which can be downloaded and played; add a gallery as soon as there are games to show.
-- **Adopt** a news bar for the latest release (nanahira.jp's "hot topic", TyranoScript's banner), an FAQ that answers money, platform, and AI questions first (TyranoScript), and English and Japanese from the first day.
-- **Adapt** nanahira.jp's look:
-  - near-white background, one accent, pill section titles on rules, small ornaments between sections, sticker-style art, and a desktop motif, which suits a desktop app;
-  - in Himawari's own colors: sunflower yellow fills, golden brown text. Keep every text color at 4.5:1 or better;
-  - with art drawn by the owner, never generated (plan §1.5).
-- **Avoid**:
-  - emoji feature cards, carousels, and walls of text;
-  - trackers, analytics, and cookie banners (PRIVACY.md);
-  - a browser demo, since there's no web runtime.
+### 18.4 How Moeko Works already builds sites ✅ (the owner's repositories, read 2026-10-22)
+The owner asked the website to be built the way the previous projects are. Four are on this PC, all deployed on Vercel.
+
+| Project | Stack | What it contributes |
+|---|---|---|
+| **Aqua Iro Archive** (fan archive, bilingual) | Astro 7 static-first with Preact islands, plain CSS, Neon and Drizzle, Better Auth with TOTP, Cloudflare Turnstile, self-hosted Umami, Vercel `sin1` | The template for this site: Astro fonts API (Fredoka, Zen Maru Gothic), BudouX, Phosphor duotone icons as one build-time SVG sprite, `html[data-motion]` set by a pre-paint script, a motion vocabulary (`reveal`, `tilt`, `odometer`, `offscreen`, `sparkle`, marquee, splash), GSAP ScrollTrigger as a dynamic import, CSP hashes written into `vercel.json` at build, contrast and JavaScript-budget scripts, Playwright with axe on Chromium and WebKit, PGlite integration tests, Neon branches in CI, weekly encrypted backups |
+| **Moeko Works portfolio** | Next.js 16, MUI, GSAP, Lenis, canvas-confetti, lucide and simple-icons, Neon and Drizzle, Cloudinary, Vercel `sin1` | Lenis that runs only while scrolling, cursor sparkles in flower, heart, and star shapes, falling flowers, letter pops, marquees driven by scroll speed; **cookieless visit counting** (a daily rotating salt, no stored IPs); a contact form with a honeypot, a signed start time, and rate limits in Postgres; a daily cron; sticker styling (a black outline and an offset color shadow); a gray scale and a butter yellow `#F8D95A` |
+| **Hanon and Kotoha fan sites** | Plain HTML with Vercel functions in `api/`, Neon, argon2 | The simplest form: static pages plus a few serverless functions |
+
+Working habits seen across them:
+- **Work and deployment:** work on `dev`, and `main` deploys; secrets live only in Vercel and `.env.local`, never in tracked files.
+- **Asking questions:** questions to the owner come with a recommendation and a confidence level.
+- **Media:** no sound.
+- **Defaults:** everything on by default is private by default, with no cookies for visitors.
+
+### → Himawari decisions (WEBSITE.md v0.3)
+- **Adopt** the opening every engine site uses:
+  - one sentence, then a download button with the version and date, then "make your first game";
+  - an FAQ that answers money, platform, and AI questions first;
+  - English and Japanese from the first day.
+- **Adopt** showing play-as-you-write *working*, as ink and Light.vn do:
+  - a live HTML and CSS recreation in the hero, which needs no art;
+  - a real Studio recording further down.
+- **Adopt** a news bar for the latest release (nanahira.jp, TyranoScript).
+- **Adapt** proof of use: the owner's own visual novel is coming, so the home page says **coming soon**. There are no samples on the home page and no gallery until games exist.
+- **Adapt** nanahira.jp's layout (one long page, pill section titles on rules, a speech-bubble news bar, sticker frames, a desktop motif) in **sunflower colors**:
+  - yellow for fills and highlights;
+  - white and warm paper;
+  - gray and black for text.
+  - Yellow text appears only on black (11.96:1). Every text pair meets 4.5:1, which the reference's coral text doesn't (1.85:1).
+- **Adopt the owner's stack and backend patterns** (§18.4):
+  - Astro static-first on Vercel;
+  - Neon with Drizzle, cookieless counting, rate limits, a daily cron;
+  - CSP hashes at build, and the same checks in CI.
+- **Adopt a calm subset of the owner's motion vocabulary**, behind a Motion switch that honors `prefers-reduced-motion`: one moving thing per screen (the typing hero, letter pops, reveals, bobbing and falling flowers, download confetti). This reverses v0.1's "no animation". Busier effects (a splash, cursor sparkles, Lenis, marquees, counters) were dropped after the owner asked to keep nanahira.jp's simplicity (WEBSITE.md v0.3, approved mockup).
+- **Adopt Phosphor duotone icons** (and Simple Icons for brand marks); never emoji.
+- **Avoid** any dependence on commissioned art: the owner has no art budget. Visuals come from the existing logos, flower shapes drawn in code, icons, and real screenshots and recordings. Nothing is generated (plan §1.5).
+- **Avoid** carousels, emoji feature cards, walls of text, cookies, and third-party trackers. **Avoid** a browser demo, since there's no web runtime.
 
 ---
 
@@ -634,3 +659,4 @@ The owner chose the official site of the singer Nanahira as the reference for ho
 - Engine sites, visited 2026-10-22: [Ren'Py](https://www.renpy.org/) · [Naninovel](https://naninovel.com/) · [TyranoBuilder](https://tyranobuilder.com/) · [ink (inkle)](https://www.inklestudios.com/ink/) · [Twine](https://twinery.org/) · [Godot](https://godotengine.org/) · [Monogatari](https://monogatari.io/) · [TyranoScript](https://tyrano.jp/) · [Light.vn](https://lightvn.net/) · [Visual Novel Maker](https://www.visualnovelmaker.com/) · [Dialogic](https://dialogic.pro/)
 - The intended look: [nanahira.jp](https://nanahira.jp/) (layout, colors, and fonts read from its stylesheet)
 - Contrast: [WCAG 2.2, 1.4.3 Contrast (Minimum) (W3C)](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html)
+- The owner's projects (local working copies): Aqua Iro Archive (`README.md`, `astro.config.ts`, `vercel.json`, `src/styles/`, `src/scripts/`, `.github/workflows/ci.yml`), the Moeko Works portfolio (`CLAUDE.md`, `src/theme/`, `src/components/site/MotionRoot.tsx`, `src/server/actions/contact.ts`, `src/app/api/track/route.ts`), and the Hanon and Kotoha fan sites (`package.json`)
