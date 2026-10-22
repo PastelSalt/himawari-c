@@ -1,6 +1,9 @@
 <div align="center">
 
-<img src="branding/himawari-studio-logo.png" alt="Himawari Studio: Visual Novel Engine and Maker by Moeko Works" width="620">
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/himawari-studio-logo-dark.png">
+  <img src="branding/himawari-studio-logo.png" alt="Himawari Studio: Visual Novel Engine and Maker by Moeko Works" width="620">
+</picture>
 
 **A free, open-source visual novel engine and editor for Windows.**<br>
 Write your story, watch it play as you type, and export a small game that runs on any Windows PC.
@@ -394,6 +397,11 @@ Found a bug, or have an idea or a question? Use the [contact page](https://moeko
 <br>
 
 <div align="center">
-<a href="https://moekoworks.vercel.app/"><img src="branding/moeko-works-logo.png" alt="Moeko Works" width="220"></a><br>
+<a href="https://moekoworks.vercel.app/">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/images/moeko-works-logo-dark.png">
+    <img src="branding/moeko-works-logo.png" alt="Moeko Works" width="220">
+  </picture>
+</a><br>
 <sub>Himawari is made by Moeko Works.</sub>
 </div>

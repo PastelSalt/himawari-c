@@ -14,7 +14,7 @@ Studio uses sized copies, not these files. After changing the art, run this from
 node packages/studio/scripts/make-brand.mjs
 ```
 
-It writes `packages/studio/icons/studio.ico` (16 to 256 px) and `packages/studio/src/renderer/src/brand/*.png`.
+It writes `packages/studio/icons/studio.ico` (16 to 256 px), `packages/studio/src/renderer/src/brand/*.png`, and the README's dark-theme logos in `docs/images/*-logo-dark.png`.
 
 The art has black outlines and dark lettering, drawn for light backgrounds. In Studio's dark theme it sits on a light card (`--brand-surface` in `styles.css`).
 

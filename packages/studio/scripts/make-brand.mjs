@@ -3,8 +3,9 @@
 //
 //   node packages/studio/scripts/make-brand.mjs
 //
-// Writes packages/studio/icons/studio.ico (the exe, window, and installer icon, 16–256 px)
-// and packages/studio/src/renderer/src/brand/*.png (the logos, at twice their on-screen size).
+// Writes packages/studio/icons/studio.ico (the exe, window, and installer icon, 16–256 px),
+// packages/studio/src/renderer/src/brand/*.png (the logos, at twice their on-screen size), and
+// docs/images/*-logo-dark.png (the README's logos on a light card, for GitHub's dark theme).
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -132,6 +133,27 @@ function resize(img, nw, nh) {
 }
 const toWidth = (img, w) => resize(img, w, Math.round((img.h * w) / img.w));
 
+/** The art on a rounded light card, so its black outlines and dark lettering read on dark pages. */
+function onCard(img, pad, radius, [cr, cg, cb]) {
+  const w = img.w + 2 * pad, h = img.h + 2 * pad;
+  const out = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      // Coverage of the rounded corner, antialiased over about one pixel.
+      const dx = Math.max(radius - x - 0.5, x + 0.5 - (w - radius), 0), dy = Math.max(radius - y - 0.5, y + 0.5 - (h - radius), 0);
+      const card = Math.min(1, Math.max(0, radius + 0.5 - Math.hypot(dx, dy)));
+      const sx = x - pad, sy = y - pad, i = (y * w + x) * 4;
+      const a = sx >= 0 && sy >= 0 && sx < img.w && sy < img.h ? img.rgba[(sy * img.w + sx) * 4 + 3] / 255 : 0;
+      const s = (sy * img.w + sx) * 4;
+      out[i] = Math.round(a > 0 ? img.rgba[s] * a + cr * (1 - a) : cr);
+      out[i + 1] = Math.round(a > 0 ? img.rgba[s + 1] * a + cg * (1 - a) : cg);
+      out[i + 2] = Math.round(a > 0 ? img.rgba[s + 2] * a + cb * (1 - a) : cb);
+      out[i + 3] = Math.round(card * 255);
+    }
+  }
+  return { w, h, rgba: out };
+}
+
 /** An .ico with one PNG image per size (Windows Vista and later). */
 function ico(pngs) {
   const head = Buffer.alloc(6 + 16 * pngs.length);
@@ -161,4 +183,10 @@ writeFileSync(join(icons, "studio.ico"), ico([256, 128, 64, 48, 40, 32, 24, 20, 
 writeFileSync(join(brand, "flowers.png"), encode(resize(flowers, 192, 192)));
 writeFileSync(join(brand, "himawari-studio.png"), encode(toWidth(trim(read("himawari-studio-logo.png"), 0.01), 880)));
 writeFileSync(join(brand, "moeko-works.png"), encode(toWidth(trim(read("moeko-works-logo.png"), 0.01), 480)));
-console.log("✓ icons/studio.ico and src/renderer/src/brand/*.png");
+// The same cream as Studio's dark-theme --brand-surface.
+const CREAM = [0xfb, 0xf6, 0xec];
+const docs = join(studio, "..", "..", "docs", "images");
+mkdirSync(docs, { recursive: true });
+writeFileSync(join(docs, "himawari-studio-logo-dark.png"), encode(onCard(toWidth(trim(read("himawari-studio-logo.png"), 0.01), 1160), 40, 28, CREAM)));
+writeFileSync(join(docs, "moeko-works-logo-dark.png"), encode(onCard(toWidth(trim(read("moeko-works-logo.png"), 0.01), 400), 20, 16, CREAM)));
+console.log("✓ icons/studio.ico, src/renderer/src/brand/*.png, and docs/images/*-logo-dark.png");
