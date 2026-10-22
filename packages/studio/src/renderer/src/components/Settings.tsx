@@ -4,6 +4,7 @@ import type { AssistantKeyStatus, McpStatus, UiLanguage } from "../../../shared/
 import { studio } from "../api";
 import { LANGUAGE_NAMES } from "../i18n";
 import { setAiHelp } from "@himawari/core";
+import { AboutCard } from "./About";
 import { CREDITS, type Credit, GameIcon, creditOf, setCredit } from "./Credit";
 import { selectAiAllowed, useStudio } from "../store";
 import { ThemeSelect } from "./Welcome";
@@ -274,6 +275,8 @@ export function SettingsPage() {
           </>
         )}
       </section>
+
+      <AboutCard />
     </div>
   );
 }

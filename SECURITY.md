@@ -18,7 +18,7 @@ Report it privately using GitHub's security advisories:
 
 👉 **[Report a vulnerability](https://github.com/PastelSalt/himawari-c/security/advisories/new)**
 
-(That's the "Security" tab of the repository → "Report a vulnerability".) Include:
+(That's the "Security" tab of the repository → "Report a vulnerability".) If you can't use GitHub, write through Moeko Works' [contact page](https://moekoworks.vercel.app/contact), say it's a security problem, and we'll continue privately. Include:
 - What you found and which part of Himawari it affects (Studio, the runtime, `hwc`, or `himawari-mcp`), with the version.
 - Steps to reproduce, or a small file that triggers it (a project folder, a `.hwp`, a save file). A proof of concept helps a lot.
 - What you think an attacker could do with it.

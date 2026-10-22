@@ -1264,6 +1264,42 @@ These are the engine's reference loaders, so behaviour had to stay exactly the s
 
 **Duplication** (99): the known duplicate, the `png()` helper in the examples' `make-art.mjs`, stays on purpose. Each example is self-contained and CC0.
 
+**Result** (`e094313`): DebtDraft went from 72 (C-) to **94.96 (A)**:
+- vulnerabilities 100;
+- outdated dependencies 97.6 (TypeScript left);
+- complexity 79;
+- duplication 99.5.
+
+CI's first two tries failed while downloading pnpm itself (npm registry timeouts on GitHub's runners), and reruns passed.
+
+---
+
+## Session 29: 2026-10-22 · Moeko Works' branding in Studio
+**You gave:** three images (the two-flower icon, the Himawari Studio logo, and the Moeko Works logo), your website for the clickable logo (https://moekoworks.vercel.app/), and the contact page for bugs and everything else (https://moekoworks.vercel.app/contact).
+
+**Done:**
+- **The art lives in `branding/`, as drawn.** `packages/studio/scripts/make-brand.mjs` makes the sized copies:
+  - `packages/studio/icons/studio.ico` (16 to 256 px);
+  - `src/renderer/src/brand/*.png`, at twice their on-screen size.
+  It's plain Node with no image library. `branding/README.md` says which file is used where.
+- **Studio's icon is the flowers.** It's on the exe, the window (development runs too, through electron-vite's `?asset`), the installer, and the uninstaller.
+  - `electron-builder.yml` now has `signAndEditExecutable: true`. Without a certificate nothing is signed, but the exe finally gets its own icon and details: "Himawari Studio", "Moeko Works", 0.4.0. Since Phase 4 it had Electron's (LOG session 20).
+  - Checked:
+    - the bundled `himawari.exe` and `himawari-tools.exe` come out byte-for-byte unchanged;
+    - the packaged Studio starts;
+    - the icon extracted from the exe and the installer is the flowers.
+- **The Welcome screen** shows the Himawari Studio wordmark in place of the drawn sunflower. A new row under the footer has "Made by" with the Moeko Works logo, which opens the website, and "Report a problem", which opens the contact page.
+- **Settings → About** is a new card: the wordmark, the version, "Made by" Moeko Works, a short note on what makes a useful report, and buttons for the contact page and the website.
+- **Links:**
+  - both URLs live in one place, `src/shared/links.ts`;
+  - they open in the browser through the existing https-only `app.openExternal`;
+  - PRIVACY.md already says Studio opens links only when clicked.
+- **The dark theme:** the art has black outlines and dark lettering, so it sits on a light card there (the `--brand-surface` and `--brand-pad` tokens). Screenshots of both themes looked right.
+- **The docs** point bug reports and questions to the contact page: README (with the logo on top and a new Contact section), CONTRIBUTING, SECURITY (as the fallback when GitHub isn't possible), GOVERNANCE, and the docs home page in English and Japanese.
+- `package.json`'s description, which Windows shows as the installer's description, is now "Himawari Studio: a visual novel engine and maker by Moeko Works".
+
+**For you to confirm:** `branding/README.md` says the names and logos belong to Moeko Works and aren't covered by the open licenses. A fork would keep the code but use its own name and logo. Change it if you want the art open too.
+
 ---
 
 ## Decision Register
@@ -1354,7 +1390,7 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 28)
+## Next Steps (after session 29)
 
 0. **Graphify:** accept the 20 seeded memory notes in Graphify's Memory → Needs review, and check whether it re-indexes on push.
 1. **Usability rounds 1–3** ([FINALIZATION.md](FINALIZATION.md) §11.2) with five or six writers each; the M2 and Phase 6 hallway tests can be round 1.
@@ -1375,7 +1411,6 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
    - per-row "Show as script" (C-3) and "Show line IDs" (C-7);
    - W-12 and W-14;
    - Ctrl+Y outside text boxes, D-3, and OC-9;
-   - a real Studio icon.
 6. The first real eval runs (`node packages/evals/dist/main.js run --model claude-haiku-5-5`, then Sonnet and Opus; a few cents to a dollar each), then `trend --write`.
 7. Human review of the Japanese UI (1 014 messages) and of AI-written Japanese in the examples.
 8. Before v1.0: code signing (Azure Artifact Signing or an OV certificate); betas ship unsigned with a SmartScreen explanation.

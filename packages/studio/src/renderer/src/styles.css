@@ -51,6 +51,9 @@
   --hl-punct: #8d8697;
   --selection: #f5d57c66;
   --active-line: #faf8f4;
+  /* Behind Moeko Works' art (black outlines and dark lettering, drawn for light backgrounds). */
+  --brand-surface: transparent;
+  --brand-pad: 0;
   --radius: 10px;
   --radius-sm: 7px;
   --radius-lg: 16px;
@@ -105,6 +108,8 @@
   --hl-punct: #9c97a8;
   --selection: #f2d27a38;
   --active-line: #ffffff08;
+  --brand-surface: #fbf6ec;
+  --brand-pad: 8px 12px;
   color-scheme: dark;
 }
 
@@ -288,21 +293,60 @@ pre {
 }
 .welcome-brand {
   display: flex;
-  gap: 16px;
+  flex-direction: column;
   align-items: center;
   margin-bottom: 24px;
+  text-align: center;
 }
 .welcome-brand h1 {
+  width: 100%;
   margin: 0;
-  font-size: 26px;
+  line-height: 0;
+}
+.welcome-brand h1 .brand-art {
+  width: 440px;
+  margin: 0 auto;
 }
 .welcome-brand p {
-  margin: 4px 0 0;
+  margin: 10px 0 0;
 }
-.logo {
-  width: 52px;
-  height: 52px;
-  flex: none;
+/* Moeko Works' art, on a light "sticker" in the dark theme so its outlines stay visible. */
+.brand-art {
+  display: block;
+  height: auto;
+  max-width: 100%;
+  background: var(--brand-surface);
+  padding: var(--brand-pad);
+  border-radius: var(--radius);
+  user-select: none;
+}
+.welcome-maker {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.made-by {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 2px 4px;
+}
+.made-by:hover {
+  background: var(--button-hover);
+}
+.made-by .brand-art {
+  width: 150px;
+}
+.about .about-wordmark {
+  width: min(320px, 100%);
 }
 .welcome-actions {
   display: grid;

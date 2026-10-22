@@ -28,13 +28,16 @@ extraResources:
   - from: build-resources/tools
     to: tools
 win:
+  # The flowers from branding/ (made by scripts/make-brand.mjs).
+  icon: icons/studio.ico
   target:
     - target: nsis
       arch: [x64]
     - target: portable
       arch: [x64]
-  # Code signing is planned before the public v1.0 (plan §14.5).
-  signAndEditExecutable: false
+  # Edits the exe's icon and file details (name, company, version). Code signing itself is
+  # planned before the public v1.0 (plan §14.5); without a certificate, nothing is signed.
+  signAndEditExecutable: true
 # The usual Windows setup (FINALIZATION.md OC-1, D61): "for me only" (no admin) or "for everyone",
 # a folder choice, Start menu and desktop shortcuts, and "Run Himawari Studio" at the end.
 # Uninstalling never touches projects; Studio's settings and history stay unless removed by hand.
@@ -47,6 +50,8 @@ nsis:
   runAfterFinish: true
   deleteAppDataOnUninstall: false
   artifactName: Himawari-Studio-Setup-${version}.${ext}
+  installerIcon: icons/studio.ico
+  uninstallerIcon: icons/studio.ico
 portable:
   artifactName: Himawari-Studio-${version}-portable.${ext}
 # Electron fuses (plan §11.1): no running as plain Node, no NODE_OPTIONS or --inspect,

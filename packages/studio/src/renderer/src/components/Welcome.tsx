@@ -3,24 +3,9 @@ import { FormattedMessage, useIntl } from "react-intl";
 import type { Appearance, BundledProject, ProjectSnapshot, UiLanguage } from "../../../shared/api";
 import { studio } from "../api";
 import { useStudio } from "../store";
+import { MadeBy, ReportProblem, Wordmark } from "./About";
 import { Icon } from "./Icon";
 import { NewProjectWizard } from "./Wizard";
-
-/** Himawari's mark: a flat sunflower (petals around a seed disc), drawn in the theme's accent. */
-export function Logo() {
-  const petals = Array.from({ length: 12 }, (_, i) => i * 30);
-  return (
-    <svg className="logo" viewBox="0 0 64 64" aria-hidden>
-      <g transform="translate(32 32)">
-        {petals.map((a) => (
-          <ellipse key={a} cx="0" cy="-19" rx="6.5" ry="11" transform={`rotate(${a})`} fill="var(--accent)" stroke="var(--accent-line)" strokeWidth="1" />
-        ))}
-        <circle r="12" fill="var(--hl-string)" opacity="0.85" />
-        <circle r="12" fill="none" stroke="var(--accent-hover)" strokeWidth="1.5" />
-      </g>
-    </svg>
-  );
-}
 
 /** Light, dark, or Windows's own theme (Settings → Appearance). */
 export function ThemeSelect({ compact = false }: { compact?: boolean }) {
@@ -85,15 +70,12 @@ export function Welcome() {
     <div className="welcome">
       <div className="welcome-card">
         <div className="welcome-brand">
-          <Logo />
-          <div>
-            <h1>
-              <FormattedMessage id="app.title" />
-            </h1>
-            <p className="muted">
-              <FormattedMessage id="welcome.tagline" />
-            </p>
-          </div>
+          <h1>
+            <Wordmark />
+          </h1>
+          <p className="muted">
+            <FormattedMessage id="welcome.tagline" />
+          </p>
         </div>
 
         <div className="welcome-actions">
@@ -180,6 +162,10 @@ export function Welcome() {
           </label>
           <ThemeSelect compact />
           <span className="muted small">{info ? intl.formatMessage({ id: "welcome.version" }, { version: info.version }) : ""}</span>
+        </div>
+        <div className="welcome-maker">
+          <MadeBy />
+          <ReportProblem />
         </div>
       </div>
       {wizard && <NewProjectWizard onClose={() => setWizard(false)} onCreated={(s) => useStudio.getState().openSnapshot(s)} />}

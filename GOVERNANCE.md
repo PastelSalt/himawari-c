@@ -48,7 +48,7 @@ These are decisions, not oversights. Please don't send pull requests for them, a
 | **Locking engine features behind payment.** | The engine is never feature-gated. |
 
 ## Maintainers
-- **Project lead:** Moeko Works ([`PastelSalt`](https://github.com/PastelSalt)).
+- **Project lead:** Moeko Works ([`PastelSalt`](https://github.com/PastelSalt); [website](https://moekoworks.vercel.app/), [contact](https://moekoworks.vercel.app/contact)).
 - **Maintainers** can review and merge pull requests. They're added by the lead, based on a record of good contributions and good judgment. Maintainers can be removed the same way, or step down whenever they like.
 - **Contributors** are everyone else. Your name stays in the git history, and you keep the credit for what you did.
 

@@ -14,7 +14,7 @@ Himawari is an open-source, AI-assisted **visual novel engine** for other develo
 - Root: `README.md`, this file, the licenses, and GitHub's community files (`CONTRIBUTING`, `CODE_OF_CONDUCT`, `SECURITY`, `GOVERNANCE`, `PRIVACY`, `THIRD_PARTY_NOTICES`).
 - `planning/`: the plan, finalization, break-it, research, and the log. `rfcs/`: accepted decisions. `spec/`: the language, bytecode, pack, and protocol specs. `docs/`: the user docs site.
 - `packages/`: Core, tools, MCP, CLI, evals, Studio. `runtime/`: the C runtime (`src/`, `tests/`, `fuzz/`, `ext/`, `shaders/`).
-- `templates/`, `examples/`: starter projects and sample games. `tests/`: cross-package tests; **[tests/README.md](tests/README.md) maps every test**, wherever it lives. `scripts/`: dev tools ([scripts/README.md](scripts/README.md)).
+- `templates/`, `examples/`: starter projects and sample games. `branding/`: Moeko Works' logos and Studio's icon art (not under the open licenses; `packages/studio/scripts/make-brand.mjs` makes Studio's sized copies). `tests/`: cross-package tests; **[tests/README.md](tests/README.md) maps every test**, wherever it lives. `scripts/`: dev tools ([scripts/README.md](scripts/README.md)).
 
 ## Code map (Graphify)
 When the Graphify MCP server is connected (user scope; repo `PastelSalt/himawari-c`), use it to get around and to scope changes. It reads an index of GitHub's `main`, so local edits and unpushed commits aren't in it: check `graph_stats` (the `commit` field) first.

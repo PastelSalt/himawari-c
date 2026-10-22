@@ -122,4 +122,4 @@ Please don't add code or assets with licenses that don't fit, and add any new th
 Please **don't** open a public issue. Follow [SECURITY.md](SECURITY.md).
 
 ## Questions
-Use GitHub Discussions on [PastelSalt/himawari-c](https://github.com/PastelSalt/himawari-c). We're glad you're here. 🌻
+Use GitHub Discussions on [PastelSalt/himawari-c](https://github.com/PastelSalt/himawari-c), or Moeko Works' [contact page](https://moekoworks.vercel.app/contact). We're glad you're here. 🌻

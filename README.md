@@ -1,5 +1,7 @@
 # Himawari 🌻
 
+<p align="center"><img src="branding/himawari-studio-logo.png" alt="Himawari Studio: Visual Novel Engine and Maker by Moeko Works" width="560"></p>
+
 An open-source **visual novel engine** that's easy enough for anyone, open enough for coders, and light enough for any PC.
 
 - **No code needed, code welcome.** Himawari Studio is meant to let you make a whole visual novel without writing code: lines, choices, characters, backgrounds, music, branching, and the look of your menus. Everything can be done with pickers and forms. People who code get the same project as plain text, with a command-line tool, git, and C extensions, and both ways can be mixed.
@@ -35,6 +37,7 @@ Try the examples: [`examples/sunflower-demo`](examples/sunflower-demo) (every fe
 | [`runtime/`](runtime/) | Himawari-C: C11 + SDL 3.4 runtime that plays compiled games | zlib |
 | [`templates/`](templates/), [`examples/`](examples/) | Starter projects and examples | MIT |
 | [`rfcs/`](rfcs/) | Spec-change proposals and spike results | CC-BY-4.0 |
+| [`branding/`](branding/) | Moeko Works' logos and Studio's icon | Not open: they belong to Moeko Works ([branding/README.md](branding/README.md)) |
 
 ## AI scope
 AI in Himawari is a **development assistant only**: it reads, writes, validates, translates, and playtests scripts and text. Himawari never generates images, audio, voice, or video (plan §1.5), and games run no AI. AI-written text is recorded in `.himawari/provenance.json`; `hwc report ai-content` summarizes it for store disclosure.
@@ -74,3 +77,8 @@ Shaders are HLSL in `runtime/shaders/`, precompiled to DXIL and SPIR-V headers i
 ```bash
 cmake -DDXC=path/to/dxc.exe -P shaders/compile-shaders.cmake
 ```
+
+## Contact
+Himawari is made by [Moeko Works](https://moekoworks.vercel.app/).
+- **Found a bug, or have an idea or a question?** Use the [contact page](https://moekoworks.vercel.app/contact), or open an issue here. Studio has the same link under Settings → About → Report a problem. It helps to say what you did, what you expected, and what happened instead.
+- **A security problem?** Please report it privately: see [SECURITY.md](SECURITY.md).

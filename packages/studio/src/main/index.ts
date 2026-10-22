@@ -12,6 +12,7 @@ import { dirname, extname, join, normalize, sep } from "node:path";
 import { CORE_VERSION } from "@himawari/core";
 import { TOOLS } from "@himawari/tools";
 import { BrowserWindow, Menu, app, clipboard, dialog, ipcMain, nativeTheme, protocol, session, shell } from "electron";
+import studioIcon from "../../icons/studio.ico?asset";
 import { type BundledProject, CHANNELS, type MethodName, type PreviewEvent, type ProjectSnapshot, type Settings } from "../shared/api.js";
 import { AssistantHost } from "./assistant.js";
 import { TranslateHost } from "./translate.js";
@@ -419,6 +420,8 @@ function createWindow(): void {
     show: false,
     backgroundColor: windowBackground(),
     title: "Himawari Studio",
+    // The packaged exe carries the same icon; this one also covers development runs.
+    icon: studioIcon,
     webPreferences: {
       preload: preloadPath(),
       contextIsolation: true,

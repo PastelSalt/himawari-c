@@ -2,7 +2,7 @@
   "name": "@himawari/studio",
   "version": "0.4.0",
   "private": true,
-  "description": "Himawari Studio, the authoring app (Electron + React + CodeMirror 6)",
+  "description": "Himawari Studio: a visual novel engine and maker by Moeko Works",
   "license": "MIT",
   "type": "module",
   "main": "./out/main/index.js",

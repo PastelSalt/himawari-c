@@ -36,4 +36,4 @@ Himawari は、ビジュアルノベルを作るためのエンジンです。�
 - [プライバシー](../../PRIVACY.md)（英語）：Himawari はどこにも何も送信しません
 - [サードパーティのライセンス](../../THIRD_PARTY_NOTICES.md)（英語）
 
-Himawari は Moeko Works が作っているオープンソースです。ランタイムは zlib、ツールは MIT、仕様は CC BY 4.0、テンプレートとサンプルは CC0 です。コードは [github.com/PastelSalt/himawari-c](https://github.com/PastelSalt/himawari-c) にあります。
+Himawari は [Moeko Works](https://moekoworks.vercel.app/) が作っています。不具合の報告や質問は[お問い合わせページ](https://moekoworks.vercel.app/contact)か、Studio の「設定 → Himawari Studio について → 問題を報告」からどうぞ。Himawari はオープンソースです。ランタイムは zlib、ツールは MIT、仕様は CC BY 4.0、テンプレートとサンプルは CC0 です。コードは [github.com/PastelSalt/himawari-c](https://github.com/PastelSalt/himawari-c) にあります。
