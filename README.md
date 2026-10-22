@@ -35,7 +35,7 @@ Himawari is a visual novel engine built around three promises:
 
 AI help is available but never required, and it never creates images, music, voices, or video. Himawari is made by [Moeko Works](https://moekoworks.vercel.app/).
 
-The current version is **0.4.0**, the first public build. It works from start to finish, but it's early: read [Project status](#project-status) and [Current limits](#current-limits) before starting a large project.
+The current version is **0.4.1**, an early public build. It works from start to finish, but it's early: read [Project status](#project-status) and [Current limits](#current-limits) before starting a large project.
 
 ## Contents
 
@@ -56,7 +56,7 @@ The current version is **0.4.0**, the first public build. It works from start to
 
 ## Download and install
 
-1. Download **Himawari-Studio-Setup-0.4.0.exe** from the [latest release](https://github.com/PastelSalt/himawari-c/releases/latest).
+1. Download **Himawari-Studio-Setup-0.4.1.exe** from the [latest release](https://github.com/PastelSalt/himawari-c/releases/latest).
 2. Run it. Install for yourself only (no administrator rights needed) or for everyone on the PC.
 3. Studio opens when setup finishes. Choose **Open Tutorial Project** for a guided first game, or **New Project** to start your own.
 

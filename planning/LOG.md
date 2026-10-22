@@ -1317,6 +1317,7 @@ CI's first two tries failed while downloading pnpm itself (npm registry timeouts
 - **Found while taking screenshots, and in 0.4.0:** `project.openBundled` copied *Sunflower Days* into the folder `Layered Sprites`. After opening one of the two samples, the other's button opened the first again.
   - Fixed: `BUNDLED_FOLDERS` in `src/main/project.ts` gives each sample its own folder, with a test that every sample opens its own copy.
   - The release notes list it as a known bug, with a workaround (rename the folder).
+  - **Released in [v0.4.1](https://github.com/PastelSalt/himawari-c/releases/tag/v0.4.1)**, the same day: Studio's version bumped, the installer built from the tagged commit, and the notes point to v0.4.1 as the fix.
 
 **The README** was rewritten from scratch.
 - **For people who don't code:** what Himawari is, then download and install (with the SmartScreen step) and requirements. Then features by who uses them (writers, artists, translators, coders, players, optional AI), and questions people ask (cost, selling games, AI, privacy, Ren'Py, platforms).
@@ -1440,8 +1441,7 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 6. The first real eval runs (`node packages/evals/dist/main.js run --model claude-haiku-5-5`, then Sonnet and Opus; a few cents to a dollar each), then `trend --write`.
 7. Human review of the Japanese UI (1 014 messages) and of AI-written Japanese in the examples.
 8. Before v1.0: code signing (Azure Artifact Signing or an OV certificate); betas ship unsigned with a SmartScreen explanation.
-9. **Release 0.4.1** with the bundled-sample fix (session 30): bump `packages/studio/package.json`, package, and publish like v0.4.0.
-10. **DebtDraft follow-ups** (session 28):
+9. **DebtDraft follow-ups** (session 28):
    - the rest of the complexity list, using the same compare-old-and-new method: `disassemble`, `checkProject`, `checkRefs`, the lexer, `Parser.parseStatement`, `readTheme`, and Studio's `StoryGraph` and `Workspace`;
    - TypeScript 7 once typescript-eslint supports it;
    - coverage, which DebtDraft doesn't measure yet (vitest's coverage report could feed it).

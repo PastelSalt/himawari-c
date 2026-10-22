@@ -1,6 +1,6 @@
 {
   "name": "@himawari/studio",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "description": "Himawari Studio: a visual novel engine and maker by Moeko Works",
   "license": "MIT",
