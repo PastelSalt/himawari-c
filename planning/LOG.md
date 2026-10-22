@@ -1298,7 +1298,33 @@ CI's first two tries failed while downloading pnpm itself (npm registry timeouts
 - **The docs** point bug reports and questions to the contact page: README (with the logo on top and a new Contact section), CONTRIBUTING, SECURITY (as the fallback when GitHub isn't possible), GOVERNANCE, and the docs home page in English and Japanese.
 - `package.json`'s description, which Windows shows as the installer's description, is now "Himawari Studio: a visual novel engine and maker by Moeko Works".
 
-**For you to confirm:** `branding/README.md` says the names and logos belong to Moeko Works and aren't covered by the open licenses. A fork would keep the code but use its own name and logo. Change it if you want the art open too.
+**Confirmed (session 30):** the names and logos belong to Moeko Works and aren't covered by the open licenses (`branding/README.md`). `brand/flowers.png` is kept for later use.
+
+---
+
+## Session 30: 2026-10-22 · The first release, and a README for everyone
+**You asked:**
+- to put the setup file on GitHub's Releases page as the first version;
+- to rewrite the README so it answers what anyone, technical or not, would ask: features, stack, roadmap, current limits, and testing. It should look like a well-made repo README, not AI-written: no emoji, no giveaways.
+
+**The release:** [v0.4.0](https://github.com/PastelSalt/himawari-c/releases/tag/v0.4.0), "Himawari Studio 0.4.0", marked Latest.
+- The installer was built from `5d5f779` with a fresh runtime build. The tag `v0.4.0` points at that commit.
+- The release has `Himawari-Studio-Setup-0.4.0.exe` (145.8 MB). Its SHA-256 (`9d6be09e…bf5ab5cd`) is in the notes and matches GitHub's own digest.
+- The notes cover:
+  - install steps, and the SmartScreen warning (unsigned);
+  - requirements and what's in this version;
+  - known limits and how to report a problem.
+- **Found while taking screenshots, and in 0.4.0:** `project.openBundled` copied *Sunflower Days* into the folder `Layered Sprites`. After opening one of the two samples, the other's button opened the first again.
+  - Fixed: `BUNDLED_FOLDERS` in `src/main/project.ts` gives each sample its own folder, with a test that every sample opens its own copy.
+  - The release notes list it as a known bug, with a workaround (rename the folder).
+
+**The README** was rewritten from scratch.
+- **For people who don't code:** what Himawari is, then download and install (with the SmartScreen step) and requirements. Then features by who uses them (writers, artists, translators, coders, players, optional AI), and questions people ask (cost, selling games, AI, privacy, Ren'Py, platforms).
+- **For people who code:** how it works (a Mermaid diagram), the tech stack, project status by phase, a roadmap (before 1.0, after 1.0, maybe later), and current limits. Then testing and stability (what each kind of test covers, with real numbers), building from source, repository layout, and licenses.
+- **Corrected from the old README:**
+  - templates and examples are CC0, not MIT;
+  - SDL3_ttf is gone (session 25).
+- **Screenshots** of the real app with the game docked: `docs/images/` holds `studio.png`, `studio-dark.png`, `ui-designer.png`, and `welcome.png`. They were taken with Windows' `PrintWindow`, because the preview is a separate native window that a page screenshot can't see. The story graph wasn't fitted to its pane when it opened, so there's no graph screenshot yet.
 
 ---
 
@@ -1390,7 +1416,7 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 29)
+## Next Steps (after session 30)
 
 0. **Graphify:** accept the 20 seeded memory notes in Graphify's Memory → Needs review, and check whether it re-indexes on push.
 1. **Usability rounds 1–3** ([FINALIZATION.md](FINALIZATION.md) §11.2) with five or six writers each; the M2 and Phase 6 hallway tests can be round 1.
@@ -1414,7 +1440,8 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 6. The first real eval runs (`node packages/evals/dist/main.js run --model claude-haiku-5-5`, then Sonnet and Opus; a few cents to a dollar each), then `trend --write`.
 7. Human review of the Japanese UI (1 014 messages) and of AI-written Japanese in the examples.
 8. Before v1.0: code signing (Azure Artifact Signing or an OV certificate); betas ship unsigned with a SmartScreen explanation.
-9. **DebtDraft follow-ups** (session 28):
+9. **Release 0.4.1** with the bundled-sample fix (session 30): bump `packages/studio/package.json`, package, and publish like v0.4.0.
+10. **DebtDraft follow-ups** (session 28):
    - the rest of the complexity list, using the same compare-old-and-new method: `disassemble`, `checkProject`, `checkRefs`, the lexer, `Parser.parseStatement`, `readTheme`, and Studio's `StoryGraph` and `Workspace`;
    - TypeScript 7 once typescript-eslint supports it;
    - coverage, which DebtDraft doesn't measure yet (vitest's coverage report could feed it).

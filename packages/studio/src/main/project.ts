@@ -10,7 +10,7 @@ import { basename, join, resolve } from "node:path";
 import { LocalHistory } from "./local-history.js";
 import { ProjectFs, compileProject, imageSizes, initProject, isReservedName, packageGame, safeName } from "@himawari/tools";
 import { zipSync } from "fflate";
-import type { BuildReport, FileChange, ImageSizes, NewProjectOptions, ProjectFile, ProjectSnapshot } from "../shared/api.js";
+import type { BuildReport, BundledProject, FileChange, ImageSizes, NewProjectOptions, ProjectFile, ProjectSnapshot } from "../shared/api.js";
 import { fingerprint } from "../shared/fingerprint.js";
 
 /** The text files Studio loads and edits. */
@@ -287,6 +287,14 @@ export function createProject(o: NewProjectOptions, templatesDir: string): strin
   }
   return root;
 }
+
+/** Each bundled project's folder in Documents/Himawari: one per project, so opening one never reuses another's copy. */
+export const BUNDLED_FOLDERS: Record<BundledProject, string> = {
+  tutorial: "Tutorial",
+  "sunflower-demo": "Sunflower Days",
+  "festival-eve": "Festival Eve",
+  layered: "Layered Sprites",
+};
 
 /** Copies a bundled project to Documents/Himawari/<name> (the user's own copy to play with), or reuses that copy. */
 export function copyBundled(source: string, documents: string, name: string): string {

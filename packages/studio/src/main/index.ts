@@ -19,7 +19,7 @@ import { TranslateHost } from "./translate.js";
 import { McpHost } from "./mcp-host.js";
 import { preloadPath, rendererDir, resources } from "./paths.js";
 import { Preview } from "./preview.js";
-import { Project, copyBundled, createProject } from "./project.js";
+import { BUNDLED_FOLDERS, Project, copyBundled, createProject } from "./project.js";
 import { Proposals } from "./proposals.js";
 import { addRecent, getSettings, setSettings } from "./settings.js";
 
@@ -260,8 +260,7 @@ const handlers: Record<MethodName, (...args: unknown[]) => unknown> = {
     const projects = resources().projects;
     const n = str(name, "name") as BundledProject;
     if (!(n in projects)) throw new Error("unknown project");
-    const folder = n === "tutorial" ? "Tutorial" : n === "festival-eve" ? "Festival Eve" : "Layered Sprites";
-    return openProject(copyBundled(projects[n], documentsDir(), folder));
+    return openProject(copyBundled(projects[n], documentsDir(), BUNDLED_FOLDERS[n]));
   },
   "project.close": () => closeProject(),
   "project.write": (file, text, force, base) => needProject().write(str(file, "file"), str(text, "text"), force === true, typeof base === "string" ? base : undefined),

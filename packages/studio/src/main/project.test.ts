@@ -2,7 +2,7 @@
 import { fileURLToPath } from "node:url";
 import { describe, expect, test } from "vitest";
 import { buildModel } from "../renderer/src/model.js";
-import { Project, isProjectText } from "./project.js";
+import { BUNDLED_FOLDERS, Project, copyBundled, isProjectText } from "./project.js";
 
 const DEMO = fileURLToPath(new URL("../../../../examples/sunflower-demo/", import.meta.url));
 
@@ -16,6 +16,26 @@ describe("project snapshot", () => {
     const model = buildModel(files, snap.assets);
     expect(model.errors).toBe(0);
     expect(model.check.theme?.get("color.accent")).toEqual({ type: "color", value: 0xf5ba0a });
+  });
+});
+
+describe("bundled projects", () => {
+  // 0.4.0 copied Sunflower Days into "Layered Sprites", so opening one sample could open the other.
+  test("each opens its own copy", async () => {
+    const { mkdtempSync, readFileSync, rmSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const docs = mkdtempSync(join(tmpdir(), "himawari-bundled-"));
+    const examples = fileURLToPath(new URL("../../../../examples/", import.meta.url));
+    const sources = { tutorial: "tutorial", "sunflower-demo": "sunflower-demo", "festival-eve": "festival-eve", layered: "layered" } as const;
+    const names = new Set<string>();
+    for (const [project, folder] of Object.entries(BUNDLED_FOLDERS)) {
+      const copied = copyBundled(join(examples, sources[project as keyof typeof sources]), docs, folder);
+      const manifest = JSON.parse(readFileSync(join(copied, "himawari.json"), "utf8")) as { name: string };
+      names.add(manifest.name);
+    }
+    rmSync(docs, { recursive: true, force: true });
+    expect(names.size).toBe(Object.keys(BUNDLED_FOLDERS).length);
   });
 });
 
