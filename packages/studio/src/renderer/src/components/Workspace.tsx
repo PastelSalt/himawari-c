@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { MIN_RIGHT, MIN_SIDE, fitPanes } from "../layout";
 import { FormattedMessage, useIntl } from "react-intl";
 import { studio } from "../api";
 import { isScript } from "../model";
@@ -44,6 +45,17 @@ function useSize(key: string, initial: number): [number, (n: number) => void] {
   return [v, set];
 }
 
+/** The window's width, kept current as it's resized. */
+function useWindowWidth(): number {
+  const [w, setW] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const on = () => setW(window.innerWidth);
+    window.addEventListener("resize", on);
+    return () => window.removeEventListener("resize", on);
+  }, []);
+  return w;
+}
+
 function Splitter({ dir, onDrag }: { dir: "col" | "row"; onDrag: (delta: number) => void }) {
   const last = useRef(0);
   return (
@@ -82,6 +94,7 @@ export function Workspace() {
   const [rightW, setRightW] = useSize("right", 560);
   const [bottomH, setBottomH] = useSize("bottom", 200);
   const [assistantH, setAssistantH] = useSize("assistant", 320);
+  const windowWidth = useWindowWidth();
   const aiAllowed = useStudio(selectAiAllowed);
   const assistantOpen = useStudio((s) => s.settings?.assistantOpen === true) && aiAllowed;
   const setAssistantOpen = (open: boolean) => void useStudio.getState().setSettings({ assistantOpen: open });
@@ -131,6 +144,7 @@ export function Workspace() {
 
   const open = (tool: Tool) => useStudio.getState().open({ kind: "tool", tool });
   const active = center?.kind === "tool" ? center.tool : null;
+  const fitted = fitPanes(windowWidth, sideW, rightW, active !== "designer");
   // "Story" goes back to the script last open (or the first one) from any tool, the UI Designer included.
   const lastFile = useRef<string | null>(null);
   if (center?.kind === "file") lastFile.current = center.file;
@@ -166,12 +180,13 @@ export function Workspace() {
           </button>
         </nav>
         {/* The UI Designer needs the room more than the project tree does. */}
+
         {active !== "designer" && (
           <>
-            <aside className="side" style={{ width: sideW }}>
+            <aside className="side" style={{ width: fitted.side }}>
               <Explorer />
             </aside>
-            <Splitter dir="col" onDrag={(d) => setSideW(Math.min(480, Math.max(170, sideW + d)))} />
+            <Splitter dir="col" onDrag={(d) => setSideW(Math.min(480, Math.max(MIN_SIDE, fitted.side + d)))} />
           </>
         )}
         <div className="ws-center-col">
@@ -194,8 +209,8 @@ export function Workspace() {
           {bottomOpen && <Splitter dir="row" onDrag={(d) => setBottomH(Math.min(600, Math.max(90, bottomH - d)))} />}
           <BottomPanel height={bottomOpen ? bottomH : undefined} />
         </div>
-        <Splitter dir="col" onDrag={(d) => setRightW(Math.min(1200, Math.max(320, rightW - d)))} />
-        <section className="right-col" style={{ width: rightW }}>
+        <Splitter dir="col" onDrag={(d) => setRightW(Math.min(1200, Math.max(MIN_RIGHT, fitted.right - d)))} />
+        <section className="right-col" style={{ width: fitted.right }}>
           <PreviewPane />
           {assistantOpen && (
             <>

@@ -547,6 +547,8 @@ function SpeakerPicker({ s, ctx }: { s: Extract<Stmt, { kind: "Say" | "Narration
   const c = speaker ? model?.check.characters.get(speaker) : undefined;
   const words = c ? [...characterWords(c)].sort().filter((w) => !attrs.includes(w)) : [];
   const [picking, setPicking] = useState(false);
+  const attrBox = useRef<HTMLSpanElement>(null);
+  useDismiss(attrBox, picking, () => setPicking(false));
   const setHead = (sp: string | null, at: string[]) => ctx.edit(setSayHead(ctx.text, s.span.start, sp, at), "history.changedSpeaker");
   return (
     <span className="sp-speaker">
@@ -571,12 +573,12 @@ function SpeakerPicker({ s, ctx }: { s: Extract<Stmt, { kind: "Say" | "Narration
         </button>
       ))}
       {c && words.length > 0 && (
-        <span className="sp-attr-add">
+        <span className="sp-attr-add" ref={attrBox}>
           <button className="sp-chip add" aria-label={intl.formatMessage({ id: "screenplay.addAttr" })} title={intl.formatMessage({ id: "screenplay.addAttr" })} onClick={() => setPicking(!picking)}>
             +
           </button>
           {picking && (
-            <div className="sp-attr-menu" onMouseLeave={() => setPicking(false)}>
+            <div className="sp-attr-menu">
               {words.map((w) => (
                 <button
                   key={w}
@@ -793,6 +795,13 @@ function AddBar({ ctx, after, sceneSpanEnd, indent }: { ctx: Ctx; after: Stmt | 
   const model = useStudio((st) => st.model);
   const assets = useStudio((st) => st.assets);
   const [stage, setStage] = useState(false);
+  const stageBox = useRef<HTMLSpanElement>(null);
+  const stageMenu = useRef<HTMLDivElement>(null);
+  useDismiss(stageBox, stage, () => setStage(false));
+  // A menu opened near the bottom of the pane scrolls into view once, so every choice can be seen.
+  useEffect(() => {
+    if (stage) stageMenu.current?.scrollIntoView({ block: "nearest" });
+  }, [stage]);
   const end = after ? after.span.end : sceneSpanEnd;
   const firstChar = model ? [...model.check.characters.keys()][0] : undefined;
   const speaker = ctx.lastSpeaker ?? firstChar ?? null;
@@ -893,13 +902,13 @@ function AddBar({ ctx, after, sceneSpanEnd, indent }: { ctx: Ctx; after: Stmt | 
         <Icon name="plus" size={13} />
         <FormattedMessage id="screenplay.add.choice" />
       </button>
-      <span className="sp-stage-add">
-        <button onClick={() => setStage(!stage)}>
+      <span className="sp-stage-add" ref={stageBox}>
+        <button onClick={() => setStage(!stage)} aria-expanded={stage}>
           <Icon name="plus" size={13} />
           <FormattedMessage id="screenplay.add.stage" />
         </button>
         {stage && (
-          <div className="sp-attr-menu stage-menu" onMouseLeave={() => setStage(false)}>
+          <div className="sp-attr-menu stage-menu" ref={stageMenu}>
             {stageGroups.map((g) => (
               <div key={g.group} className="stage-menu-group">
                 <span className="muted small">
@@ -918,6 +927,29 @@ function AddBar({ ctx, after, sceneSpanEnd, indent }: { ctx: Ctx; after: Stmt | 
       <span className="muted small grow right">{intl.formatMessage({ id: "screenplay.lines" }, { count: countLines(ctx.text) })}</span>
     </div>
   );
+}
+
+/**
+ * Closes a small menu on a click outside `box` (the menu and its button) or on Escape. Menus used
+ * to close when the mouse left them, but scrolling (the mouse wheel, or a test scrolling to an
+ * item) moves a menu out from under a still pointer, and it vanished mid-choice.
+ */
+function useDismiss(box: React.RefObject<HTMLElement | null>, open: boolean, close: () => void): void {
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (box.current && !box.current.contains(e.target as Node)) close();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close();
+    };
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [box, open, close]);
 }
 
 const NO_VARIABLES: Readonly<Record<string, { type: string; enum?: string[] }>> = {};

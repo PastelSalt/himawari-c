@@ -197,6 +197,13 @@ jobs:
           if-no-files-found: ignore
       - name: End to end (first run, edit → preview under 1 s, export, Japanese UI)
         run: pnpm --filter @himawari/studio e2e
+      - name: Upload screenshots of failed end-to-end tests
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-failures
+          path: packages/studio/e2e-artifacts/
+          if-no-files-found: ignore
       - name: Package (NSIS installer and portable)
         run: pnpm --filter @himawari/studio package
       - uses: actions/upload-artifact@v7

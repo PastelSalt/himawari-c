@@ -11,13 +11,13 @@
  * Needs `electron-vite build` and runtime/build/win64-release (or -debug).
  * Run: corepack pnpm --filter @himawari/studio e2e
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { type ElectronApplication, type Page, _electron } from "playwright";
-import { afterAll, beforeAll, describe, expect, test } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest";
 
 const STUDIO = fileURLToPath(new URL("..", import.meta.url));
 const home = mkdtempSync(join(tmpdir(), "himawari-e2e-"));
@@ -46,8 +46,26 @@ beforeAll(async () => {
     env: { ...process.env, HIMAWARI_STUDIO_TEST_HOME: home, HIMAWARI_STUDIO_TEST_PICK: projects },
   });
   page = await app.firstWindow();
+  // HW_E2E_SLOWDOWN=6 runs Studio's window at a sixth of this PC's speed, like a slow CI machine,
+  // to reproduce timing failures that only show up there.
+  const slowdown = Number(process.env["HW_E2E_SLOWDOWN"] ?? 0);
+  if (slowdown > 1) await (await page.context().newCDPSession(page)).send("Emulation.setCPUThrottlingRate", { rate: slowdown });
   await page.waitForSelector(".welcome");
 }, 60000);
+
+// A failed test leaves a screenshot and the window and screen sizes in e2e-artifacts/ (CI uploads
+// the folder), so a failure that only happens on another machine can be seen, not guessed.
+afterEach(async ({ task }) => {
+  if (task.result?.state !== "fail" || !page) return;
+  const dir = join(STUDIO, "e2e-artifacts");
+  mkdirSync(dir, { recursive: true });
+  const name = task.name.replace(/[^a-zA-Z0-9]+/g, "-").slice(0, 60);
+  await page.screenshot({ path: join(dir, `${name}.png`) }).catch(() => {});
+  const sizes = await app
+    .evaluate(({ BrowserWindow, screen }) => ({ window: BrowserWindow.getAllWindows()[0]?.getBounds(), content: BrowserWindow.getAllWindows()[0]?.getContentBounds(), screen: screen.getPrimaryDisplay().workArea, scale: screen.getPrimaryDisplay().scaleFactor }))
+    .catch((e: unknown) => ({ error: String(e) }));
+  writeFileSync(join(dir, `${name}.json`), JSON.stringify(sizes, null, 2));
+});
 
 afterAll(async () => {
   await app?.close();
@@ -126,6 +144,9 @@ describe("Himawari Studio", () => {
 
   test("no code needed: every kind of step added from menus and forms checks clean and plays (FINALIZATION.md §3)", async () => {
     // The Screenplay only: the Script view is never opened, and nothing is typed except the story's own words.
+    // A small window, like CI's: menus near the bottom then have to scroll, which once closed them mid-click.
+    const size = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.getSize());
+    await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]!.setSize(1024, 700));
     await page.getByRole("button", { name: "Story", exact: true }).click();
     await page.locator(".explorer").getByText("start", { exact: true }).first().click();
     await page.locator(".sp-scene").first().waitFor();
@@ -145,6 +166,20 @@ describe("Himawari Studio", () => {
       "Pause", "Shake the screen", "Flash the screen", "Text box style or page",
       "Remember something", "Only if… (a branch)", "Visit a scene and come back", "Go to scene",
     ];
+    // The menu stays open until a choice, a click outside it, Escape, or its own button; not when the mouse leaves.
+    const stageMenu = page.locator(".stage-menu");
+    await addBar().getByRole("button", { name: "Stage direction" }).click();
+    await stageMenu.waitFor();
+    await page.keyboard.press("Escape");
+    await stageMenu.waitFor({ state: "detached" });
+    await addBar().getByRole("button", { name: "Stage direction" }).click();
+    await page.mouse.move(5, 5); // the mouse leaving no longer closes it
+    expect(await stageMenu.count()).toBe(1);
+    await page.locator(".sp-scene-head").first().click();
+    await stageMenu.waitFor({ state: "detached" });
+    await addBar().getByRole("button", { name: "Stage direction" }).click();
+    await addBar().getByRole("button", { name: "Stage direction" }).click();
+    await stageMenu.waitFor({ state: "detached" });
     for (const step of steps) {
       await addBar().getByRole("button", { name: "Stage direction" }).click();
       await page.getByRole("button", { name: step, exact: true }).click();
@@ -162,6 +197,7 @@ describe("Himawari Studio", () => {
     expect(errors).toBe(0);
     const built = await waitFor((x) => x.preview.built !== null && (x.files["script/start.hws"] ?? "") === script, 10000);
     expect(built.preview.built?.ok).toBe(true);
+    await app.evaluate(({ BrowserWindow }, [w, h]) => BrowserWindow.getAllWindows()[0]!.setSize(w!, h!), size);
   }, 90000);
 
   test("accessibility: no serious axe problems on the main screens (FINALIZATION.md §11.5)", async () => {

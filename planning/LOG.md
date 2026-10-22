@@ -1208,6 +1208,29 @@ Graphify processes notes after about 15 quiet minutes, and each one needs your *
 
 ---
 
+## Session 27: 2026-10-22 · DebtDraft, and CI's failing no-code test
+**You asked:** to add DebtDraft's code health scan to CI, then to fix the no-code e2e test that failed on CI ("the stage menu closing before the click") and get CI green.
+
+**DebtDraft** (`82f1075`): the `ts` job runs `debtdraft/debtdraft-action@v1` after the tests, with `pull-requests: write` so it can comment on pull requests. It needs the `DEBTDRAFT_API_KEY` repository secret, which you added.
+
+**The e2e failure, found:**
+- **The cause wasn't the menu alone.** Two guesses passed locally: a slow CPU (6× throttling) and a small window. What actually failed showed up in a failure screenshot at 1100 × 700 (Studio's minimum width). The Explorer (250 px) and the preview (560 px) kept their full widths, which squeezed the screenplay to about 230 px, one word per line.
+- In that cramped column, the stage menu sat in a scroll area. It closed on `mouseleave`, so a pointer passing over its edge on the way to "Background" shut it.
+
+**Fixed:**
+- **Menus** (Screenplay's stage menu and attribute picker) close on a click outside or on Escape, not on mouse-leave. The button toggles them, and an opened menu scrolls into view.
+- **Narrow windows:** `fitPanes` (`packages/studio/src/renderer/src/layout.ts`, unit-tested) keeps the screenplay at least 480 px wide. The preview gives way first (down to 320 px), then the Explorer (down to 170 px). The saved sizes stay as they are, and the splitters drag from what's shown.
+- **The e2e suite:**
+  - The no-code test now runs at Studio's minimum window size and checks how the menus behave.
+  - A failed test saves a screenshot and the window and screen sizes to `packages/studio/e2e-artifacts/`, which CI uploads as `e2e-failures`.
+  - `HW_E2E_SLOWDOWN=N` throttles the window's CPU, for chasing timing failures locally.
+
+**Checked:**
+- the Studio e2e suite: 8 of 8 tests pass;
+- `corepack pnpm check`: 536 passed, 1 skipped.
+
+---
+
 ## Decision Register
 
 | ID | Decision | Since | Status |
@@ -1296,7 +1319,7 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 26)
+## Next Steps (after session 27)
 
 0. **Graphify:** accept the 20 seeded memory notes in Graphify's Memory → Needs review, and check whether it re-indexes on push.
 1. **Usability rounds 1–3** ([FINALIZATION.md](FINALIZATION.md) §11.2) with five or six writers each; the M2 and Phase 6 hallway tests can be round 1.
