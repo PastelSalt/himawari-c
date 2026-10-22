@@ -1,9 +1,9 @@
 // Renders the website mockup to full-page PNGs with Electron (offscreen): desktop and phone widths.
-// From packages/studio: node_modules/electron/dist/electron.exe ../../planning/website-mockup/render.cjs <index.html> <outDir> [desktop|phone]
-const { app, BrowserWindow } = require("electron");
-const { writeFileSync } = require("node:fs");
-const { join } = require("node:path");
-const { pathToFileURL } = require("node:url");
+// From packages/studio: node_modules/electron/dist/electron.exe ../../planning/website-mockup/render.mjs <index.html> <outDir> [desktop|phone]
+import { app, BrowserWindow } from "electron";
+import { writeFileSync } from "node:fs";
+import { join } from "node:path";
+import { pathToFileURL } from "node:url";
 
 const [page, out, which] = process.argv.slice(-3);
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));

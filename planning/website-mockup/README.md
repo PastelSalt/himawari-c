@@ -14,7 +14,7 @@ It's a sketch for judging the look, not the site itself. The real site is Astro 
 | `index.html` | The mockup. Open it in a browser; it uses the repo's own logos and screenshots by relative path |
 | `mockup-desktop.png` | The full page at 1440 px wide |
 | `mockup-phone.png` | The full page at 390 px wide |
-| `render.cjs` | Renders the two images with the Electron already in `packages/studio` |
+| `render.mjs` | Renders the two images with the Electron already in `packages/studio` |
 
 **What moves**, with Motion on:
 - the hero types a line into the editor, and the game's textbox follows, then changes the expression;
@@ -29,9 +29,9 @@ The Motion button switches everything off, and it starts off when the system ask
 **To re-render the images after editing**, from `packages/studio`:
 
 ```bash
-node_modules/electron/dist/electron.exe ../../planning/website-mockup/render.cjs ../../planning/website-mockup/index.html ../../planning/website-mockup desktop
+node_modules/electron/dist/electron.exe ../../planning/website-mockup/render.mjs ../../planning/website-mockup/index.html ../../planning/website-mockup desktop
 ```
 
 ```bash
-node_modules/electron/dist/electron.exe ../../planning/website-mockup/render.cjs ../../planning/website-mockup/index.html ../../planning/website-mockup phone
+node_modules/electron/dist/electron.exe ../../planning/website-mockup/render.mjs ../../planning/website-mockup/index.html ../../planning/website-mockup phone
 ```
