@@ -6,6 +6,7 @@ Himawari is an open-source, AI-assisted **visual novel engine** for other develo
 - [DETAILED_PLAN.md](planning/DETAILED_PLAN.md): the plan (v0.7). Section numbers are referenced everywhere.
 - [LOG.md](planning/LOG.md): decision history, the decision register (D01–D74), and next steps.
 - [FINALIZATION.md](planning/FINALIZATION.md): the finalization half of Phase 8: the core concept (no code needed, any Windows PC, one click), AI present but quiet, translation optional, "human-like common sense", and how it's tested.
+- [WEBSITE.md](planning/WEBSITE.md): the plan for Himawari's public website (nanahira.jp as the reference look; research in RESEARCH.md §18).
 - [BREAK_IT.md](planning/BREAK_IT.md): the plan for breaking Studio and the engine on purpose (fuzzing, property tests, generated stories, a Studio monkey, fault injection, hostile projects), with its findings log.
 - [RESEARCH.md](planning/RESEARCH.md): evidence behind decisions (🔬§N in the plan = RESEARCH.md §N).
 - [rfcs/](rfcs/): accepted decisions (0001 static build, 0002 GPU transitions, 0003 text stack, 0004 bytecode before the freeze, 0005 layered sprites, 0006 Studio preview and AI live sync, 0007 extensions, textbox modes, and themes, 0008 macros, 0009 asset packs, 0010 theme 2.0 and the UI Designer, 0011 review notes, the glossary, and AI depth).

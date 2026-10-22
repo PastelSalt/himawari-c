@@ -1,6 +1,6 @@
 # Himawari — Foundations Research
 
-> **Status:** v1.3 · 2026-10-20 (§17 added: testing methods for finalization and the "any Windows PC" facts, see FINALIZATION.md). v1.2 · 2026-10-17 (§4.4 and §15 updated with Phase 0 spike results; plan v0.5 is Windows-only, so Linux-specific findings, e.g. cross-compiling in §4.5, are kept for the future Linux work in plan §18.9 but are not on the v1 path)
+> **Status:** v1.4 · 2026-10-22 (§18 added: how visual novel engine sites present themselves, and the nanahira.jp look, for WEBSITE.md). v1.3 · 2026-10-20 (§17 added: testing methods for finalization and the "any Windows PC" facts, see FINALIZATION.md). v1.2 · 2026-10-17 (§4.4 and §15 updated with Phase 0 spike results; plan v0.5 is Windows-only, so Linux-specific findings, e.g. cross-compiling in §4.5, are kept for the future Linux work in plan §18.9 but are not on the v1 path)
 > **Purpose:** Find proven, field-tested patterns before committing to designs, so the plan rests on evidence instead of guesses.
 > **Method:** Web research across official docs, specs, source repositories, and practitioner write-ups (October 2026). Each finding is rated:
 > - ✅ **Primary:** official docs, specs, or source code
@@ -34,6 +34,7 @@
 | 17 | License | MIT/zlib maximize adoption; MPL-2.0 keeps engine changes open | **Runtime: zlib. Tooling: MIT** | ◐ |
 | 18 | AI content compliance | Steam (Jan 2026): disclose pre-generated vs live-generated AI content; dev tools exempt | **Adopt** text-only provenance tracking and an exportable "AI content report". Himawari has no media generation (plan v0.4 §1.5) | ◐ |
 | 19 | Docs | Diátaxis (tutorials / how-to / reference / explanation) | **Adopt** | ◐ |
+| 20 | Website | Engine sites open with one sentence and a versioned download, prove real use with games, and show the editor; nanahira.jp's look (near-white, one accent, pill titles, sticker art) | **Adopt** the structure; **Adapt** the look in Himawari's colors with readable contrast (§18, WEBSITE.md) | ✅ |
 
 ---
 
@@ -510,6 +511,85 @@ Ren'Py's defaults are the closest thing to a genre standard:
 
 ---
 
+## 18. The Website: How Visual Novel Engine Sites Present Themselves (added 2026-10-22, for WEBSITE.md)
+
+Himawari needs a public website: GitHub works for people who code, not for writers and artists. The question here is what an engine's site has to say and show, judged by the sites people already use, and how the owner's chosen reference, nanahira.jp, looks in detail. Every site below was visited on 2026-10-22; quotes are paraphrased.
+
+### 18.1 What engine sites put on their home page ✅ (the sites themselves)
+
+| Site | Opening line (paraphrased) | Main action | What follows | Worth noting |
+|---|---|---|---|---|
+| **Ren'Py** | A visual novel engine used by thousands of creators to tell interactive stories with words, images, and sounds | **Download 8.5.3**, with the release name and date beside it; a nightly build second | Where it runs (platform icons), where to start (quickstart, manual in Japanese and Chinese), where to talk (Discord, forums), sponsors by name, then games made with it | "Used to create over 8,000 works", with screenshots and one line about each game. Plain and dense: everything on one page |
+| **Naninovel** | An all-in-one suite of writer-friendly storytelling tools | **Buy now** and **Explore** | Six feature cards, a 3-minute trailer, a gallery of games, a free web demo and an editor sandbox in the browser, user reviews | Dark theme with a mascot. "Try before you buy" is a section of its own |
+| **TyranoBuilder** | Make multi-platform visual novels quickly, even knowing nothing about programming | **Tutorial** and **Buy now** | A carousel, a feature list (drag and drop, browser export, Live2D, camera, video backdrops), a video | Says "no licensing fees or royalties" plainly; the price is in the carousel |
+| **ink** (inkle) | A narrative scripting language for games | The hero is a screenshot of the Inky editor: script on the left, the story playing on the right | Getting started (three documents), downloads per OS, the language and the editor as two short bullet lists, engine integrations, open source with repository links, a sample game with its source, where to ask | The screenshot *is* the pitch: you see writing and playing side by side before reading anything |
+| **Twine** | An open-source tool for telling interactive, nonlinear stories | **Download desktop app** and **Use in your browser**, with the version and its date below | Learn, Community, Support (Patreon, a nonprofit), Source code | "You don't need to write any code … but you can extend it": the same promise as Himawari's |
+| **Godot** | Your free, open-source game engine | **Download Latest** with a version badge, and **What's new** | Latest news and releases, features, get involved (code, docs, donate) | The hero is a real game made with Godot, credited by name |
+| **Monogatari** | Create visual novels anyone can play almost anywhere; free and open source | **Download** with the version | Discord, X, and GitHub buttons; feature cards; get involved; the open-source projects it's built on; sponsors | Ends with "Not what you're looking for?" and links to other open engines |
+| **TyranoScript** (Japanese) | A free novel-game engine for phones, PCs, and browsers | **Download** in the menu | A news bar at the very top (its contest), a carousel, "over 20,000 works", features, a showcase with a short description per game, sample games whose scripts can be copied, related services, an FAQ | The FAQ answers the money and platform questions first (fees, phone apps, compatibility, adult games). Has an English page |
+| **Light.vn** (Japanese) | An engine made for visual novels; a light for every work | **Download the latest (17.9.1)**, plus an English version on itch.io | A contest banner, then its real-time preview *demonstrated*: click line 3, the scene at line 3 appears; a "from zero" video series, a feature grid, other genres it can make, a playable sample, published works | Shows the live preview working instead of describing it, the closest precedent for Himawari's play-as-you-write |
+| **Visual Novel Maker** | Visualize, share, create | **Get Visual Novel Maker** | Features (live preview, Live2D, layered audio, localization, bundled assets), platform icons, scripting | A big painted key visual; little else |
+| **Dialogic** | A Godot plugin for visual novels and conversations | **Download Dialogic** | Community, open source, made with Dialogic | Very small: one screen |
+
+### 18.2 What repeats, and what doesn't work ✅ / 💭
+- **Above the fold:** one sentence saying what it is and who it's for, then a download button **with the version number next to it** (Ren'Py, Twine, Godot, Monogatari, Light.vn). Showing the version and date tells visitors the project is alive. ✅
+- **Proof that real games exist:** every free engine shows games made with it, often with a count (Ren'Py 8,000+, TyranoScript 20,000+). Godot puts one in the hero. ✅
+- **Show the editor working:** ink's hero is the editor; Light.vn animates its live preview. 💭 Himawari's strongest difference is play-as-you-write, which a still image undersells: show it moving.
+- **Try it before installing:** Naninovel's browser demo and sandbox, Light.vn's playable sample, Twine in the browser. 💭 Himawari has no web runtime (plan §1.4), so the honest version is a downloadable sample game, which is only about 3 MB, plus a short video.
+- **A learning path right after the download:** quickstart, tutorial, manual (Ren'Py, ink, Twine). ✅
+- **Community, help, bug reports, and the source** as their own section (Ren'Py, ink, Twine, Godot, Monogatari, Dialogic). ✅
+- **Support and sponsorship** where the project is free (Ren'Py, Godot, Twine, Monogatari). ✅
+- **News:** the latest release or event at the top (Godot, TyranoScript, Light.vn). ✅
+- **Japanese engines publish an English page, and English engines translate their manuals** (TyranoScript, Light.vn, Ren'Py). ✅
+- **What doesn't work:** 💭
+  - feature cards that open with an emoji (Naninovel, Monogatari), which read as generic;
+  - carousels that hide most of their content (TyranoBuilder, TyranoScript);
+  - long walls of text (Ren'Py);
+  - a key visual with almost no information (Visual Novel Maker).
+
+### 18.3 The intended look: nanahira.jp ✅ (visited 2026-10-22; values read from its stylesheet)
+The owner chose the official site of the singer Nanahira as the reference for how Himawari's site should feel. What it's made of:
+
+- **Color: one accent and near-white.** The background is `#FFFAFA`. A single coral, `#FFA399`, does all the work: text, links, rules, outlines, and the filled news bar. Every other color comes from the illustrations.
+- **Type.**
+  - Arboria (Adobe Fonts), a geometric sans, at 16 px with 1.2 px letter spacing. Headings and navigation are in capitals.
+  - For Japanese, it also loads M PLUS Rounded 1c, a rounded gothic, and two handwritten faces (Yomogi, Handlee).
+- **Header.**
+  - The logo on the left and social icons on the right. A second row has the site name, a thin rule, and the navigation, which stays at the top while scrolling.
+  - On phones, the navigation becomes a filled coral square with a menu icon.
+- **A "hot topic" bar:** a rounded coral bar with a speech-bubble tail, a label, and one news link.
+- **Hero.**
+  - One large character illustration, drawn like a sticker: white outline, pink halftone shadow.
+  - Around it, retro computer windows, folders, a music player, and small pixel sprites: a playful *desktop* motif.
+- **Section titles:** one word in capitals inside a pill with a double coral outline, centered on a full-width rule. A small ribbon ornament with a face separates sections.
+- **Layout.**
+  - A content column of at most 1000 px, with generous space around it.
+  - The news list is rows: a thumbnail on the left, then the title, a "date | category" line, and the text, with thin rules between rows.
+  - The discography is a three-column grid of square covers.
+  - "More works" is a wide, pale coral button.
+- **One long page with anchored sections** (Topic, About, Discography, Works, Guideline, Contact). The footer has small pixel characters on the left and the copyright on the right.
+- **No CSS animation.** The charm comes from the illustration and the small ornaments, not from motion.
+- **Its weak point is contrast.** Coral text on that background measures **1.85:1**. WCAG 2.2 asks for **4.5:1** for normal text (success criterion 1.4.3). ✅ (W3C) Measured for a Himawari palette:
+  - Studio's golden brown `#8F6500` on a warm white `#FFFCF5` gives 5.09:1;
+  - Studio's text color `#2E2A33` gives 13.71:1;
+  - dark text on a sunflower button (`#3A2D00` on `#F5D57C`) gives 9.45:1.
+
+### → Himawari decisions (WEBSITE.md)
+- **Adopt** the opening every engine site uses: one sentence, then a download button with the version and date, then "make your first game".
+- **Adopt** showing play-as-you-write *moving*: a short, silent loop of Studio, after ink and Light.vn.
+- **Adopt** proof of real use. Until games made with Himawari exist, show the sample games, which can be downloaded and played; add a gallery as soon as there are games to show.
+- **Adopt** a news bar for the latest release (nanahira.jp's "hot topic", TyranoScript's banner), an FAQ that answers money, platform, and AI questions first (TyranoScript), and English and Japanese from the first day.
+- **Adapt** nanahira.jp's look:
+  - near-white background, one accent, pill section titles on rules, small ornaments between sections, sticker-style art, and a desktop motif, which suits a desktop app;
+  - in Himawari's own colors: sunflower yellow fills, golden brown text. Keep every text color at 4.5:1 or better;
+  - with art drawn by the owner, never generated (plan §1.5).
+- **Avoid**:
+  - emoji feature cards, carousels, and walls of text;
+  - trackers, analytics, and cookie banners (PRIVACY.md);
+  - a browser demo, since there's no web runtime.
+
+---
+
 ## Sources
 
 **Engines and authoring tools**
@@ -549,3 +629,8 @@ Ren'Py's defaults are the closest thing to a genre standard:
 - Accessibility: [Playwright accessibility testing](https://playwright.dev/docs/accessibility-testing)
 - Players: [Ren'Py preferences](https://www.renpy.org/doc/html/preferences.html)
 - Any PC: [KB2999226: Universal C Runtime update (Microsoft)](https://support.microsoft.com/kb/2999226) · [Steam survey: Windows 11 past 70 % (Windows Central)](https://www.windowscentral.com/gaming/pc-gaming/windows-11-new-milestone-steam-over-70-percent-share) · [Steam survey, August 2026](https://tech-insider.org/steam-hardware-survey-august-2026/) · [Prism improvements for games (TechRadar)](https://www.techradar.com/computing/windows/it-took-nearly-a-year-but-microsoft-has-finally-improved-windows-11-to-run-more-pc-games-on-arm-laptops) · [Godot: Exporting for Windows](https://docs.godotengine.org/en/stable/tutorials/export/exporting_for_windows.html) · [Godot forum: PCK embedding and rcedit](https://godotforums.org/d/29929-pck-not-being-embedded-in-windows-export-although-the-option-is-checked)
+
+**The website (§18)**
+- Engine sites, visited 2026-10-22: [Ren'Py](https://www.renpy.org/) · [Naninovel](https://naninovel.com/) · [TyranoBuilder](https://tyranobuilder.com/) · [ink (inkle)](https://www.inklestudios.com/ink/) · [Twine](https://twinery.org/) · [Godot](https://godotengine.org/) · [Monogatari](https://monogatari.io/) · [TyranoScript](https://tyrano.jp/) · [Light.vn](https://lightvn.net/) · [Visual Novel Maker](https://www.visualnovelmaker.com/) · [Dialogic](https://dialogic.pro/)
+- The intended look: [nanahira.jp](https://nanahira.jp/) (layout, colors, and fonts read from its stylesheet)
+- Contrast: [WCAG 2.2, 1.4.3 Contrast (Minimum) (W3C)](https://www.w3.org/WAI/WCAG22/Understanding/contrast-minimum.html)

@@ -1329,6 +1329,40 @@ CI's first two tries failed while downloading pnpm itself (npm registry timeouts
 
 ---
 
+## Session 31: 2026-10-22 · Research for a website, and its plan
+**You asked:**
+- to add research to RESEARCH.md on how visual novel engine sites are made, as a reference for Himawari's own;
+- to write a new plan for the website;
+- to use nanahira.jp as the reference for how the site should look.
+
+**Researched:** [RESEARCH.md](RESEARCH.md) §18 (v1.4), plus row 20 of its summary.
+- **Eleven engine sites visited and compared:** Ren'Py, Naninovel, TyranoBuilder, ink, Twine, Godot, Monogatari, TyranoScript, Light.vn, Visual Novel Maker, and Dialogic.
+- **What repeats across them:**
+  - one sentence, then a download button showing the version;
+  - real games as proof;
+  - the editor shown working, as ink and Light.vn do;
+  - a learning path, community and source links, news, and an FAQ for money and platforms;
+  - English and Japanese pages.
+- **What doesn't work:** emoji feature cards, carousels, walls of text.
+- **nanahira.jp, measured from its stylesheet:**
+  - near-white `#FFFAFA` with one coral accent, `#FFA399`;
+  - Arboria with letter spacing;
+  - double-outlined pill section titles on full-width rules;
+  - a speech-bubble news bar, a sticker-style hero among retro desktop windows, ribbon ornaments, and pixel sprites in the footer;
+  - one long anchored page, and no animation.
+- **Its weak point:** coral text is 1.85:1 against WCAG's 4.5:1. Studio's golden brown on a warm white reaches 5.09:1.
+
+**Planned:** [WEBSITE.md](WEBSITE.md) v0.1.
+- **The site's shape:**
+  - goals and visitors, a site map, and the home page section by section;
+  - nanahira.jp's look in Himawari's colors (Studio's light-theme tokens), with Outfit and M PLUS Rounded 1c self-hosted;
+  - the art the owner would draw.
+- **How it's built:** Astro static pages in `site/`; the download button fed by GitHub's latest-release endpoint; the docs rendered inside the site; Vercel recommended.
+- **What it has to meet:** quality bars (WCAG 2.2 AA, under 1 MB, no third-party requests), milestones W0–W4, seven questions for you, and a done-when list.
+- **Nothing is built yet.**
+
+---
+
 ## Decision Register
 
 | ID | Decision | Since | Status |
@@ -1417,7 +1451,7 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 
 ---
 
-## Next Steps (after session 30)
+## Next Steps (after session 31)
 
 0. **Graphify:** accept the 20 seeded memory notes in Graphify's Memory → Needs review, and check whether it re-indexes on push.
 1. **Usability rounds 1–3** ([FINALIZATION.md](FINALIZATION.md) §11.2) with five or six writers each; the M2 and Phase 6 hallway tests can be round 1.
@@ -1441,7 +1475,8 @@ Also: **D13** (games export for Windows x64 only) stays active; its "internal Li
 6. The first real eval runs (`node packages/evals/dist/main.js run --model claude-haiku-5-5`, then Sonnet and Opus; a few cents to a dollar each), then `trend --write`.
 7. Human review of the Japanese UI (1 014 messages) and of AI-written Japanese in the examples.
 8. Before v1.0: code signing (Azure Artifact Signing or an OV certificate); betas ship unsigned with a SmartScreen explanation.
-9. **DebtDraft follow-ups** (session 28):
+9. **The website** ([WEBSITE.md](WEBSITE.md)): answer its seven questions (address, hosting, hero character, art, dark theme, sample downloads, press terms), then build W1–W4.
+10. **DebtDraft follow-ups** (session 28):
    - the rest of the complexity list, using the same compare-old-and-new method: `disassemble`, `checkProject`, `checkRefs`, the lexer, `Parser.parseStatement`, `readTheme`, and Studio's `StoryGraph` and `Workspace`;
    - TypeScript 7 once typescript-eslint supports it;
    - coverage, which DebtDraft doesn't measure yet (vitest's coverage report could feed it).
