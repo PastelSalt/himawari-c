@@ -23,6 +23,10 @@ jobs:
   ts:
     name: TypeScript (typecheck, lint, test)
     runs-on: windows-latest
+    # pull-requests: write lets DebtDraft comment its health score on pull requests.
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
@@ -39,6 +43,13 @@ jobs:
         run: pnpm test
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # DebtDraft: a code health score for each push and pull request (needs the DEBTDRAFT_API_KEY secret).
+      - uses: debtdraft/debtdraft-action@v1
+        if: ${{ !cancelled() }}
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          api-key: ${{ secrets.DEBTDRAFT_API_KEY }}
+          api-url: https://debtdraft.dev/api/scans
 
   i18n:
     name: Studio UI strings (EN/JA in sync)
